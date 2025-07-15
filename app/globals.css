@@ -1,0 +1,81 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 23.9958 9.6112% 9.9910%;
+    --card: 0 0% 100%;
+    --card-foreground: 240.0756 5.7405% 26.1456%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 223.8136 0.0000% 3.9388%;
+    --primary: 356.946 95.8988% 57.7229%;
+    --primary-foreground: 223.8136 0.0002% 96.0587%;
+    --secondary: 0 0% 100%;
+    --secondary-foreground: 33.3488 6.2756% 32.2417%;
+    --muted: 0 0% 100%;
+    --muted-foreground: 25.0184 5.9005% 44.6376%;
+    --accent: 223.8136 0.0002% 96.0587%;
+    --accent-foreground: 33.3488 6.2756% 32.2417%;
+    --destructive: 356.946 95.8988% 57.7229%;
+    --destructive-foreground: 223.8136 -172.5242% 100.0000%;
+    --border: 60.0083 3.6456% 95.9383%;
+    --input: 60.0083 3.6456% 95.9383%;
+    --ring: 24.0058 6.6869% 82.9784%;
+    --chart-1: 356.946 95.8988% 57.7229%;
+    --chart-2: 359.7294 105.4707% 82.2203%;
+    --chart-3: 356.946 95.8988% 57.7229%;
+    --chart-4: 359.9479 102.8403% 89.6393%;
+    --chart-5: 353.3247 117.9685% 34.7245%;
+    --sidebar: 60.0073 7.0942% 97.9047%;
+    --sidebar-foreground: 223.8136 0.0000% 3.9388%;
+    --sidebar-primary: 223.8136 0.0000% 9.0527%;
+    --sidebar-primary-foreground: 223.8136 0.0004% 98.0256%;
+    --sidebar-accent: 223.8136 0.0002% 96.0587%;
+    --sidebar-accent-foreground: 223.8136 0.0000% 9.0527%;
+    --sidebar-border: 223.8136 0.0001% 89.8161%;
+    --sidebar-ring: 24.0105 5.8452% 63.0534%;
+    --font-sans:
+      ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+    --font-serif: ui-serif, Georgia, Cambria, "Times New Roman", Times, serif;
+    --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    --radius: 2.125rem;
+    --shadow-2xs: 0 1px 0px 0px hsl(0 0% 0% / 0.0);
+    --shadow-xs: 0 1px 0px 0px hsl(0 0% 0% / 0.0);
+    --shadow-sm: 0 1px 0px 0px hsl(0 0% 0% / 0.0), 0 1px 2px -1px hsl(0 0% 0% / 0.0);
+    --shadow: 0 1px 0px 0px hsl(0 0% 0% / 0.0), 0 1px 2px -1px hsl(0 0% 0% / 0.0);
+    --shadow-md: 0 1px 0px 0px hsl(0 0% 0% / 0.0), 0 2px 4px -1px hsl(0 0% 0% / 0.0);
+    --shadow-lg: 0 1px 0px 0px hsl(0 0% 0% / 0.0), 0 4px 6px -1px hsl(0 0% 0% / 0.0);
+    --shadow-xl: 0 1px 0px 0px hsl(0 0% 0% / 0.0), 0 8px 10px -1px hsl(0 0% 0% / 0.0);
+    --shadow-2xl: 0 1px 0px 0px hsl(0 0% 0% / 0.0);
+    --tracking-normal: 0.05em;
+    --spacing: 0.25rem;
+  }
+
+  body {
+    letter-spacing: var(--tracking-normal);
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+/* Compatibilidad con TweakCN */
+:root {
+  /* Variables CSS personalizables desde TweakCN */
+}
+
+/* Text truncation utility */
+.line-clamp-3 {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
