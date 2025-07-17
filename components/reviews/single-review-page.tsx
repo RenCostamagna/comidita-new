@@ -20,6 +20,7 @@ interface SingleReviewPageProps {
   onGoHome?: () => void
   onGoReview?: () => void
   onGoProfile?: () => void
+  onNotificationClick?: (notification: any) => void // Nueva prop
 }
 
 export function SingleReviewPage({
@@ -29,6 +30,7 @@ export function SingleReviewPage({
   onGoHome,
   onGoReview,
   onGoProfile,
+  onNotificationClick, // Nueva prop
 }: SingleReviewPageProps) {
   const [review, setReview] = useState<DetailedReview | null>(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -160,7 +162,13 @@ export function SingleReviewPage({
 
   return (
     <div className="min-h-screen bg-background">
-      <Header showBackButton={true} onBack={onBack} user={review.user} onPlaceSelect={handleHeaderPlaceSelect} />
+      <Header
+        showBackButton={true}
+        onBack={onBack}
+        user={review?.user}
+        onPlaceSelect={handleHeaderPlaceSelect}
+        onNotificationClick={onNotificationClick} // Pasar la prop
+      />
 
       <main className="container mx-auto px-4 py-6 pt-20 max-w-2xl pb-24">
         <Card>

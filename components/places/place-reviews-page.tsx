@@ -17,7 +17,8 @@ interface PlaceReviewsPageProps {
   currentUser: any
   onGoHome?: () => void
   onGoReview?: () => void
-  onGoProfile?: () => void // Nueva prop
+  onGoProfile?: () => void
+  onNotificationClick?: (notification: any) => void // Nueva prop
 }
 
 export function PlaceReviewsPage({
@@ -28,6 +29,7 @@ export function PlaceReviewsPage({
   onGoHome,
   onGoReview,
   onGoProfile,
+  onNotificationClick, // Nueva prop
 }: PlaceReviewsPageProps) {
   const [reviews, setReviews] = useState<Review[]>([])
   const [detailedReviews, setDetailedReviews] = useState<DetailedReview[]>([])
@@ -107,7 +109,13 @@ export function PlaceReviewsPage({
 
   return (
     <div className="min-h-screen bg-background">
-      <Header showBackButton={true} onBack={onBack} user={currentUser} onPlaceSelect={handleHeaderPlaceSelect} />
+      <Header
+        showBackButton={true}
+        onBack={onBack}
+        user={currentUser}
+        onPlaceSelect={handleHeaderPlaceSelect}
+        onNotificationClick={onNotificationClick} // Pasar la prop
+      />
 
       <main className="container mx-auto px-4 py-6 pt-20 max-w-2xl pb-24">
         <Card>

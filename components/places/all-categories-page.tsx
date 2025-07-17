@@ -16,6 +16,7 @@ interface AllCategoriesPageProps {
   onGoHome?: () => void
   onGoReview?: () => void
   onGoProfile?: () => void
+  onNotificationClick?: (notification: any) => void // Nueva prop
 }
 
 // Mapeo de categorías a iconos y colores (mismo que en categories-section)
@@ -65,6 +66,7 @@ export function AllCategoriesPage({
   onGoHome,
   onGoReview,
   onGoProfile,
+  onNotificationClick, // Nueva prop
 }: AllCategoriesPageProps) {
   const [categoryCounts, setCategoryCounts] = useState<Record<string, number>>({})
   const [isLoading, setIsLoading] = useState(true)
@@ -115,7 +117,13 @@ export function AllCategoriesPage({
 
   return (
     <div className="min-h-screen bg-background">
-      <Header showBackButton={true} onBack={onBack} user={currentUser} onPlaceSelect={handleHeaderPlaceSelect} />
+      <Header
+        showBackButton={true}
+        onBack={onBack}
+        user={currentUser}
+        onPlaceSelect={handleHeaderPlaceSelect}
+        onNotificationClick={onNotificationClick} // Pasar la prop
+      />
 
       <main className="container mx-auto px-4 py-6 pt-20 max-w-4xl pb-24">
         {/* Grid de categorías */}

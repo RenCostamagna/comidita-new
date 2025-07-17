@@ -18,6 +18,9 @@ import { CategoriesSection } from "@/components/places/categories-section"
 import { AchievementToast } from "@/components/achievements/achievement-toast"
 import { AchievementsProgress } from "@/components/achievements/achievements-progress"
 
+// Importar tipos y funciones de notificaciones
+import type { Notification } from "@/lib/notifications"
+
 interface HomePageProps {
   user: any
 }
@@ -50,6 +53,41 @@ export function HomePage({ user: initialUser }: HomePageProps) {
   const currentUser = initialUser || testUser
 
   const supabase = createClient()
+
+  // Agregar estado para manejar notificaciones
+  const [showNotificationHandler, setShowNotificationHandler] = useState(false)
+
+  // Función para manejar clicks en notificaciones
+  const handleNotificationClick = (notification: Notification) => {
+    switch (notification.type) {
+      case "review_published":
+        if (notification.data?.review_id) {
+          // Navegar a la reseña específica
+          setSelectedReviewId(notification.data.review_id)
+          setShowSingleReview(true)
+          resetView() // Limpiar otras vistas
+        }
+        break
+
+      case "achievement_unlocked":
+        // Navegar al perfil en la pestaña de logros
+        goToProfile()
+        break
+
+      case "level_up":
+        // Navegar al perfil en la pestaña de niveles
+        goToProfile()
+        break
+
+      case "points_earned":
+        // Navegar al perfil en la pestaña de actividad
+        goToProfile()
+        break
+
+      default:
+        console.log("Tipo de notificación no manejado:", notification.type)
+    }
+  }
 
   // Función para login de prueba
   const handleTestLogin = async () => {
@@ -546,6 +584,7 @@ export function HomePage({ user: initialUser }: HomePageProps) {
         onViewProfile={goToProfile}
         onLogoClick={goToHome}
         onPlaceSelect={handleHeaderPlaceSelect}
+        onNotificationClick={handleNotificationClick} // Agregar esta línea
       />
 
       <main className={`container mx-auto px-4 py-8 pt-20 ${currentUser ? "pb-24" : ""}`}>

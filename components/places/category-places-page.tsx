@@ -25,6 +25,7 @@ interface CategoryPlacesPageProps {
   onGoHome?: () => void
   onGoReview?: () => void
   onGoProfile?: () => void
+  onNotificationClick?: (notification: any) => void // Nueva prop
 }
 
 interface Filters {
@@ -43,6 +44,7 @@ export function CategoryPlacesPage({
   onGoHome,
   onGoReview,
   onGoProfile,
+  onNotificationClick, // Nueva prop
 }: CategoryPlacesPageProps) {
   const [places, setPlaces] = useState<Place[]>([])
   const [filteredPlaces, setFilteredPlaces] = useState<Place[]>([])
@@ -156,7 +158,13 @@ export function CategoryPlacesPage({
 
   return (
     <div className="min-h-screen bg-background">
-      <Header showBackButton={true} onBack={onBack} user={currentUser} onPlaceSelect={handleHeaderPlaceSelect} />
+      <Header
+        showBackButton={true}
+        onBack={onBack}
+        user={currentUser}
+        onPlaceSelect={handleHeaderPlaceSelect}
+        onNotificationClick={onNotificationClick} // Pasar la prop
+      />
 
       <main className="container mx-auto px-4 py-6 pt-20 max-w-2xl pb-24">
         {/* Filtros */}
@@ -223,7 +231,7 @@ export function CategoryPlacesPage({
                     min={0}
                     max={10}
                     step={1}
-                    className="w-full [&>div]:h-2 [&_[role=slider]]:h-6 [&_[role=slider]]:w-6 [&_[role=slider]_span]:text-xs"
+                    className="w-full [&>div]:h-2 [&_[role=slider]]:h-6 [&_[role=slider]_span]:text-xs"
                   />
                 </div>
                 {filters.minRating === 0 && (
