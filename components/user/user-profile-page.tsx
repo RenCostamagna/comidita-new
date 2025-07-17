@@ -48,7 +48,8 @@ export function UserProfilePage({ user, onBack }: UserProfilePageProps) {
         .from("detailed_reviews")
         .select(`
           *,
-          place:places(*)
+          place:places(*),
+          user:users(*)
         `)
         .eq("user_id", user.id)
         .order("created_at", { ascending: false })
@@ -57,7 +58,17 @@ export function UserProfilePage({ user, onBack }: UserProfilePageProps) {
         console.error("Error fetching user reviews:", reviewsError)
         setUserReviews([])
       } else {
-        setUserReviews(reviewsData || [])
+        // Asegurar que cada reseña tenga la información del usuario actual
+        const reviewsWithUser = (reviewsData || []).map((review) => ({
+          ...review,
+          user: review.user || {
+            id: user.id,
+            email: user.email,
+            full_name: user.user_metadata?.full_name || user.email?.split("@")[0] || "Usuario",
+            avatar_url: user.user_metadata?.avatar_url || "/placeholder.svg",
+          },
+        }))
+        setUserReviews(reviewsWithUser)
       }
 
       // Obtener estadísticas del usuario

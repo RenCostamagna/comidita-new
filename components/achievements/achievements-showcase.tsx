@@ -3,11 +3,11 @@
 import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Trophy, Star, Target } from "lucide-react"
 import { CategoryAchievements } from "./category-achievements"
 import { createClient } from "@/lib/supabase/client"
 import { RESTAURANT_CATEGORIES } from "@/lib/types"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 interface AchievementStats {
   total_achievements: number
@@ -44,6 +44,7 @@ export function AchievementsShowcase({ userId }: AchievementsShowcaseProps) {
   const [stats, setStats] = useState<AchievementStats | null>(null)
   const [recentAchievements, setRecentAchievements] = useState<RecentAchievement[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [selectedCategory, setSelectedCategory] = useState<string>("PARRILLAS")
 
   const supabase = createClient()
 
@@ -190,34 +191,26 @@ export function AchievementsShowcase({ userId }: AchievementsShowcaseProps) {
           <CardDescription>Explora y desbloquea logros en cada tipo de restaurante</CardDescription>
         </CardHeader>
         <CardContent>
-          <Tabs defaultValue="PARRILLAS" className="w-full">
-            <TabsList className="grid w-full grid-cols-3 lg:grid-cols-5 mb-6">
-              {Object.entries(RESTAURANT_CATEGORIES)
-                .slice(0, 5)
-                .map(([key, label]) => (
-                  <TabsTrigger key={key} value={key} className="text-xs">
-                    {label.split(" ")[0]}
-                  </TabsTrigger>
-                ))}
-            </TabsList>
+          <div className="space-y-6">
+            {/* Dropdown selector */}
+            <div className="w-full">
+              <Select defaultValue="PARRILLAS" onValueChange={setSelectedCategory}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Selecciona una categoría" />
+                </SelectTrigger>
+                <SelectContent>
+                  {Object.entries(RESTAURANT_CATEGORIES).map(([key, label]) => (
+                    <SelectItem key={key} value={key}>
+                      {label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
 
-            {/* Segunda fila de tabs para las categorías restantes */}
-            <TabsList className="grid w-full grid-cols-4 mb-6">
-              {Object.entries(RESTAURANT_CATEGORIES)
-                .slice(5)
-                .map(([key, label]) => (
-                  <TabsTrigger key={key} value={key} className="text-xs">
-                    {label.split(" ")[0]}
-                  </TabsTrigger>
-                ))}
-            </TabsList>
-
-            {Object.entries(RESTAURANT_CATEGORIES).map(([key]) => (
-              <TabsContent key={key} value={key}>
-                <CategoryAchievements userId={userId} category={key} showTitle={false} />
-              </TabsContent>
-            ))}
-          </Tabs>
+            {/* Achievement content */}
+            <CategoryAchievements userId={userId} category={selectedCategory} showTitle={false} />
+          </div>
         </CardContent>
       </Card>
     </div>
