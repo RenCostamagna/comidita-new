@@ -91,9 +91,9 @@ export function AchievementsProgress({
         }
 
         if (data) {
-          // Agregar categoría a cada logro y filtrar solo los incompletos
+          // Agregar categoría a cada logro y filtrar solo los no desbloqueados
           const categoryAchievements = data
-            .filter((achievement: any) => !achievement.is_unlocked && achievement.current_progress > 0)
+            .filter((achievement: any) => !achievement.is_unlocked)
             .map((achievement: any) => ({
               ...achievement,
               category,
@@ -103,23 +103,50 @@ export function AchievementsProgress({
         }
       }
 
-      // Agrupar por categoría y tomar solo el más cercano a completar de cada una
+      // Agrupar por categoría y seleccionar el mejor candidato de cada una
       const achievementsByCategory = allAchievements.reduce(
         (acc, achievement) => {
-          if (
-            !acc[achievement.category] ||
-            achievement.progress_percentage > acc[achievement.category].progress_percentage
-          ) {
+          if (!acc[achievement.category]) {
             acc[achievement.category] = achievement
+          } else {
+            const current = acc[achievement.category]
+
+            // Priorizar logros con progreso > 0, luego por mayor progreso
+            if (achievement.current_progress > 0 && current.current_progress === 0) {
+              acc[achievement.category] = achievement
+            } else if (
+              achievement.current_progress > 0 &&
+              current.current_progress > 0 &&
+              achievement.progress_percentage > current.progress_percentage
+            ) {
+              acc[achievement.category] = achievement
+            } else if (
+              achievement.current_progress === 0 &&
+              current.current_progress === 0 &&
+              achievement.level < current.level
+            ) {
+              // Si ninguno tiene progreso, tomar el de menor nivel (primero a completar)
+              acc[achievement.category] = achievement
+            }
           }
           return acc
         },
         {} as Record<string, Achievement>,
       )
 
-      // Convertir a array y ordenar por progreso descendente
+      // Convertir a array y ordenar: primero los que tienen progreso (por progreso desc), luego los que no tienen progreso (por nivel asc)
       const uniqueAchievements = Object.values(achievementsByCategory)
-        .sort((a, b) => b.progress_percentage - a.progress_percentage)
+        .sort((a, b) => {
+          // Si ambos tienen progreso, ordenar por progreso descendente
+          if (a.current_progress > 0 && b.current_progress > 0) {
+            return b.progress_percentage - a.progress_percentage
+          }
+          // Si solo uno tiene progreso, ese va primero
+          if (a.current_progress > 0 && b.current_progress === 0) return -1
+          if (a.current_progress === 0 && b.current_progress > 0) return 1
+          // Si ninguno tiene progreso, ordenar por nivel ascendente
+          return a.level - b.level
+        })
         .slice(0, 6) // Máximo 6 logros
 
       setIncompleteAchievements(uniqueAchievements)
@@ -207,7 +234,7 @@ export function AchievementsProgress({
               return (
                 <Card
                   key={achievement.achievement_id}
-                  className={`relative overflow-hidden cursor-pointer hover:shadow-lg transition-all duration-300 w-48 h-44 border-0 flex-shrink-0 ${config.color}`}
+                  className={`relative overflow-hidden cursor-pointer hover:shadow-lg transition-all duration-300 w-48 h-48 border-0 flex-shrink-0 ${config.color}`}
                   onClick={() => handleAchievementClick(achievement)}
                 >
                   <CardContent className="p-4 h-full flex flex-col justify-between text-white relative">
@@ -221,7 +248,7 @@ export function AchievementsProgress({
                     {/* Content */}
                     <div className="relative z-10 h-full flex flex-col">
                       {/* Top row with icon and level */}
-                      <div className="flex items-start justify-between mb-2">
+                      <div className="flex items-start justify-between mb-3">
                         <div className="p-2 bg-white/20 backdrop-blur-sm rounded-lg">
                           <span className="text-lg">{achievement.icon}</span>
                         </div>
@@ -232,7 +259,7 @@ export function AchievementsProgress({
 
                       {/* Achievement info */}
                       <div className="flex-1 flex flex-col justify-between">
-                        <div className="mb-3">
+                        <div className="mb-4">
                           <h3 className="font-semibold text-sm text-white leading-tight mb-1">{achievement.name}</h3>
                           <p className="text-xs text-white/80 leading-tight">{categoryName}</p>
                         </div>
@@ -254,10 +281,12 @@ export function AchievementsProgress({
                             />
                           </div>
 
-                          {/* Progress percentage - with proper spacing */}
-                          <div className="text-center pt-1">
+                          {/* Progress percentage - with more spacing */}
+                          <div className="text-center pt-2">
                             <span className="text-xs font-medium text-white">
-                              {Math.round(achievement.progress_percentage)}% completado
+                              {achievement.current_progress > 0
+                                ? `${Math.round(achievement.progress_percentage)}% completado`
+                                : "Sin progreso aún"}
                             </span>
                           </div>
                         </div>
