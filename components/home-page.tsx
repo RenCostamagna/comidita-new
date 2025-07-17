@@ -16,6 +16,7 @@ import { Header } from "@/components/layout/header"
 import { BottomNavigation } from "@/components/layout/bottom-navigation"
 import { CategoriesSection } from "@/components/places/categories-section"
 import { AchievementToast } from "@/components/achievements/achievement-toast"
+import { AchievementsProgress } from "@/components/achievements/achievements-progress"
 
 interface HomePageProps {
   user: any
@@ -252,8 +253,8 @@ export function HomePage({ user: initialUser }: HomePageProps) {
             google_place_id: reviewData.place.google_place_id,
             name: reviewData.place.name,
             address: reviewData.place.address,
-            latitude: reviewData.place.latitude,
-            longitude: reviewData.place.longitude,
+            latitude: reviewData.longitude,
+            longitude: reviewData.longitude,
             phone: reviewData.phone,
             website: reviewData.website,
           }
@@ -644,8 +645,18 @@ export function HomePage({ user: initialUser }: HomePageProps) {
             {/* Lugares destacados */}
             <TopRatedPlaces onPlaceSelect={handlePlaceSelect} onReviewSelect={handleReviewSelect} />
 
-            {/* Categorías */}
+            {/* Categorías - MOVED TO SECOND POSITION */}
             <CategoriesSection onCategorySelect={handleCategorySelect} onViewAllCategories={handleViewAllCategories} />
+
+            {/* Logros - MOVED TO THIRD POSITION */}
+            <AchievementsProgress
+              userId={currentUser.id}
+              onViewAllAchievements={() => setShowProfile(true)} // Navigate to profile achievements tab
+              onAchievementSelect={(achievement) => {
+                // Could navigate to specific category or show achievement details
+                console.log("Selected achievement:", achievement)
+              }}
+            />
           </div>
         )}
 
