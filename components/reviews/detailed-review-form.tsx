@@ -22,7 +22,7 @@ interface DetailedReviewFormProps {
   onSubmit: (reviewData: any) => Promise<void>
   onCancel: () => void
   isLoading?: boolean
-  preSelectedPlace?: any // Nuevo prop para lugar preseleccionado
+  preSelectedPlace?: any
 }
 
 export function DetailedReviewForm({
@@ -44,9 +44,6 @@ export function DetailedReviewForm({
     presentation: 5,
     portion_size: 5,
     drinks_variety: 5,
-    veggie_options: 5,
-    gluten_free_options: 5,
-    vegan_options: 5,
     music_acoustics: 5,
     ambiance: 5,
     furniture_comfort: 5,
@@ -54,27 +51,29 @@ export function DetailedReviewForm({
     service: 5,
   })
 
-  const [priceRange, setPriceRange] = useState("under_10000") // Valor inicial
+  // Nuevos campos booleanos para opciones dietéticas
+  const [dietaryOptions, setDietaryOptions] = useState({
+    celiac_friendly: false,
+    vegetarian_friendly: false,
+  })
+
+  const [priceRange, setPriceRange] = useState("under_10000")
   const [category, setCategory] = useState("")
 
-  // Efecto para actualizar el lugar seleccionado cuando cambia el prop
   useEffect(() => {
     if (preSelectedPlace) {
-      // Validar que el lugar tenga los campos mínimos necesarios
       if (preSelectedPlace.name) {
         setSelectedPlace(preSelectedPlace)
       }
     }
   }, [preSelectedPlace])
 
+  // Labels actualizados sin las opciones dietéticas
   const ratingLabels = {
     food_taste: "Sabor de la comida",
     presentation: "Presentación del plato",
     portion_size: "Tamaño de la porción",
     drinks_variety: "Carta de bebidas",
-    veggie_options: "Variedad platos veggies",
-    gluten_free_options: "Variedad platos sin TACC",
-    vegan_options: "Variedad platos veganos",
     music_acoustics: "Música y acústica",
     ambiance: "Ambientación",
     furniture_comfort: "Confort del mobiliario",
@@ -90,6 +89,10 @@ export function DetailedReviewForm({
     setSelectedPlace(place)
   }
 
+  const handleDietaryOptionChange = (option: string, checked: boolean) => {
+    setDietaryOptions((prev) => ({ ...prev, [option]: checked }))
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!selectedPlace || !priceRange || !category) {
@@ -97,7 +100,6 @@ export function DetailedReviewForm({
       return
     }
 
-    // Validar que el lugar tenga los campos requeridos
     if (!selectedPlace.google_place_id || !selectedPlace.name || !selectedPlace.address) {
       alert("Error: Información del lugar incompleta. Por favor selecciona el lugar nuevamente.")
       return
@@ -106,21 +108,18 @@ export function DetailedReviewForm({
     setIsSubmitting(true)
 
     try {
-      // Procesar fotos
       let photo1Url = null
       let photo2Url = null
 
       if (photos.length > 0) {
         const reviewId = `review_${Date.now()}`
 
-        // Procesar primera foto
         if (photos[0] instanceof File) {
           photo1Url = await uploadReviewPhoto(photos[0], "temp-user", reviewId, 1)
         } else if (typeof photos[0] === "string") {
           photo1Url = photos[0]
         }
 
-        // Procesar segunda foto
         if (photos[1]) {
           if (photos[1] instanceof File) {
             photo2Url = await uploadReviewPhoto(photos[1], "temp-user", reviewId, 2)
@@ -130,7 +129,6 @@ export function DetailedReviewForm({
         }
       }
 
-      // Asegurar que todos los campos del lugar estén presentes
       const placeData = {
         google_place_id: selectedPlace.google_place_id,
         name: selectedPlace.name,
@@ -139,13 +137,16 @@ export function DetailedReviewForm({
         longitude: selectedPlace.longitude || -60.6505388,
         phone: selectedPlace.phone || null,
         website: selectedPlace.website || null,
-        id: selectedPlace.id || null, // Puede ser null si es un lugar nuevo
+        id: selectedPlace.id || null,
       }
 
       const reviewData = {
         place: placeData,
         dish_name: dishName.trim() || null,
         ...ratings,
+        // Agregar las opciones dietéticas
+        celiac_friendly: dietaryOptions.celiac_friendly,
+        vegetarian_friendly: dietaryOptions.vegetarian_friendly,
         price_range: priceRange,
         restaurant_category: category,
         comment: comment.trim() || null,
@@ -231,6 +232,46 @@ export function DetailedReviewForm({
               })}
             </div>
 
+            {/* Opciones dietéticas - NUEVAS CHECKBOXES */}
+            <div className="space-y-4">
+              <div className="space-y-1">
+                <Label className="text-base font-semibold">Opciones dietéticas</Label>
+                <p className="text-sm text-muted-foreground">
+                  Marca las opciones que apliquen (información adicional, no afecta la puntuación)
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 gap-4">
+                <div className="flex items-center space-x-3 p-3 border rounded-lg bg-muted/30">
+                  <Checkbox
+                    id="celiac-friendly"
+                    checked={dietaryOptions.celiac_friendly}
+                    onCheckedChange={(checked) => handleDietaryOptionChange("celiac_friendly", !!checked)}
+                  />
+                  <div className="flex-1">
+                    <Label htmlFor="celiac-friendly" className="text-sm font-medium cursor-pointer">
+                      🌾 Celíaco friendly
+                    </Label>
+                    <p className="text-xs text-muted-foreground">Tiene opciones sin gluten/TACC</p>
+                  </div>
+                </div>
+
+                <div className="flex items-center space-x-3 p-3 border rounded-lg bg-muted/30">
+                  <Checkbox
+                    id="vegetarian-friendly"
+                    checked={dietaryOptions.vegetarian_friendly}
+                    onCheckedChange={(checked) => handleDietaryOptionChange("vegetarian_friendly", !!checked)}
+                  />
+                  <div className="flex-1">
+                    <Label htmlFor="vegetarian-friendly" className="text-sm font-medium cursor-pointer">
+                      🥬 Vegetariano friendly
+                    </Label>
+                    <p className="text-xs text-muted-foreground">Tiene buenas opciones vegetarianas/veganas</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
             {/* Checkbox para recomendar plato */}
             <div className="space-y-3">
               <div className="flex items-center space-x-2">
@@ -240,7 +281,7 @@ export function DetailedReviewForm({
                   onCheckedChange={(checked) => {
                     setWantsToRecommendDish(!!checked)
                     if (!checked) {
-                      setDishName("") // Limpiar el nombre del plato si se desmarca
+                      setDishName("")
                     }
                   }}
                 />

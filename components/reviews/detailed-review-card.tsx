@@ -20,14 +20,12 @@ export function DetailedReviewCard({ review }: DetailedReviewCardProps) {
     })
   }
 
+  // Labels actualizados sin las opciones dietéticas
   const ratingLabels = {
     food_taste: "Sabor",
     presentation: "Presentación",
     portion_size: "Porción",
     drinks_variety: "Bebidas",
-    veggie_options: "Veggies",
-    gluten_free_options: "Sin TACC",
-    vegan_options: "Veganos",
     music_acoustics: "Música",
     ambiance: "Ambiente",
     furniture_comfort: "Confort",
@@ -35,6 +33,7 @@ export function DetailedReviewCard({ review }: DetailedReviewCardProps) {
     service: "Servicio",
   }
 
+  // Calcular promedio con los 9 campos actualizados
   const averageRating =
     Object.values(ratingLabels).reduce((sum, _, index) => {
       const key = Object.keys(ratingLabels)[index] as keyof typeof ratingLabels
@@ -83,6 +82,25 @@ export function DetailedReviewCard({ review }: DetailedReviewCardProps) {
           </Badge>
         </div>
 
+        {/* Opciones dietéticas - NUEVOS BADGES INFORMATIVOS */}
+        {(review.celiac_friendly || review.vegetarian_friendly) && (
+          <div className="flex flex-wrap gap-2">
+            {review.celiac_friendly && (
+              <Badge variant="secondary" className="bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-200">
+                🌾 Celíaco friendly
+              </Badge>
+            )}
+            {review.vegetarian_friendly && (
+              <Badge
+                variant="secondary"
+                className="bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-200"
+              >
+                🥬 Vegetariano friendly
+              </Badge>
+            )}
+          </div>
+        )}
+
         {/* Fotos */}
         {(review.photo_1_url || review.photo_2_url) && (
           <div className="grid grid-cols-2 gap-2">
@@ -107,7 +125,7 @@ export function DetailedReviewCard({ review }: DetailedReviewCardProps) {
           </div>
         )}
 
-        {/* Puntuaciones detalladas */}
+        {/* Puntuaciones detalladas - CAMPOS ACTUALIZADOS */}
         <div className="grid grid-cols-2 gap-3 text-sm">
           {Object.entries(ratingLabels).map(([key, label]) => {
             const rating = review[key as keyof typeof review] as number

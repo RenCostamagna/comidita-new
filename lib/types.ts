@@ -43,19 +43,20 @@ export interface DetailedReview {
   place_id: string
   dish_name?: string
 
-  // Puntuaciones del 1 al 5
+  // Puntuaciones del 1 al 10 - CAMPOS REDUCIDOS (sin opciones dietéticas)
   food_taste: number
   presentation: number
   portion_size: number
   drinks_variety: number
-  veggie_options: number
-  gluten_free_options: number
-  vegan_options: number
   music_acoustics: number
   ambiance: number
   furniture_comfort: number
   cleanliness: number
   service: number
+
+  // Nuevos campos booleanos para opciones dietéticas
+  celiac_friendly?: boolean
+  vegetarian_friendly?: boolean
 
   price_range: string
   restaurant_category: string

@@ -5,6 +5,7 @@ import { Calendar, Star, DollarSign, Utensils, MapPin, X } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
 import { createClient } from "@/lib/supabase/client"
 import { PRICE_RANGES, RESTAURANT_CATEGORIES } from "@/lib/types"
@@ -20,7 +21,7 @@ interface SingleReviewPageProps {
   onGoHome?: () => void
   onGoReview?: () => void
   onGoProfile?: () => void
-  onNotificationClick?: (notification: any) => void // Nueva prop
+  onNotificationClick?: (notification: any) => void
 }
 
 export function SingleReviewPage({
@@ -30,7 +31,7 @@ export function SingleReviewPage({
   onGoHome,
   onGoReview,
   onGoProfile,
-  onNotificationClick, // Nueva prop
+  onNotificationClick,
 }: SingleReviewPageProps) {
   const [review, setReview] = useState<DetailedReview | null>(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -77,14 +78,12 @@ export function SingleReviewPage({
   }
 
   const calculateAverageRating = (review: DetailedReview) => {
+    // Calcular promedio con los 9 campos actualizados (sin opciones dietéticas)
     const ratings = [
       review.food_taste,
       review.presentation,
       review.portion_size,
       review.drinks_variety,
-      review.veggie_options,
-      review.gluten_free_options,
-      review.vegan_options,
       review.music_acoustics,
       review.ambiance,
       review.furniture_comfort,
@@ -108,22 +107,18 @@ export function SingleReviewPage({
     setSelectedImage(null)
   }
 
-  // Nueva función para manejar selección desde el header
   const handleHeaderPlaceSelect = async (selectedPlace: any) => {
-    // Navegar a las reseñas del lugar seleccionado
     if (onGoHome) {
-      onGoHome() // Esto debería manejar la navegación en el componente padre
+      onGoHome()
     }
   }
 
+  // Categorías de rating actualizadas
   const ratingCategories = [
     { key: "food_taste", label: "Sabor" },
     { key: "presentation", label: "Presentación" },
     { key: "portion_size", label: "Porción" },
     { key: "drinks_variety", label: "Bebidas" },
-    { key: "veggie_options", label: "Veggies" },
-    { key: "gluten_free_options", label: "Sin TACC" },
-    { key: "vegan_options", label: "Veganos" },
     { key: "music_acoustics", label: "Música" },
     { key: "ambiance", label: "Ambiente" },
     { key: "furniture_comfort", label: "Confort" },
@@ -167,13 +162,13 @@ export function SingleReviewPage({
         onBack={onBack}
         user={review?.user}
         onPlaceSelect={handleHeaderPlaceSelect}
-        onNotificationClick={onNotificationClick} // Pasar la prop
+        onNotificationClick={onNotificationClick}
       />
 
       <main className="container mx-auto px-4 py-6 pt-20 max-w-2xl pb-24">
         <Card>
           <CardContent className="p-6 space-y-6">
-            {/* Place info with rating - AT THE TOP */}
+            {/* Place info with rating */}
             <div className="space-y-3">
               <div className="flex items-start justify-between">
                 <div className="flex-1">
@@ -199,7 +194,6 @@ export function SingleReviewPage({
                 Ver lugar completo
               </Button>
 
-              {/* Category centered below button */}
               <div className="text-center">
                 <span className="text-sm text-muted-foreground">
                   {RESTAURANT_CATEGORIES[review.restaurant_category as keyof typeof RESTAURANT_CATEGORIES]}
@@ -207,7 +201,7 @@ export function SingleReviewPage({
               </div>
             </div>
 
-            {/* Dish info - BEFORE USER INFO (without category) */}
+            {/* Dish info */}
             <div className="flex flex-wrap items-center gap-4 py-3 border-t border-b text-sm text-muted-foreground">
               {review.dish_name && (
                 <div className="flex items-center gap-1">
@@ -221,7 +215,7 @@ export function SingleReviewPage({
               </div>
             </div>
 
-            {/* User info - AFTER DISH INFO */}
+            {/* User info */}
             <div className="flex items-center gap-3">
               <Avatar className="h-8 w-8">
                 <AvatarImage src={review.user?.avatar_url || "/placeholder.svg"} alt={review.user?.full_name} />
@@ -238,7 +232,29 @@ export function SingleReviewPage({
               </div>
             </div>
 
-            {/* Photos - Now clickable */}
+            {/* Opciones dietéticas - NUEVOS BADGES INFORMATIVOS */}
+            {(review.celiac_friendly || review.vegetarian_friendly) && (
+              <div className="flex flex-wrap gap-2 py-2 border-t border-b">
+                {review.celiac_friendly && (
+                  <Badge
+                    variant="secondary"
+                    className="bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-200"
+                  >
+                    🌾 Celíaco friendly
+                  </Badge>
+                )}
+                {review.vegetarian_friendly && (
+                  <Badge
+                    variant="secondary"
+                    className="bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-200"
+                  >
+                    🥬 Vegetariano friendly
+                  </Badge>
+                )}
+              </div>
+            )}
+
+            {/* Photos */}
             {(review.photo_1_url || review.photo_2_url) && (
               <div className="space-y-4">
                 {review.photo_1_url && (
@@ -272,7 +288,7 @@ export function SingleReviewPage({
               </div>
             )}
 
-            {/* Rating categories */}
+            {/* Rating categories - CAMPOS ACTUALIZADOS */}
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 {ratingCategories.map((category) => {
@@ -331,7 +347,6 @@ export function SingleReviewPage({
         </div>
       )}
 
-      {/* Bottom Navigation */}
       <BottomNavigation
         currentPage="home"
         onGoHome={onGoHome || (() => {})}

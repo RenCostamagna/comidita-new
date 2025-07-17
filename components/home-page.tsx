@@ -18,7 +18,6 @@ import { CategoriesSection } from "@/components/places/categories-section"
 import { AchievementToast } from "@/components/achievements/achievement-toast"
 import { AchievementsProgress } from "@/components/achievements/achievements-progress"
 
-// Importar tipos y funciones de notificaciones
 import type { Notification } from "@/lib/notifications"
 
 interface HomePageProps {
@@ -41,46 +40,37 @@ export function HomePage({ user: initialUser }: HomePageProps) {
   const [newAchievements, setNewAchievements] = useState<any[]>([])
   const [showAchievementToast, setShowAchievementToast] = useState(false)
 
-  // Nuevo estado para rastrear la navegación
   const [navigationHistory, setNavigationHistory] = useState<{
-    cameFromReview?: string // ID de la reseña desde la que se navegó
+    cameFromReview?: string
   }>({})
 
-  // Estado para usuario de prueba
   const [testUser, setTestUser] = useState<any>(null)
 
-  // Usuario actual (real o de prueba)
   const currentUser = initialUser || testUser
 
   const supabase = createClient()
 
-  // Agregar estado para manejar notificaciones
   const [showNotificationHandler, setShowNotificationHandler] = useState(false)
 
-  // Función para manejar clicks en notificaciones
   const handleNotificationClick = (notification: Notification) => {
     switch (notification.type) {
       case "review_published":
         if (notification.data?.review_id) {
-          // Navegar a la reseña específica
           setSelectedReviewId(notification.data.review_id)
           setShowSingleReview(true)
-          resetView() // Limpiar otras vistas
+          resetView()
         }
         break
 
       case "achievement_unlocked":
-        // Navegar al perfil en la pestaña de logros
         goToProfile()
         break
 
       case "level_up":
-        // Navegar al perfil en la pestaña de niveles
         goToProfile()
         break
 
       case "points_earned":
-        // Navegar al perfil en la pestaña de actividad
         goToProfile()
         break
 
@@ -89,7 +79,6 @@ export function HomePage({ user: initialUser }: HomePageProps) {
     }
   }
 
-  // Función para login de prueba
   const handleTestLogin = async () => {
     const testUserData = {
       id: "test-user-123",
@@ -100,7 +89,6 @@ export function HomePage({ user: initialUser }: HomePageProps) {
       },
     }
 
-    // Crear usuario de prueba en la base de datos si no existe
     try {
       const { error } = await supabase.from("users").upsert({
         id: testUserData.id,
@@ -119,20 +107,16 @@ export function HomePage({ user: initialUser }: HomePageProps) {
     setTestUser(testUserData)
   }
 
-  // Función para ir al inicio
   const goToHome = () => {
     resetView()
   }
 
-  // Función para ver perfil
   const goToProfile = () => {
     resetView()
     setShowProfile(true)
   }
 
-  // Función específica para ir a reseñar - MODIFICADA para no resetear
   const goToReview = () => {
-    // NO llamar resetView() aquí para preservar preSelectedPlaceForReview
     setSelectedPlace(null)
     setShowReviews(false)
     setShowProfile(false)
@@ -144,40 +128,32 @@ export function HomePage({ user: initialUser }: HomePageProps) {
     setSelectedReviewId(null)
     setNavigationHistory({})
 
-    // Establecer el formulario de reseña
     setShowDetailedReviewForm(true)
   }
 
-  // Función para manejar selección de categoría
   const handleCategorySelect = (category: string) => {
     setSelectedCategory(category)
     setShowCategoryPlaces(true)
   }
 
-  // Función para mostrar todas las categorías
   const handleViewAllCategories = () => {
     setShowAllCategories(true)
   }
 
-  // Nueva función para manejar selección desde el header
   const handleHeaderPlaceSelect = async (place: any) => {
-    // Procesar el lugar seleccionado
     await handlePlaceSelect(place)
-    // Ir directamente a las reseñas del lugar
     setShowReviews(true)
   }
 
   const handlePlaceSelect = async (googlePlace: any) => {
     setIsLoading(true)
     try {
-      // Si es un lugar de la base de datos (viene de TopRatedPlaces)
       if (googlePlace.id && !googlePlace.google_place_id.startsWith("temp")) {
         setSelectedPlace(googlePlace)
         setIsLoading(false)
         return
       }
 
-      // Verificar si el lugar ya existe en nuestra base de datos
       const { data: existingPlace } = await supabase
         .from("places")
         .select("*")
@@ -187,7 +163,6 @@ export function HomePage({ user: initialUser }: HomePageProps) {
       if (existingPlace) {
         setSelectedPlace(existingPlace)
       } else {
-        // Crear nuevo lugar en la base de datos
         const newPlace = {
           google_place_id: googlePlace.google_place_id,
           name: googlePlace.name,
@@ -202,7 +177,6 @@ export function HomePage({ user: initialUser }: HomePageProps) {
 
         if (error) {
           console.error("Error creating place:", error)
-          // Si falla la creación, usar datos temporales
           setSelectedPlace({
             id: `temp-${Date.now()}`,
             ...newPlace,
@@ -233,7 +207,6 @@ export function HomePage({ user: initialUser }: HomePageProps) {
       return
     }
 
-    // Normalizar el lugar para el formulario de reseña
     const normalizedPlace = {
       id: place.id,
       google_place_id: place.google_place_id,
@@ -247,31 +220,22 @@ export function HomePage({ user: initialUser }: HomePageProps) {
       total_reviews: place.total_reviews,
     }
 
-    // PRIMERO establecer el lugar preseleccionado
     setPreSelectedPlaceForReview(normalizedPlace)
-
-    // LUEGO ir a la pestaña de reseñar
     goToReview()
   }
-
-  // Actualizar la función handleSubmitDetailedReview para usar el nuevo sistema de puntos
 
   const handleSubmitDetailedReview = async (reviewData: any) => {
     if (!currentUser) return
 
     setIsLoading(true)
     try {
-      // Validar datos del lugar
       if (!reviewData.place || !reviewData.place.google_place_id) {
         throw new Error("Datos del lugar incompletos")
       }
 
-      // Primero, verificar si el lugar ya existe en la base de datos
       let placeId = reviewData.place.id
 
-      // Si no tenemos un ID válido o es temporal, buscar/crear el lugar
       if (!placeId || placeId.startsWith("temp-")) {
-        // Buscar si el lugar ya existe por google_place_id
         const { data: existingPlace, error: searchError } = await supabase
           .from("places")
           .select("id")
@@ -286,15 +250,14 @@ export function HomePage({ user: initialUser }: HomePageProps) {
         if (existingPlace) {
           placeId = existingPlace.id
         } else {
-          // El lugar no existe, crear uno nuevo
           const placeToInsert = {
             google_place_id: reviewData.place.google_place_id,
             name: reviewData.place.name,
             address: reviewData.place.address,
-            latitude: reviewData.longitude,
-            longitude: reviewData.longitude,
-            phone: reviewData.phone,
-            website: reviewData.website,
+            latitude: reviewData.place.latitude,
+            longitude: reviewData.place.longitude,
+            phone: reviewData.place.phone,
+            website: reviewData.place.website,
           }
 
           const { data: createdPlace, error: placeError } = await supabase
@@ -311,7 +274,6 @@ export function HomePage({ user: initialUser }: HomePageProps) {
         }
       }
 
-      // Verificar si el usuario ya tiene una reseña para este lugar
       const { data: existingReview, error: reviewCheckError } = await supabase
         .from("detailed_reviews")
         .select("id")
@@ -328,11 +290,9 @@ export function HomePage({ user: initialUser }: HomePageProps) {
         throw new Error("Ya tienes una reseña para este lugar. Solo puedes tener una reseña por lugar.")
       }
 
-      // Calcular el desglose de puntos ANTES de insertar la reseña
       const hasPhotos = !!(reviewData.photo_1_url || reviewData.photo_2_url)
       const commentLength = reviewData.comment ? reviewData.comment.length : 0
 
-      // Verificar si es primera reseña del lugar
       const { data: reviewCount } = await supabase
         .from("detailed_reviews")
         .select("id", { count: "exact" })
@@ -340,14 +300,12 @@ export function HomePage({ user: initialUser }: HomePageProps) {
 
       const isFirstReview = (reviewCount?.length || 0) === 0
 
-      // Calcular puntos según el nuevo sistema
       const basePoints = 100
       const firstReviewBonus = isFirstReview ? 500 : 0
       const photoBonus = hasPhotos ? 50 : 0
       const extendedReviewBonus = commentLength >= 300 ? 50 : 0
       const totalPoints = basePoints + firstReviewBonus + photoBonus + extendedReviewBonus
 
-      // Insertar la reseña detallada
       const reviewToInsert = {
         user_id: currentUser.id,
         place_id: placeId,
@@ -356,14 +314,13 @@ export function HomePage({ user: initialUser }: HomePageProps) {
         presentation: reviewData.presentation,
         portion_size: reviewData.portion_size,
         drinks_variety: reviewData.drinks_variety,
-        veggie_options: reviewData.veggie_options,
-        gluten_free_options: reviewData.gluten_free_options,
-        vegan_options: reviewData.vegan_options,
         music_acoustics: reviewData.music_acoustics,
         ambiance: reviewData.ambiance,
         furniture_comfort: reviewData.furniture_comfort,
         cleanliness: reviewData.cleanliness,
         service: reviewData.service,
+        celiac_friendly: reviewData.celiac_friendly || false,
+        vegetarian_friendly: reviewData.vegetarian_friendly || false,
         price_range: reviewData.price_range,
         restaurant_category: reviewData.restaurant_category,
         comment: reviewData.comment,
@@ -378,7 +335,6 @@ export function HomePage({ user: initialUser }: HomePageProps) {
         throw error
       }
 
-      // Verificar logros desbloqueados después de insertar la reseña
       if (reviewData.restaurant_category) {
         try {
           const { data: achievementsData, error: achievementsError } = await supabase.rpc(
@@ -400,21 +356,6 @@ export function HomePage({ user: initialUser }: HomePageProps) {
           console.error("Error checking achievements:", error)
         }
       }
-
-      // Mostrar toast con desglose de puntos
-      const pointsBreakdown = {
-        base_points: basePoints,
-        first_review_bonus: firstReviewBonus,
-        photo_bonus: photoBonus,
-        extended_review_bonus: extendedReviewBonus,
-        total_points: totalPoints,
-        is_first_review: isFirstReview,
-        has_photos: hasPhotos,
-        is_extended_review: commentLength >= 300,
-      }
-
-      // Aquí podrías mostrar el PointsEarnedToast con el desglose
-      // setPointsEarnedToast(pointsBreakdown)
 
       setShowDetailedReviewForm(false)
       setPreSelectedPlaceForReview(null)
@@ -440,7 +381,7 @@ export function HomePage({ user: initialUser }: HomePageProps) {
     setShowSingleReview(false)
     setSelectedReviewId(null)
     setPreSelectedPlaceForReview(null)
-    setNavigationHistory({}) // Limpiar historial de navegación
+    setNavigationHistory({})
   }
 
   const handleReviewSelect = (reviewId: string) => {
@@ -448,9 +389,7 @@ export function HomePage({ user: initialUser }: HomePageProps) {
     setShowSingleReview(true)
   }
 
-  // Handle place navigation from single review page
   const handleViewPlaceFromReview = (place: Place) => {
-    // Guardar el ID de la reseña desde la que se navega
     setNavigationHistory({ cameFromReview: selectedReviewId })
     setSelectedPlace(place)
     setShowReviews(true)
@@ -458,27 +397,21 @@ export function HomePage({ user: initialUser }: HomePageProps) {
     setSelectedReviewId(null)
   }
 
-  // Función para manejar el botón "atrás" en PlaceReviewsPage
   const handleBackFromPlaceReviews = () => {
     if (navigationHistory.cameFromReview) {
-      // Si vinimos de una reseña, volver a esa reseña
       setSelectedReviewId(navigationHistory.cameFromReview)
       setShowSingleReview(true)
       setShowReviews(false)
       setSelectedPlace(null)
-      setNavigationHistory({}) // Limpiar historial
+      setNavigationHistory({})
     } else if (showCategoryPlaces && selectedCategory) {
-      // Si vinimos de la página de categorías, volver a esa página
       setShowReviews(false)
       setSelectedPlace(null)
-      // Keep showCategoryPlaces and selectedCategory to return to category page
     } else {
-      // Si no vinimos de una reseña ni de categorías, ir al inicio
       resetView()
     }
   }
 
-  // Si estamos viendo todas las categorías
   if (showAllCategories) {
     return (
       <AllCategoriesPage
@@ -495,12 +428,11 @@ export function HomePage({ user: initialUser }: HomePageProps) {
     )
   }
 
-  // Si estamos viendo las reseñas de un lugar (MOVER ESTA CONDICIÓN ARRIBA)
   if (showReviews && selectedPlace) {
     return (
       <PlaceReviewsPage
         place={selectedPlace}
-        onBack={handleBackFromPlaceReviews} // Usar la nueva función de navegación
+        onBack={handleBackFromPlaceReviews}
         onAddReview={handleAddReview}
         currentUser={currentUser}
         onGoHome={goToHome}
@@ -510,7 +442,6 @@ export function HomePage({ user: initialUser }: HomePageProps) {
     )
   }
 
-  // Si estamos viendo una sola reseña
   if (showSingleReview && selectedReviewId) {
     return (
       <SingleReviewPage
@@ -527,7 +458,6 @@ export function HomePage({ user: initialUser }: HomePageProps) {
     )
   }
 
-  // Si estamos viendo el perfil
   if (showProfile && currentUser) {
     return (
       <div className="min-h-screen bg-background">
@@ -540,7 +470,6 @@ export function HomePage({ user: initialUser }: HomePageProps) {
         <main className="container mx-auto px-4 py-8 pt-20 pb-24">
           <UserProfilePage user={currentUser} onBack={() => setShowProfile(false)} />
         </main>
-        {/* Bottom Navigation for Profile */}
         {currentUser && (
           <BottomNavigation
             currentPage="profile"
@@ -553,7 +482,6 @@ export function HomePage({ user: initialUser }: HomePageProps) {
     )
   }
 
-  // Si estamos viendo lugares por categoría (MOVER ESTA CONDICIÓN ABAJO)
   if (showCategoryPlaces && selectedCategory) {
     return (
       <CategoryPlacesPage
@@ -563,10 +491,8 @@ export function HomePage({ user: initialUser }: HomePageProps) {
           setSelectedCategory("")
         }}
         onPlaceSelect={(place) => {
-          // Set the selected place and show reviews
           setSelectedPlace(place)
           setShowReviews(true)
-          // Don't reset the category view state yet, we'll handle it in the back navigation
         }}
         onAddReview={handleAddReview}
         currentUser={currentUser}
@@ -584,7 +510,7 @@ export function HomePage({ user: initialUser }: HomePageProps) {
         onViewProfile={goToProfile}
         onLogoClick={goToHome}
         onPlaceSelect={handleHeaderPlaceSelect}
-        onNotificationClick={handleNotificationClick} // Agregar esta línea
+        onNotificationClick={handleNotificationClick}
       />
 
       <main className={`container mx-auto px-4 py-8 pt-20 ${currentUser ? "pb-24" : ""}`}>
@@ -690,9 +616,8 @@ export function HomePage({ user: initialUser }: HomePageProps) {
             {/* Logros - MOVED TO THIRD POSITION */}
             <AchievementsProgress
               userId={currentUser.id}
-              onViewAllAchievements={() => setShowProfile(true)} // Navigate to profile achievements tab
+              onViewAllAchievements={() => setShowProfile(true)}
               onAchievementSelect={(achievement) => {
-                // Could navigate to specific category or show achievement details
                 console.log("Selected achievement:", achievement)
               }}
             />
