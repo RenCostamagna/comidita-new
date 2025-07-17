@@ -12,8 +12,8 @@ interface BottomNavigationProps {
 
 export function BottomNavigation({ currentPage, onGoHome, onGoReview, onGoProfile }: BottomNavigationProps) {
   return (
-    <div className="fixed bottom-0 left-0 right-0 bg-background border-t border-border">
-      <div className="container mx-auto px-4">
+    <div className="fixed bottom-0 left-0 right-0 bg-background/100 backdrop-blur-xl border-t border-border shadow-lg">
+      <div className="container mx-auto px-4 bg-background">
         {/* Contenedor con altura fija */}
         <div className="relative h-20 flex items-center justify-center">
           {/* Grid con posiciones fijas */}

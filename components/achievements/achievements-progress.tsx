@@ -281,8 +281,8 @@ export function AchievementsProgress({
                             />
                           </div>
 
-                          {/* Progress percentage - with more spacing */}
-                          <div className="text-center pt-2">
+                          {/* Progress percentage - with less bottom spacing */}
+                          <div className="text-center pt-1">
                             <span className="text-xs font-medium text-white">
                               {achievement.current_progress > 0
                                 ? `${Math.round(achievement.progress_percentage)}% completado`
