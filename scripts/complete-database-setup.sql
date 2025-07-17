@@ -58,7 +58,7 @@ CREATE TABLE IF NOT EXISTS detailed_reviews (
   -- Puntuaciones del 1 al 10
   food_taste INTEGER CHECK (food_taste >= 1 AND food_taste <= 10),
   presentation INTEGER CHECK (presentation >= 1 AND presentation <= 10),
-  portion_size INTEGER CHECK (portion_size >= 1 AND portion_size <= 10),
+  portion_size INTEGER CHECK (portion_size >= 1 AND presentation <= 10),
   drinks_variety INTEGER CHECK (drinks_variety >= 1 AND drinks_variety <= 10),
   veggie_options INTEGER CHECK (veggie_options >= 1 AND veggie_options <= 10),
   gluten_free_options INTEGER CHECK (gluten_free_options >= 1 AND gluten_free_options <= 10),
@@ -284,66 +284,66 @@ DELETE FROM category_achievements;
 
 -- PARRILLAS
 INSERT INTO category_achievements (category, level, name, description, required_reviews, points_reward, icon, color) VALUES
-('PARRILLAS', 1, 'Asador Novato', 'Primeros pasos en el mundo de las parrillas', 3, 150, '🥩', '#EF4444'),
-('PARRILLAS', 2, 'Catador de Achuras', 'Ya conoces los secretos de la parrilla', 10, 300, '🔥', '#DC2626'),
-('PARRILLAS', 3, 'Maestro del Asado', 'Dominas el arte del asado argentino', 25, 600, '👨‍🍳', '#B91C1C'),
-('PARRILLAS', 4, 'Parrillero Consagrado', 'Leyenda viviente de las parrillas', 50, 1000, '👑', '#991B1B');
+('PARRILLAS', 1, 'Asador Novato', 'Primeros pasos en el mundo de las parrillas', 2, 150, '🥩', '#EF4444'),
+('PARRILLAS', 2, 'Catador de Achuras', 'Ya conoces los secretos de la parrilla', 4, 300, '🔥', '#DC2626'),
+('PARRILLAS', 3, 'Maestro del Asado', 'Dominas el arte del asado argentino', 6, 600, '👨‍🍳', '#B91C1C'),
+('PARRILLAS', 4, 'Parrillero Consagrado', 'Leyenda viviente de las parrillas', 10, 1000, '👑', '#991B1B');
 
 -- CAFÉ Y DELI
 INSERT INTO category_achievements (category, level, name, description, required_reviews, points_reward, icon, color) VALUES
-('CAFE_Y_DELI', 1, 'Tostado Inicial', 'Comenzando tu ruta cafetera', 3, 150, '☕', '#F59E0B'),
-('CAFE_Y_DELI', 2, 'Cafetero Frecuente', 'El café ya es parte de tu rutina', 10, 300, '🫘', '#D97706'),
-('CAFE_Y_DELI', 3, 'Fan de los Brunches', 'Experto en desayunos y meriendas', 25, 600, '🥐', '#B45309'),
-('CAFE_Y_DELI', 4, 'Experto en Flat White', 'Maestro de todas las preparaciones', 50, 1000, '🎯', '#92400E');
+('CAFE_Y_DELI', 1, 'Tostado Inicial', 'Comenzando tu ruta cafetera', 2, 150, '☕', '#F59E0B'),
+('CAFE_Y_DELI', 2, 'Cafetero Frecuente', 'El café ya es parte de tu rutina', 4, 300, '🫘', '#D97706'),
+('CAFE_Y_DELI', 3, 'Fan de los Brunches', 'Experto en desayunos y meriendas', 6, 600, '🥐', '#B45309'),
+('CAFE_Y_DELI', 4, 'Experto en Flat White', 'Maestro de todas las preparaciones', 10, 1000, '🎯', '#92400E');
 
 -- BODEGONES
 INSERT INTO category_achievements (category, level, name, description, required_reviews, points_reward, icon, color) VALUES
-('BODEGONES', 1, 'Plato del Día', 'Descubriendo la tradición porteña', 3, 150, '🍽️', '#3B82F6'),
-('BODEGONES', 2, 'Tradición y Sabor', 'Conocedor de la cocina tradicional', 10, 300, '🏠', '#2563EB'),
-('BODEGONES', 3, 'Cliente de la Casa', 'Ya eres parte de la familia', 25, 600, '❤️', '#1D4ED8'),
-('BODEGONES', 4, 'Bodegonero Legendario', 'Guardián de las tradiciones culinarias', 50, 1000, '🏆', '#1E40AF');
+('BODEGONES', 1, 'Plato del Día', 'Descubriendo la tradición porteña', 2, 150, '🍽️', '#3B82F6'),
+('BODEGONES', 2, 'Tradición y Sabor', 'Conocedor de la cocina tradicional', 4, 300, '🏠', '#2563EB'),
+('BODEGONES', 3, 'Cliente de la Casa', 'Ya eres parte de la familia', 6, 600, '❤️', '#1D4ED8'),
+('BODEGONES', 4, 'Bodegonero Legendario', 'Guardián de las tradiciones culinarias', 10, 1000, '🏆', '#1E40AF');
 
 -- RESTAURANTES
 INSERT INTO category_achievements (category, level, name, description, required_reviews, points_reward, icon, color) VALUES
-('RESTAURANTES', 1, 'Comensal Formal', 'Iniciando en la alta gastronomía', 3, 150, '🍷', '#8B5CF6'),
-('RESTAURANTES', 2, 'Foodie Activo', 'Explorador de nuevos sabores', 10, 300, '🌟', '#7C3AED'),
-('RESTAURANTES', 3, 'Crítico Profesional', 'Tu paladar es tu mejor herramienta', 25, 600, '📝', '#6D28D9'),
-('RESTAURANTES', 4, 'Gourmet Internacional', 'Conocedor de cocinas del mundo', 50, 1000, '🌍', '#5B21B6');
+('RESTAURANTES', 1, 'Comensal Formal', 'Iniciando en la alta gastronomía', 2, 150, '🍷', '#8B5CF6'),
+('RESTAURANTES', 2, 'Foodie Activo', 'Explorador de nuevos sabores', 4, 300, '🌟', '#7C3AED'),
+('RESTAURANTES', 3, 'Crítico Profesional', 'Tu paladar es tu mejor herramienta', 6, 600, '📝', '#6D28D9'),
+('RESTAURANTES', 4, 'Gourmet Internacional', 'Conocedor de cocinas del mundo', 10, 1000, '🌍', '#5B21B6');
 
 -- HAMBURGUESERÍAS
 INSERT INTO category_achievements (category, level, name, description, required_reviews, points_reward, icon, color) VALUES
-('HAMBURGUESERIAS', 1, 'Triple con Cheddar', 'Primer mordisco al mundo burger', 3, 150, '🍔', '#F97316'),
-('HAMBURGUESERIAS', 2, 'Ruta de la Hamburguesa', 'Cazador de las mejores burgers', 10, 300, '🛣️', '#EA580C'),
-('HAMBURGUESERIAS', 3, 'Fanático del Smashed', 'Conoces todos los estilos', 25, 600, '🔨', '#DC2626'),
-('HAMBURGUESERIAS', 4, 'Rey del Pan Brioche', 'Emperador de las hamburguesas', 50, 1000, '👑', '#B91C1C');
+('HAMBURGUESERIAS', 1, 'Triple con Cheddar', 'Primer mordisco al mundo burger', 2, 150, '🍔', '#F97316'),
+('HAMBURGUESERIAS', 2, 'Ruta de la Hamburguesa', 'Cazador de las mejores burgers', 4, 300, '🛣️', '#EA580C'),
+('HAMBURGUESERIAS', 3, 'Fanático del Smashed', 'Conoces todos los estilos', 6, 600, '🔨', '#DC2626'),
+('HAMBURGUESERIAS', 4, 'Rey del Pan Brioche', 'Emperador de las hamburguesas', 10, 1000, '👑', '#B91C1C');
 
 -- PIZZERÍAS
 INSERT INTO category_achievements (category, level, name, description, required_reviews, points_reward, icon, color) VALUES
-('PIZZERIAS', 1, 'Fugazzeta Inicial', 'Comenzando tu amor por la pizza', 3, 150, '🍕', '#10B981'),
-('PIZZERIAS', 2, 'Fan de la Muzza', 'La mozzarella no tiene secretos', 10, 300, '🧀', '#059669'),
-('PIZZERIAS', 3, 'Maestro Pizzero', 'Conoces todas las variedades', 25, 600, '👨‍🍳', '#047857'),
-('PIZZERIAS', 4, 'Campeón de la Fainá', 'Leyenda de las pizzerías porteñas', 50, 1000, '🏆', '#065F46');
+('PIZZERIAS', 1, 'Fugazzeta Inicial', 'Comenzando tu amor por la pizza', 2, 150, '🍕', '#10B981'),
+('PIZZERIAS', 2, 'Fan de la Muzza', 'La mozzarella no tiene secretos', 4, 300, '🧀', '#059669'),
+('PIZZERIAS', 3, 'Maestro Pizzero', 'Conoces todas las variedades', 6, 600, '👨‍🍳', '#047857'),
+('PIZZERIAS', 4, 'Campeón de la Fainá', 'Leyenda de las pizzerías porteñas', 10, 1000, '🏆', '#065F46');
 
 -- PASTAS
 INSERT INTO category_achievements (category, level, name, description, required_reviews, points_reward, icon, color) VALUES
-('PASTAS', 1, 'Raviolero Casual', 'Primeros pasos en el mundo de las pastas', 3, 150, '🍝', '#EC4899'),
-('PASTAS', 2, 'Amante de la Salsita', 'Las salsas ya no tienen secretos', 10, 300, '🍅', '#DB2777'),
-('PASTAS', 3, 'Catador de Ñoquis', 'Experto en todas las formas', 25, 600, '🥟', '#BE185D'),
-('PASTAS', 4, 'Emperador de la Pasta', 'Maestro de la tradición italiana', 50, 1000, '👑', '#9D174D');
+('PASTAS', 1, 'Raviolero Casual', 'Primeros pasos en el mundo de las pastas', 2, 150, '🍝', '#EC4899'),
+('PASTAS', 2, 'Amante de la Salsita', 'Las salsas ya no tienen secretos', 4, 300, '🍅', '#DB2777'),
+('PASTAS', 3, 'Catador de Ñoquis', 'Experto en todas las formas', 6, 600, '🥟', '#BE185D'),
+('PASTAS', 4, 'Emperador de la Pasta', 'Maestro de la tradición italiana', 10, 1000, '👑', '#9D174D');
 
 -- CARRITOS
 INSERT INTO category_achievements (category, level, name, description, required_reviews, points_reward, icon, color) VALUES
-('CARRITOS', 1, 'Callejero Nivel 1', 'Descubriendo la comida de la calle', 3, 150, '🚚', '#8B5CF6'),
-('CARRITOS', 2, 'Ruta Street Food', 'Explorador de sabores urbanos', 10, 300, '🛣️', '#7C3AED'),
-('CARRITOS', 3, 'Campeón de la Choriloca', 'Conoces todos los carritos', 25, 600, '🌭', '#6D28D9'),
-('CARRITOS', 4, 'Leyenda del Trailer', 'Rey de la comida callejera', 50, 1000, '👑', '#5B21B6');
+('CARRITOS', 1, 'Callejero Nivel 1', 'Descubriendo la comida de la calle', 2, 150, '🚚', '#8B5CF6'),
+('CARRITOS', 2, 'Ruta Street Food', 'Explorador de sabores urbanos', 4, 300, '🛣️', '#7C3AED'),
+('CARRITOS', 3, 'Campeón de la Choriloca', 'Conoces todos los carritos', 6, 600, '🌭', '#6D28D9'),
+('CARRITOS', 4, 'Leyenda del Trailer', 'Rey de la comida callejera', 10, 1000, '👑', '#5B21B6');
 
 -- BARES
 INSERT INTO category_achievements (category, level, name, description, required_reviews, points_reward, icon, color) VALUES
-('BARES', 1, 'Primer After', 'Iniciando en la vida nocturna', 3, 150, '🍺', '#F59E0B'),
-('BARES', 2, 'Fan de las IPAs', 'Conocedor de cervezas artesanales', 10, 300, '🍻', '#D97706'),
-('BARES', 3, 'Crítico de Cervezas', 'Tu paladar distingue cada estilo', 25, 600, '🎯', '#B45309'),
-('BARES', 4, 'Maestro del After Office', 'Leyenda de los after office', 50, 1000, '🏆', '#92400E');
+('BARES', 1, 'Primer After', 'Iniciando en la vida nocturna', 2, 150, '🍺', '#F59E0B'),
+('BARES', 2, 'Fan de las IPAs', 'Conocedor de cervezas artesanales', 4, 300, '🍻', '#D97706'),
+('BARES', 3, 'Crítico de Cervezas', 'Tu paladar distingue cada estilo', 6, 600, '🎯', '#B45309'),
+('BARES', 4, 'Maestro del After Office', 'Leyenda de los after office', 10, 1000, '🏆', '#92400E');
 
 -- ============================================================================
 -- 6. CREAR FUNCIONES
@@ -965,7 +965,7 @@ BEGIN
     -- Log de nuevos logros
     IF jsonb_array_length(new_achievements) > 0 THEN
       RAISE NOTICE 'Usuario % desbloqueó % nuevos logros en categoría %', 
-        NEW.user_id, jsonb_array_length(new_achievements), place_category;
+        NEW.id, jsonb_array_length(new_achievements), place_category;
     END IF;
   END IF;
   
