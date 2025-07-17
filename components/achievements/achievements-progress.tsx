@@ -103,11 +103,26 @@ export function AchievementsProgress({
         }
       }
 
-      // Ordenar por progreso descendente (los más cercanos a completar primero)
-      const sortedAchievements = allAchievements.sort((a, b) => b.progress_percentage - a.progress_percentage)
+      // Agrupar por categoría y tomar solo el más cercano a completar de cada una
+      const achievementsByCategory = allAchievements.reduce(
+        (acc, achievement) => {
+          if (
+            !acc[achievement.category] ||
+            achievement.progress_percentage > acc[achievement.category].progress_percentage
+          ) {
+            acc[achievement.category] = achievement
+          }
+          return acc
+        },
+        {} as Record<string, Achievement>,
+      )
 
-      // Tomar solo los primeros 6 para mostrar
-      setIncompleteAchievements(sortedAchievements.slice(0, 6))
+      // Convertir a array y ordenar por progreso descendente
+      const uniqueAchievements = Object.values(achievementsByCategory)
+        .sort((a, b) => b.progress_percentage - a.progress_percentage)
+        .slice(0, 6) // Máximo 6 logros
+
+      setIncompleteAchievements(uniqueAchievements)
     } catch (error) {
       console.error("Error fetching incomplete achievements:", error)
       setIncompleteAchievements([])
@@ -192,7 +207,7 @@ export function AchievementsProgress({
               return (
                 <Card
                   key={achievement.achievement_id}
-                  className={`relative overflow-hidden cursor-pointer hover:shadow-lg transition-all duration-300 w-48 h-40 border-0 flex-shrink-0 ${config.color}`}
+                  className={`relative overflow-hidden cursor-pointer hover:shadow-lg transition-all duration-300 w-48 h-44 border-0 flex-shrink-0 ${config.color}`}
                   onClick={() => handleAchievementClick(achievement)}
                 >
                   <CardContent className="p-4 h-full flex flex-col justify-between text-white relative">
@@ -217,7 +232,7 @@ export function AchievementsProgress({
 
                       {/* Achievement info */}
                       <div className="flex-1 flex flex-col justify-between">
-                        <div>
+                        <div className="mb-3">
                           <h3 className="font-semibold text-sm text-white leading-tight mb-1">{achievement.name}</h3>
                           <p className="text-xs text-white/80 leading-tight">{categoryName}</p>
                         </div>
@@ -239,7 +254,8 @@ export function AchievementsProgress({
                             />
                           </div>
 
-                          <div className="text-center">
+                          {/* Progress percentage - with proper spacing */}
+                          <div className="text-center pt-1">
                             <span className="text-xs font-medium text-white">
                               {Math.round(achievement.progress_percentage)}% completado
                             </span>
