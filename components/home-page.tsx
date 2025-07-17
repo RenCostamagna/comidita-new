@@ -15,6 +15,7 @@ import { SingleReviewPage } from "@/components/reviews/single-review-page"
 import { Header } from "@/components/layout/header"
 import { BottomNavigation } from "@/components/layout/bottom-navigation"
 import { CategoriesSection } from "@/components/places/categories-section"
+import { AchievementToast } from "@/components/achievements/achievement-toast"
 
 interface HomePageProps {
   user: any
@@ -33,6 +34,8 @@ export function HomePage({ user: initialUser }: HomePageProps) {
   const [preSelectedPlaceForReview, setPreSelectedPlaceForReview] = useState<Place | null>(null)
   const [showSingleReview, setShowSingleReview] = useState(false)
   const [selectedReviewId, setSelectedReviewId] = useState<string | null>(null)
+  const [newAchievements, setNewAchievements] = useState<any[]>([])
+  const [showAchievementToast, setShowAchievementToast] = useState(false)
 
   // Nuevo estado para rastrear la navegación
   const [navigationHistory, setNavigationHistory] = useState<{
@@ -212,6 +215,8 @@ export function HomePage({ user: initialUser }: HomePageProps) {
     goToReview()
   }
 
+  // Actualizar la función handleSubmitDetailedReview para usar el nuevo sistema de puntos
+
   const handleSubmitDetailedReview = async (reviewData: any) => {
     if (!currentUser) return
 
@@ -284,6 +289,25 @@ export function HomePage({ user: initialUser }: HomePageProps) {
         throw new Error("Ya tienes una reseña para este lugar. Solo puedes tener una reseña por lugar.")
       }
 
+      // Calcular el desglose de puntos ANTES de insertar la reseña
+      const hasPhotos = !!(reviewData.photo_1_url || reviewData.photo_2_url)
+      const commentLength = reviewData.comment ? reviewData.comment.length : 0
+
+      // Verificar si es primera reseña del lugar
+      const { data: reviewCount } = await supabase
+        .from("detailed_reviews")
+        .select("id", { count: "exact" })
+        .eq("place_id", placeId)
+
+      const isFirstReview = (reviewCount?.length || 0) === 0
+
+      // Calcular puntos según el nuevo sistema
+      const basePoints = 100
+      const firstReviewBonus = isFirstReview ? 500 : 0
+      const photoBonus = hasPhotos ? 50 : 0
+      const extendedReviewBonus = commentLength >= 300 ? 50 : 0
+      const totalPoints = basePoints + firstReviewBonus + photoBonus + extendedReviewBonus
+
       // Insertar la reseña detallada
       const reviewToInsert = {
         user_id: currentUser.id,
@@ -315,10 +339,48 @@ export function HomePage({ user: initialUser }: HomePageProps) {
         throw error
       }
 
+      // Verificar logros desbloqueados después de insertar la reseña
+      if (reviewData.restaurant_category) {
+        try {
+          const { data: achievementsData, error: achievementsError } = await supabase.rpc(
+            "check_and_grant_achievements",
+            {
+              user_id_param: currentUser.id,
+              category_param: reviewData.restaurant_category,
+            },
+          )
+
+          if (!achievementsError && achievementsData && achievementsData.length > 0) {
+            const newAchievements = achievementsData[0]
+            if (Array.isArray(newAchievements) && newAchievements.length > 0) {
+              setNewAchievements(newAchievements)
+              setShowAchievementToast(true)
+            }
+          }
+        } catch (error) {
+          console.error("Error checking achievements:", error)
+        }
+      }
+
+      // Mostrar toast con desglose de puntos
+      const pointsBreakdown = {
+        base_points: basePoints,
+        first_review_bonus: firstReviewBonus,
+        photo_bonus: photoBonus,
+        extended_review_bonus: extendedReviewBonus,
+        total_points: totalPoints,
+        is_first_review: isFirstReview,
+        has_photos: hasPhotos,
+        is_extended_review: commentLength >= 300,
+      }
+
+      // Aquí podrías mostrar el PointsEarnedToast con el desglose
+      // setPointsEarnedToast(pointsBreakdown)
+
       setShowDetailedReviewForm(false)
       setPreSelectedPlaceForReview(null)
       resetView()
-      alert("¡Reseña detallada enviada exitosamente!")
+      alert(`¡Reseña enviada exitosamente! Ganaste ${totalPoints} puntos.`)
     } catch (error) {
       console.error("Error submitting detailed review:", error)
       alert(`Error al enviar la reseña: ${error.message}`)
@@ -601,6 +663,17 @@ export function HomePage({ user: initialUser }: HomePageProps) {
           </div>
         )}
       </main>
+
+      {/* Achievement Toast */}
+      {showAchievementToast && newAchievements.length > 0 && (
+        <AchievementToast
+          achievements={newAchievements}
+          onClose={() => {
+            setShowAchievementToast(false)
+            setNewAchievements([])
+          }}
+        />
+      )}
 
       {currentUser && (
         <BottomNavigation

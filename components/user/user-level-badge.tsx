@@ -6,13 +6,16 @@ import { Progress } from "@/components/ui/progress"
 import { Card, CardContent } from "@/components/ui/card"
 import { createClient } from "@/lib/supabase/client"
 
-interface UserLevel {
+interface UserLevelDetailed {
+  level_number: number
   level_name: string
   level_color: string
   level_icon: string
   min_points: number
   max_points: number | null
   progress_percentage: number
+  points_to_next_level: number
+  next_level_name: string
 }
 
 interface UserLevelBadgeProps {
@@ -20,10 +23,17 @@ interface UserLevelBadgeProps {
   userPoints?: number
   showProgress?: boolean
   size?: "sm" | "md" | "lg"
+  showNextLevel?: boolean
 }
 
-export function UserLevelBadge({ userId, userPoints, showProgress = false, size = "md" }: UserLevelBadgeProps) {
-  const [userLevel, setUserLevel] = useState<UserLevel | null>(null)
+export function UserLevelBadge({
+  userId,
+  userPoints,
+  showProgress = false,
+  size = "md",
+  showNextLevel = false,
+}: UserLevelBadgeProps) {
+  const [userLevel, setUserLevel] = useState<UserLevelDetailed | null>(null)
   const [points, setPoints] = useState(userPoints || 0)
   const [isLoading, setIsLoading] = useState(true)
 
@@ -53,8 +63,8 @@ export function UserLevelBadge({ userId, userPoints, showProgress = false, size 
 
       setPoints(currentPoints)
 
-      // Obtener el nivel del usuario
-      const { data, error } = await supabase.rpc("get_user_level", {
+      // Obtener el nivel detallado del usuario
+      const { data, error } = await supabase.rpc("get_user_level_detailed", {
         user_points: currentPoints,
       })
 
@@ -82,7 +92,7 @@ export function UserLevelBadge({ userId, userPoints, showProgress = false, size 
   }
 
   if (!userLevel) {
-    return <Badge variant="secondary">🥚 Nuevo</Badge>
+    return <Badge variant="secondary">🍽️ Novato Gourmet</Badge>
   }
 
   const badgeSize = {
@@ -110,7 +120,10 @@ export function UserLevelBadge({ userId, userPoints, showProgress = false, size 
       <CardContent className="p-4 space-y-3">
         <div className="flex items-center justify-between">
           {badge}
-          <span className="text-sm font-medium">{points.toLocaleString()} pts</span>
+          <div className="text-right">
+            <span className="text-sm font-medium">{points.toLocaleString()} pts</span>
+            <div className="text-xs text-muted-foreground">Nivel {userLevel.level_number}</div>
+          </div>
         </div>
 
         {userLevel.max_points && (
@@ -123,11 +136,20 @@ export function UserLevelBadge({ userId, userPoints, showProgress = false, size 
             <div className="text-center text-xs text-muted-foreground">
               {userLevel.progress_percentage}% hacia el siguiente nivel
             </div>
+
+            {showNextLevel && userLevel.points_to_next_level > 0 && (
+              <div className="text-center text-xs text-muted-foreground bg-muted/50 rounded-md p-2">
+                <span className="font-medium">{userLevel.points_to_next_level.toLocaleString()} puntos</span> para
+                alcanzar <span className="font-medium text-primary">{userLevel.next_level_name}</span>
+              </div>
+            )}
           </div>
         )}
 
         {!userLevel.max_points && (
-          <div className="text-center text-xs text-muted-foreground">¡Nivel máximo alcanzado! 🎉</div>
+          <div className="text-center text-xs text-muted-foreground">
+            🏆 ¡Nivel máximo alcanzado! ¡Eres un verdadero Maestro del Paladar!
+          </div>
         )}
       </CardContent>
     </Card>

@@ -260,12 +260,24 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- Función para calcular puntos de una reseña
-CREATE OR REPLACE FUNCTION calculate_review_points(place_id_param UUID)
-RETURNS INTEGER AS $$
+-- Reemplazar la función calculate_review_points con la nueva lógica
+CREATE OR REPLACE FUNCTION calculate_review_points(
+  place_id_param UUID,
+  has_photos BOOLEAN DEFAULT FALSE,
+  comment_length INTEGER DEFAULT 0
+)
+RETURNS TABLE(
+  total_points INTEGER,
+  base_points INTEGER,
+  first_review_bonus INTEGER,
+  photo_bonus INTEGER,
+  extended_review_bonus INTEGER
+) AS $$
 DECLARE
-  base_points INTEGER := 100;
-  bonus_points INTEGER := 0;
+  base_review_points INTEGER := 100;
+  first_review_bonus_points INTEGER := 0;
+  photo_bonus_points INTEGER := 0;
+  extended_review_bonus_points INTEGER := 0;
   total_reviews INTEGER;
 BEGIN
   -- Verificar si es la primera reseña del lugar
@@ -273,73 +285,48 @@ BEGIN
   FROM detailed_reviews
   WHERE place_id = place_id_param;
   
-  -- Si es la primera reseña, agregar bonus
+  -- Bonus por primera reseña del lugar
   IF total_reviews = 0 THEN
-    bonus_points := 1000;
+    first_review_bonus_points := 500; -- +500 por lugar no reseñado anteriormente
   END IF;
   
-  RETURN base_points + bonus_points;
-END;
-$$ LANGUAGE plpgsql;
-
--- Función para actualizar el rating promedio de un lugar (reseñas detalladas)
-CREATE OR REPLACE FUNCTION update_place_rating_detailed()
-RETURNS TRIGGER AS $$
-BEGIN
-  -- Actualizar el rating promedio y categoría más común del lugar
-  UPDATE places 
-  SET 
-    rating = (
-      SELECT COALESCE(AVG(
-        (food_taste + presentation + portion_size + drinks_variety + 
-         veggie_options + gluten_free_options + vegan_options + 
-         music_acoustics + ambiance + furniture_comfort + 
-         cleanliness + service) / 12.0
-      ), 0)
-      FROM detailed_reviews 
-      WHERE place_id = COALESCE(NEW.place_id, OLD.place_id)
-    ),
-    total_reviews = (
-      SELECT COUNT(*)
-      FROM detailed_reviews 
-      WHERE place_id = COALESCE(NEW.place_id, OLD.place_id)
-    ),
-    category = (
-      SELECT restaurant_category
-      FROM detailed_reviews 
-      WHERE place_id = COALESCE(NEW.place_id, OLD.place_id)
-      GROUP BY restaurant_category
-      ORDER BY COUNT(*) DESC
-      LIMIT 1
-    ),
-    average_price_range = (
-      SELECT price_range
-      FROM detailed_reviews 
-      WHERE place_id = COALESCE(NEW.place_id, OLD.place_id)
-      GROUP BY price_range
-      ORDER BY COUNT(*) DESC
-      LIMIT 1
-    ),
-    updated_at = NOW()
-  WHERE id = COALESCE(NEW.place_id, OLD.place_id);
+  -- Bonus por agregar fotos
+  IF has_photos THEN
+    photo_bonus_points := 50; -- +50 por agregar foto
+  END IF;
   
-  RETURN COALESCE(NEW, OLD);
+  -- Bonus por reseña extensa (+300 caracteres)
+  IF comment_length >= 300 THEN
+    extended_review_bonus_points := 50; -- +50 por reseña extensa
+  END IF;
+  
+  RETURN QUERY SELECT 
+    base_review_points + first_review_bonus_points + photo_bonus_points + extended_review_bonus_points,
+    base_review_points,
+    first_review_bonus_points,
+    photo_bonus_points,
+    extended_review_bonus_points;
 END;
 $$ LANGUAGE plpgsql;
 
--- Función para actualizar puntos del usuario
+-- Actualizar la función para actualizar puntos del usuario
 CREATE OR REPLACE FUNCTION update_user_points()
 RETURNS TRIGGER AS $$
 DECLARE
-  points_to_add INTEGER;
+  points_breakdown RECORD;
 BEGIN
   -- Calcular puntos para esta reseña
-  points_to_add := calculate_review_points(NEW.place_id);
+  SELECT * INTO points_breakdown
+  FROM calculate_review_points(
+    NEW.place_id,
+    (NEW.photo_1_url IS NOT NULL OR NEW.photo_2_url IS NOT NULL),
+    COALESCE(LENGTH(NEW.comment), 0)
+  );
   
   -- Actualizar puntos del usuario
   UPDATE users 
   SET 
-    points = COALESCE(points, 0) + points_to_add,
+    points = COALESCE(points, 0) + points_breakdown.total_points,
     updated_at = NOW()
   WHERE id = NEW.user_id;
   
@@ -347,19 +334,24 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- Función para restar puntos cuando se elimina una reseña
+-- Función para restar puntos cuando se elimina una reseña (actualizada)
 CREATE OR REPLACE FUNCTION subtract_user_points()
 RETURNS TRIGGER AS $$
 DECLARE
-  points_to_subtract INTEGER;
+  points_breakdown RECORD;
 BEGIN
   -- Calcular puntos que se deben restar
-  points_to_subtract := calculate_review_points(OLD.place_id);
+  SELECT * INTO points_breakdown
+  FROM calculate_review_points(
+    OLD.place_id,
+    (OLD.photo_1_url IS NOT NULL OR OLD.photo_2_url IS NOT NULL),
+    COALESCE(LENGTH(OLD.comment), 0)
+  );
   
   -- Restar puntos del usuario
   UPDATE users 
   SET 
-    points = GREATEST(COALESCE(points, 0) - points_to_subtract, 0),
+    points = GREATEST(COALESCE(points, 0) - points_breakdown.total_points, 0),
     updated_at = NOW()
   WHERE id = OLD.user_id;
   

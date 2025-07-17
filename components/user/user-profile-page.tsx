@@ -9,6 +9,10 @@ import { DetailedReviewCard } from "@/components/reviews/detailed-review-card"
 import { createClient } from "@/lib/supabase/client"
 import type { DetailedReview } from "@/lib/types"
 import { Button } from "@/components/ui/button"
+import { PointsHistory } from "@/components/user/points-history"
+import { LevelsShowcase } from "@/components/user/levels-showcase"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { AchievementsShowcase } from "@/components/achievements/achievements-showcase"
 
 const handleLogout = async () => {
   const supabase = createClient()
@@ -134,7 +138,12 @@ export function UserProfilePage({ user, onBack }: UserProfilePageProps) {
                 <CardTitle className="text-xl">{user.user_metadata?.full_name || "Usuario"}</CardTitle>
                 <CardDescription>{user.email}</CardDescription>
               </div>
-              <UserLevelBadge userId={user.id} userPoints={userStats.totalPoints} showProgress={true} />
+              <UserLevelBadge
+                userId={user.id}
+                userPoints={userStats.totalPoints}
+                showProgress={true}
+                showNextLevel={true}
+              />
             </div>
           </div>
           <div className="flex justify-end mt-4">
@@ -179,54 +188,80 @@ export function UserProfilePage({ user, onBack }: UserProfilePageProps) {
         </Card>
       </div>
 
-      {/* Información adicional */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Calendar className="h-5 w-5" />
-            Información
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-2">
-          <div className="flex items-center gap-2 text-sm">
-            <Calendar className="h-4 w-4 text-muted-foreground" />
-            <span>Miembro desde {formatDate(user.created_at || new Date().toISOString())}</span>
-          </div>
-          {userStats.totalReviews > 0 && (
-            <div className="flex items-center gap-2 text-sm">
-              <Star className="h-4 w-4 text-muted-foreground" />
-              <span>Última reseña: {formatDate(userReviews[0]?.created_at)}</span>
+      {/* Tabs para organizar el contenido */}
+      <Tabs defaultValue="activity" className="w-full">
+        <TabsList className="grid w-full grid-cols-4">
+          <TabsTrigger value="activity">Actividad</TabsTrigger>
+          <TabsTrigger value="achievements">Logros</TabsTrigger>
+          <TabsTrigger value="levels">Niveles</TabsTrigger>
+          <TabsTrigger value="reviews">Reseñas</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="activity" className="space-y-6">
+          {/* Historial de puntos */}
+          <PointsHistory userId={user.id} />
+
+          {/* Información adicional */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Calendar className="h-5 w-5" />
+                Información
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              <div className="flex items-center gap-2 text-sm">
+                <Calendar className="h-4 w-4 text-muted-foreground" />
+                <span>Miembro desde {formatDate(user.created_at || new Date().toISOString())}</span>
+              </div>
+              {userStats.totalReviews > 0 && (
+                <div className="flex items-center gap-2 text-sm">
+                  <Star className="h-4 w-4 text-muted-foreground" />
+                  <span>Última reseña: {formatDate(userReviews[0]?.created_at)}</span>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="achievements">
+          <AchievementsShowcase userId={user.id} />
+        </TabsContent>
+
+        <TabsContent value="levels">
+          <LevelsShowcase currentUserPoints={userStats.totalPoints} showStatistics={true} />
+        </TabsContent>
+
+        <TabsContent value="reviews" className="space-y-6">
+          {/* Header de reseñas */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Mis Reseñas ({userStats.totalReviews})</CardTitle>
+              <CardDescription>Todas tus reseñas y experiencias compartidas</CardDescription>
+            </CardHeader>
+          </Card>
+
+          {/* Lista de reseñas */}
+          {isLoading ? (
+            <div className="text-center py-8">
+              <div className="text-muted-foreground">Cargando reseñas...</div>
             </div>
+          ) : userReviews.length > 0 ? (
+            <div className="space-y-4">
+              {userReviews.map((review) => (
+                <DetailedReviewCard key={review.id} review={review} />
+              ))}
+            </div>
+          ) : (
+            <Card>
+              <CardContent className="text-center py-8">
+                <p className="text-muted-foreground">Aún no has hecho ninguna reseña.</p>
+                <p className="text-sm text-muted-foreground mt-2">¡Comparte tu primera experiencia gastronómica!</p>
+              </CardContent>
+            </Card>
           )}
-        </CardContent>
-      </Card>
-
-      {/* Reseñas del usuario */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Mis Reseñas ({userStats.totalReviews})</CardTitle>
-          <CardDescription>Todas tus reseñas y experiencias compartidas</CardDescription>
-        </CardHeader>
-      </Card>
-
-      {isLoading ? (
-        <div className="text-center py-8">
-          <div className="text-muted-foreground">Cargando reseñas...</div>
-        </div>
-      ) : userReviews.length > 0 ? (
-        <div className="space-y-4">
-          {userReviews.map((review) => (
-            <DetailedReviewCard key={review.id} review={review} />
-          ))}
-        </div>
-      ) : (
-        <Card>
-          <CardContent className="text-center py-8">
-            <p className="text-muted-foreground">Aún no has hecho ninguna reseña.</p>
-            <p className="text-sm text-muted-foreground mt-2">¡Comparte tu primera experiencia gastronómica!</p>
-          </CardContent>
-        </Card>
-      )}
+        </TabsContent>
+      </Tabs>
     </div>
   )
 }
