@@ -15,61 +15,51 @@ export async function DELETE(request: NextRequest) {
 
     if (authError || !user) {
       console.error("Error de autenticación:", authError)
-      return NextResponse.json({ error: "No autorizado", details: "Usuario no autenticado" }, { status: 401 })
+      return NextResponse.json({ error: "No autorizado" }, { status: 401 })
     }
 
-    // Obtener datos de la solicitud
-    const { photoId, photoUrl } = await request.json()
+    // Obtener URL de la foto desde query params
+    const { searchParams } = new URL(request.url)
+    const photoUrl = searchParams.get("url")
 
-    if (!photoId || !photoUrl) {
-      return NextResponse.json(
-        { error: "Datos requeridos", details: "photoId y photoUrl son requeridos" },
-        { status: 400 },
-      )
+    if (!photoUrl) {
+      return NextResponse.json({ error: "URL de foto requerida" }, { status: 400 })
     }
 
-    console.log("Eliminando foto:", { photoId, photoUrl })
+    console.log("Eliminando foto:", photoUrl)
 
-    // Verificar que el usuario puede eliminar esta foto
-    const { data: photoData, error: fetchError } = await supabase
-      .from("review_photos")
-      .select("uploaded_by, file_name")
-      .eq("id", photoId)
-      .single()
-
-    if (fetchError || !photoData) {
-      console.error("Error obteniendo foto:", fetchError)
-      return NextResponse.json(
-        { error: "Foto no encontrada", details: "No se pudo encontrar la foto" },
-        { status: 404 },
-      )
-    }
-
-    if (photoData.uploaded_by !== user.id) {
-      return NextResponse.json({ error: "No autorizado", details: "No puedes eliminar esta foto" }, { status: 403 })
-    }
-
-    // Eliminar de Vercel Blob
     try {
+      // Eliminar de Vercel Blob
       await del(photoUrl)
-      console.log("Foto eliminada de Blob:", photoUrl)
-    } catch (blobError) {
-      console.error("Error eliminando de Blob:", blobError)
-      // Continuar aunque falle la eliminación del blob
+      console.log("Foto eliminada de Blob exitosamente")
+
+      // También eliminar de la base de datos si existe
+      const { error: dbError } = await supabase
+        .from("review_photos")
+        .delete()
+        .eq("photo_url", photoUrl)
+        .eq("uploaded_by", user.id)
+
+      if (dbError) {
+        console.warn("Error eliminando de BD (no crítico):", dbError)
+      }
+
+      return NextResponse.json({
+        success: true,
+        message: "Foto eliminada exitosamente",
+      })
+    } catch (deleteError) {
+      console.error("Error eliminando foto:", deleteError)
+      return NextResponse.json(
+        {
+          error: "Error eliminando foto",
+          details: deleteError instanceof Error ? deleteError.message : "Error desconocido",
+        },
+        { status: 500 },
+      )
     }
-
-    // Eliminar de base de datos
-    const { error: deleteError } = await supabase.from("review_photos").delete().eq("id", photoId)
-
-    if (deleteError) {
-      console.error("Error eliminando de BD:", deleteError)
-      return NextResponse.json({ error: "Error eliminando foto", details: deleteError.message }, { status: 500 })
-    }
-
-    console.log("Foto eliminada exitosamente")
-    return NextResponse.json({ success: true, message: "Foto eliminada exitosamente" })
   } catch (error) {
-    console.error("=== ERROR GENERAL EN DELETE PHOTO ===", error)
+    console.error("Error general en delete-photo:", error)
     return NextResponse.json(
       {
         error: "Error interno del servidor",

@@ -5,13 +5,12 @@ export async function uploadMultipleReviewPhotos(files: File[], userId: string, 
   try {
     const formData = new FormData()
 
-    // Agregar archivos al FormData
+    // Agregar archivos al FormData con el nombre correcto
     files.forEach((file, index) => {
       console.log(`Agregando archivo ${index + 1}: ${file.name} (${file.size} bytes)`)
-      formData.append("files", file)
+      formData.append("photos", file)
     })
 
-    formData.append("userId", userId)
     formData.append("reviewId", reviewId)
 
     console.log("Enviando request a /api/upload-photos...")
@@ -36,7 +35,7 @@ export async function uploadMultipleReviewPhotos(files: File[], userId: string, 
       console.warn("Algunos archivos tuvieron errores:", data.errors)
     }
 
-    return data.urls || []
+    return data.uploadedUrls || []
   } catch (error) {
     console.error("Error en uploadMultipleReviewPhotos:", error)
     throw error

@@ -6,8 +6,16 @@ export async function POST(request: NextRequest) {
   try {
     console.log("=== INICIO UPLOAD PHOTOS API ===")
 
-    // Verificar autenticación
+    // Verificar que tenemos el token de Blob
+    if (!process.env.BLOB_READ_WRITE_TOKEN) {
+      console.error("BLOB_READ_WRITE_TOKEN no está configurado")
+      return NextResponse.json({ error: "Token de Vercel Blob no configurado" }, { status: 500 })
+    }
+
+    // Crear cliente de Supabase
     const supabase = await createClient()
+
+    // Verificar autenticación
     const {
       data: { user },
       error: authError,
@@ -15,39 +23,41 @@ export async function POST(request: NextRequest) {
 
     if (authError || !user) {
       console.error("Error de autenticación:", authError)
-      return NextResponse.json({ error: "No autorizado", details: "Usuario no autenticado" }, { status: 401 })
+      return NextResponse.json({ error: "No autorizado" }, { status: 401 })
     }
 
     console.log("Usuario autenticado:", user.id)
 
     // Obtener datos del formulario
     const formData = await request.formData()
+
+    // Debug: mostrar todas las claves del FormData
+    console.log("Claves en FormData:", Array.from(formData.keys()))
+
     const reviewId = formData.get("reviewId") as string
+    console.log("Review ID recibido:", reviewId)
 
     if (!reviewId) {
-      return NextResponse.json(
-        { error: "ID de reseña requerido", details: "reviewId no proporcionado" },
-        { status: 400 },
-      )
+      return NextResponse.json({ error: "ID de reseña requerido" }, { status: 400 })
     }
 
-    console.log("Review ID:", reviewId)
+    // Obtener archivos - probar diferentes nombres de campo
+    let files = formData.getAll("photos") as File[]
+    if (files.length === 0) {
+      files = formData.getAll("files") as File[]
+    }
 
-    // Obtener archivos
-    const files = formData.getAll("photos") as File[]
-    console.log("Número de archivos recibidos:", files.length)
+    console.log("Número de archivos encontrados:", files.length)
 
     if (files.length === 0) {
-      return NextResponse.json(
-        { error: "No se encontraron archivos", details: "No hay fotos para subir" },
-        { status: 400 },
-      )
+      console.log("No se encontraron archivos en FormData")
+      return NextResponse.json({ error: "No se encontraron archivos" }, { status: 400 })
     }
 
-    const uploadedPhotos = []
-    const errors = []
+    const uploadedUrls: string[] = []
+    const errors: string[] = []
 
-    // Subir cada archivo
+    // Procesar cada archivo
     for (let i = 0; i < files.length; i++) {
       const file = files[i]
       console.log(`Procesando archivo ${i + 1}:`, {
@@ -64,7 +74,6 @@ export async function POST(request: NextRequest) {
         }
 
         if (file.size > 10 * 1024 * 1024) {
-          // 10MB
           errors.push(`Archivo ${file.name}: Muy grande (máximo 10MB)`)
           continue
         }
@@ -72,10 +81,10 @@ export async function POST(request: NextRequest) {
         // Generar nombre único
         const timestamp = Date.now()
         const randomSuffix = Math.random().toString(36).substring(2, 8)
-        const fileExtension = file.name.split(".").pop() || "jpg"
-        const fileName = `review-${reviewId}-${timestamp}-${randomSuffix}.${fileExtension}`
+        const fileExtension = file.name.split(".").pop()?.toLowerCase() || "jpg"
+        const fileName = `review-photos/${user.id}_${reviewId}_${timestamp}_${randomSuffix}.${fileExtension}`
 
-        console.log(`Subiendo a Blob: ${fileName}`)
+        console.log(`Subiendo archivo como: ${fileName}`)
 
         // Subir a Vercel Blob
         const blob = await put(fileName, file, {
@@ -83,66 +92,26 @@ export async function POST(request: NextRequest) {
           addRandomSuffix: false,
         })
 
-        console.log("Blob subido exitosamente:", blob.url)
-
-        // Guardar en base de datos
-        const { data: photoData, error: dbError } = await supabase
-          .from("review_photos")
-          .insert({
-            review_id: reviewId,
-            photo_url: blob.url,
-            file_name: fileName,
-            file_size: file.size,
-            uploaded_by: user.id,
-          })
-          .select()
-          .single()
-
-        if (dbError) {
-          console.error("Error guardando en BD:", dbError)
-          errors.push(`Error guardando ${file.name} en base de datos`)
-          continue
-        }
-
-        console.log("Foto guardada en BD:", photoData)
-        uploadedPhotos.push({
-          id: photoData.id,
-          url: blob.url,
-          fileName: fileName,
-        })
-      } catch (fileError) {
-        console.error(`Error procesando archivo ${file.name}:`, fileError)
+        uploadedUrls.push(blob.url)
+        console.log(`Archivo subido exitosamente: ${blob.url}`)
+      } catch (uploadError) {
+        console.error(`Error subiendo archivo ${file.name}:`, uploadError)
         errors.push(
-          `Error subiendo ${file.name}: ${fileError instanceof Error ? fileError.message : "Error desconocido"}`,
+          `Error subiendo ${file.name}: ${uploadError instanceof Error ? uploadError.message : "Error desconocido"}`,
         )
       }
     }
 
-    console.log("=== RESULTADO FINAL ===")
-    console.log("Fotos subidas:", uploadedPhotos.length)
-    console.log("Errores:", errors.length)
-
-    // Respuesta
-    if (uploadedPhotos.length === 0) {
-      return NextResponse.json(
-        {
-          error: "No se pudieron subir las fotos",
-          details: errors.join(", "),
-          uploadedPhotos: [],
-          errors,
-        },
-        { status: 400 },
-      )
-    }
+    console.log(`Resultado final: ${uploadedUrls.length} archivos subidos, ${errors.length} errores`)
 
     return NextResponse.json({
-      success: true,
-      uploadedPhotos,
+      success: uploadedUrls.length > 0,
+      uploadedUrls,
       errors: errors.length > 0 ? errors : undefined,
-      message: `${uploadedPhotos.length} foto(s) subida(s) exitosamente${errors.length > 0 ? ` (${errors.length} errores)` : ""}`,
+      message: `${uploadedUrls.length} de ${files.length} fotos subidas correctamente`,
     })
   } catch (error) {
-    console.error("=== ERROR GENERAL EN UPLOAD PHOTOS ===", error)
+    console.error("Error general en upload-photos:", error)
     return NextResponse.json(
       {
         error: "Error interno del servidor",
