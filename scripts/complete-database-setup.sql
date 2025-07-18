@@ -349,7 +349,7 @@ INSERT INTO category_achievements (category, level, name, description, required_
 -- 6. CREAR FUNCIONES
 -- ============================================================================
 
--- Función para obtener el nivel detallado de un usuario
+-- Función para obtener el nivel detallado de un usuario (CORREGIDA)
 CREATE OR REPLACE FUNCTION get_user_level_detailed(user_points INTEGER)
 RETURNS TABLE(
   level_number INTEGER,
@@ -369,31 +369,31 @@ DECLARE
 BEGIN
   -- Obtener el nivel actual del usuario
   SELECT 
-    ROW_NUMBER() OVER (ORDER BY min_points) as level_num,
-    *
+    ROW_NUMBER() OVER (ORDER BY ul.min_points) as level_num,
+    ul.*
   INTO current_level
-  FROM user_levels
-  WHERE user_points >= min_points 
-    AND (max_points IS NULL OR user_points <= max_points)
-  ORDER BY min_points DESC
+  FROM user_levels ul
+  WHERE user_points >= ul.min_points 
+    AND (ul.max_points IS NULL OR user_points <= ul.max_points)
+  ORDER BY ul.min_points DESC
   LIMIT 1;
   
   IF current_level IS NULL THEN
     -- Fallback al primer nivel
     SELECT 
-      ROW_NUMBER() OVER (ORDER BY min_points) as level_num,
-      *
+      ROW_NUMBER() OVER (ORDER BY ul.min_points) as level_num,
+      ul.*
     INTO current_level 
-    FROM user_levels 
-    ORDER BY min_points ASC 
+    FROM user_levels ul 
+    ORDER BY ul.min_points ASC 
     LIMIT 1;
   END IF;
   
   -- Obtener información del siguiente nivel
-  SELECT * INTO next_level
-  FROM user_levels
-  WHERE min_points > current_level.min_points
-  ORDER BY min_points ASC
+  SELECT ul.* INTO next_level
+  FROM user_levels ul
+  WHERE ul.min_points > current_level.min_points
+  ORDER BY ul.min_points ASC
   LIMIT 1;
   
   -- Calcular puntos necesarios para el siguiente nivel
@@ -423,7 +423,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- Función para obtener todos los niveles
+-- Función para obtener todos los niveles (CORREGIDA)
 CREATE OR REPLACE FUNCTION get_all_user_levels()
 RETURNS TABLE(
   level_number INTEGER,
