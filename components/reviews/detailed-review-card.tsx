@@ -110,6 +110,11 @@ export function DetailedReviewCard({ review }: DetailedReviewCardProps) {
                   src={review.photo_1_url || "/placeholder.svg"}
                   alt="Foto de la reseña 1"
                   className="w-full h-full object-cover rounded-md"
+                  crossOrigin="anonymous"
+                  onError={(e) => {
+                    const target = e.target as HTMLImageElement
+                    target.src = "/placeholder.svg?height=300&width=300&text=Error+cargando+imagen"
+                  }}
                 />
               </div>
             )}
@@ -119,6 +124,11 @@ export function DetailedReviewCard({ review }: DetailedReviewCardProps) {
                   src={review.photo_2_url || "/placeholder.svg"}
                   alt="Foto de la reseña 2"
                   className="w-full h-full object-cover rounded-md"
+                  crossOrigin="anonymous"
+                  onError={(e) => {
+                    const target = e.target as HTMLImageElement
+                    target.src = "/placeholder.svg?height=300&width=300&text=Error+cargando+imagen"
+                  }}
                 />
               </div>
             )}

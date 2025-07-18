@@ -263,6 +263,7 @@ export function SingleReviewPage({
                       src={review.photo_1_url || "/placeholder.svg"}
                       alt="Foto de la reseña"
                       className="w-full h-full object-cover rounded-lg cursor-pointer hover:opacity-90 transition-opacity"
+                      crossOrigin="anonymous"
                       onClick={() => handleImageClick(review.photo_1_url!)}
                       onError={(e) => {
                         const target = e.target as HTMLImageElement
@@ -277,6 +278,7 @@ export function SingleReviewPage({
                       src={review.photo_2_url || "/placeholder.svg"}
                       alt="Foto de la reseña 2"
                       className="w-full h-full object-cover rounded-lg cursor-pointer hover:opacity-90 transition-opacity"
+                      crossOrigin="anonymous"
                       onClick={() => handleImageClick(review.photo_2_url!)}
                       onError={(e) => {
                         const target = e.target as HTMLImageElement
@@ -337,6 +339,7 @@ export function SingleReviewPage({
               src={selectedImage || "/placeholder.svg"}
               alt="Imagen ampliada"
               className="max-w-full max-h-full object-contain rounded-lg"
+              crossOrigin="anonymous"
               onClick={(e) => e.stopPropagation()}
               onError={(e) => {
                 const target = e.target as HTMLImageElement

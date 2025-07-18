@@ -7,7 +7,7 @@ const nextConfig = {
     ignoreBuildErrors: true,
   },
   images: {
-    domains: ['maps.googleapis.com', 'lh3.googleusercontent.com'],
+    domains: ['maps.googleapis.com', 'lh3.googleusercontent.com', 'blob.vercel-storage.com'],
     unoptimized: true,
   },
 }
