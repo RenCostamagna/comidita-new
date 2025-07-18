@@ -1,18 +1,15 @@
-// Función para subir fotos usando la API route
+// Función para subir múltiples fotos de reseñas usando la API route
 export async function uploadMultipleReviewPhotos(files: File[], userId: string, reviewId: string): Promise<string[]> {
-  console.log(`Subiendo ${files.length} fotos para usuario ${userId}, reseña ${reviewId}`)
-
   try {
     const formData = new FormData()
 
     // Agregar archivos al FormData
-    files.forEach((file, index) => {
-      formData.append("photos", file)
+    files.forEach((file) => {
+      formData.append("files", file)
     })
 
+    formData.append("userId", userId)
     formData.append("reviewId", reviewId)
-
-    console.log("Enviando fotos a la API...")
 
     const response = await fetch("/api/upload-photos", {
       method: "POST",
@@ -21,50 +18,40 @@ export async function uploadMultipleReviewPhotos(files: File[], userId: string, 
 
     if (!response.ok) {
       const errorData = await response.json()
-      throw new Error(errorData.error || "Error al subir fotos")
+      throw new Error(errorData.error || "Error subiendo fotos")
     }
 
-    const result = await response.json()
-
-    if (result.errors && result.errors.length > 0) {
-      console.warn("Algunos archivos tuvieron errores:", result.errors)
-    }
-
-    console.log(`${result.uploadedUrls.length} fotos subidas exitosamente`)
-    return result.uploadedUrls || []
+    const data = await response.json()
+    return data.urls || []
   } catch (error) {
-    console.error("Error en upload múltiple:", error)
+    console.error("Error en uploadMultipleReviewPhotos:", error)
     throw error
   }
 }
 
-// Función para eliminar fotos (también necesita ser una API route)
+// Función para eliminar una foto usando la API route
 export async function deleteReviewPhoto(photoUrl: string): Promise<boolean> {
   try {
-    const response = await fetch("/api/delete-photo", {
+    const response = await fetch(`/api/delete-photo?url=${encodeURIComponent(photoUrl)}`, {
       method: "DELETE",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ photoUrl }),
     })
 
-    return response.ok
+    if (!response.ok) {
+      const errorData = await response.json()
+      throw new Error(errorData.error || "Error eliminando foto")
+    }
+
+    return true
   } catch (error) {
-    console.error("Error deleting photo:", error)
+    console.error("Error en deleteReviewPhoto:", error)
     return false
   }
 }
 
-export async function deleteMultipleReviewPhotos(photoUrls: string[]): Promise<boolean[]> {
-  const deletePromises = photoUrls.map((url) => deleteReviewPhoto(url))
-  return Promise.all(deletePromises)
-}
-
-// Función alternativa para desarrollo que simula upload
-export function createLocalPhotoUrl(file: File, photoIndex: number): string {
-  if (typeof window !== "undefined") {
-    return URL.createObjectURL(file)
-  }
-  return `/placeholder.svg?height=300&width=300&text=Foto+${photoIndex}`
+// Función para generar nombre único de archivo
+export function generateUniqueFileName(originalName: string, userId: string, reviewId: string): string {
+  const timestamp = Date.now()
+  const randomString = Math.random().toString(36).substring(2, 15)
+  const fileExtension = originalName.split(".").pop() || "jpg"
+  return `reviews/${userId}/${reviewId}/${timestamp}_${randomString}.${fileExtension}`
 }
