@@ -31,6 +31,17 @@ export async function uploadMultipleReviewPhotos(files: File[], userId: string, 
     const data = await response.json()
     console.log("Upload response:", data)
 
+    // Debug: verificar que las URLs sean de Vercel Blob
+    console.log("URLs devueltas por la API:", data.uploadedUrls)
+    data.uploadedUrls?.forEach((url: string, index: number) => {
+      console.log(`URL ${index + 1}:`, url)
+      if (url.includes("blob.vercel-storage.com")) {
+        console.log("✅ URL de Vercel Blob correcta")
+      } else {
+        console.warn("⚠️ URL no es de Vercel Blob:", url)
+      }
+    })
+
     if (data.errors && data.errors.length > 0) {
       console.warn("Algunos archivos tuvieron errores:", data.errors)
     }

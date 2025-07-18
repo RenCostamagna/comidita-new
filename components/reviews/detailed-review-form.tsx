@@ -160,6 +160,17 @@ export function DetailedReviewForm({
             console.log("Iniciando upload de fotos...")
             uploadedPhotoUrls = await uploadMultipleReviewPhotos(filesToUpload, user.id, tempReviewId)
             console.log("Fotos subidas exitosamente:", uploadedPhotoUrls)
+
+            // DEBUG: Verificar que las URLs sean de Vercel Blob
+            uploadedPhotoUrls.forEach((url, index) => {
+              console.log(`[DEBUG VERCEL BLOB URL ${index}]`, {
+                url,
+                isVercelBlob: url.includes("blob.vercel-storage.com"),
+                isSupabase: url.includes("supabase.co"),
+                urlLength: url.length,
+              })
+            })
+
             setUploadProgress(75)
           } catch (uploadError) {
             console.error("Error subiendo fotos:", uploadError)
@@ -211,7 +222,15 @@ export function DetailedReviewForm({
         comment: comment.trim() || null,
         photo_urls: uploadedPhotoUrls,
         primary_photo_url: uploadedPhotoUrls.length > 0 ? uploadedPhotoUrls[0] : null,
+        // DEBUG: Campo adicional para verificar las URLs
+        vercel_blob_urls: uploadedPhotoUrls.filter((url) => url.includes("blob.vercel-storage.com")),
       }
+
+      console.log("[DEBUG REVIEW DATA]", {
+        photo_urls: reviewData.photo_urls,
+        vercel_blob_urls: reviewData.vercel_blob_urls,
+        primary_photo_url: reviewData.primary_photo_url,
+      })
 
       setUploadProgress(100)
       await onSubmit(reviewData)
