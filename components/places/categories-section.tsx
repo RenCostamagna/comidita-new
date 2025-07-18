@@ -117,7 +117,7 @@ export function CategoriesSection({ onCategorySelect, onViewAllCategories }: Cat
       {/* Horizontal scrollable cards */}
       <div className="relative">
         <div className="overflow-x-auto pb-4 scrollbar-hide">
-          <div className="flex gap-3 w-max pl-4 pr-20">
+          <div className="flex gap-3 w-max pl-0 pr-16">
             {Object.entries(RESTAURANT_CATEGORIES).map(([key, label]) => {
               const config = CATEGORY_CONFIG[key as keyof typeof CATEGORY_CONFIG]
               const count = categoryCounts[key] || 0
@@ -161,7 +161,7 @@ export function CategoriesSection({ onCategorySelect, onViewAllCategories }: Cat
         </div>
 
         {/* Gradient overlay to indicate more content */}
-        <div className="absolute top-0 right-0 bottom-0 w-6 bg-gradient-to-l from-background/60 via-background/40 to-transparent pointer-events-none"></div>
+        <div className="absolute top-0 right-0 bottom-0 w-4 bg-gradient-to-l from-background/60 via-background/40 to-transparent pointer-events-none"></div>
       </div>
     </div>
   )

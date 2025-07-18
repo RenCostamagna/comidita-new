@@ -226,7 +226,7 @@ export function AchievementsProgress({
       {/* Horizontal scrollable cards */}
       <div className="relative">
         <div className="overflow-x-auto pb-4 scrollbar-hide">
-          <div className="flex gap-3 w-max pl-4 pr-20">
+          <div className="flex gap-3 w-max pl-0 pr-16">
             {incompleteAchievements.map((achievement) => {
               const config = getCategoryConfig(achievement.category)
               const categoryName = getCategoryName(achievement.category)
@@ -303,7 +303,7 @@ export function AchievementsProgress({
         </div>
 
         {/* Gradient overlay to indicate more content */}
-        <div className="absolute top-0 right-0 bottom-0 w-6 bg-gradient-to-l from-background/60 via-background/40 to-transparent pointer-events-none"></div>
+        <div className="absolute top-0 right-0 bottom-0 w-4 bg-gradient-to-l from-background/60 via-background/40 to-transparent pointer-events-none"></div>
       </div>
     </div>
   )
