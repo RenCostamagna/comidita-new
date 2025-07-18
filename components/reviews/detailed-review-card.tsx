@@ -90,14 +90,20 @@ export function DetailedReviewCard({ review }: DetailedReviewCardProps) {
       </CardHeader>
 
       <CardContent className="space-y-4">
-        {/* Plato y detalles */}
+        {/* Dish name with prominence */}
+        {review.dish_name && (
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <Utensils className="h-4 w-4 text-foreground" />
+              <span className="font-medium text-foreground">
+                {review.dish_name.charAt(0).toUpperCase() + review.dish_name.slice(1).toLowerCase()}
+              </span>
+            </div>
+          </div>
+        )}
+
+        {/* Other details */}
         <div className="flex flex-wrap gap-2">
-          {review.dish_name && (
-            <Badge variant="outline" className="flex items-center gap-1">
-              <Utensils className="h-3 w-3" />
-              {review.dish_name}
-            </Badge>
-          )}
           <Badge variant="outline" className="flex items-center gap-1">
             <DollarSign className="h-3 w-3" />
             {PRICE_RANGES[review.price_range as keyof typeof PRICE_RANGES]}
