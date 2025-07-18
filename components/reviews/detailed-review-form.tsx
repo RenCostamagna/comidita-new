@@ -17,6 +17,7 @@ import { RESTAURANT_CATEGORIES } from "@/lib/types"
 import { PhotoUpload } from "@/components/photos/photo-upload"
 import { getRatingColor } from "@/lib/rating-labels"
 import { createClient } from "@/lib/supabase/client"
+import { uploadMultipleReviewPhotos } from "@/lib/storage"
 
 interface PhotoData {
   file: File | string
@@ -124,6 +125,39 @@ export function DetailedReviewForm({
     setIsSubmitting(true)
 
     try {
+      // Generar un ID temporal para la reseña
+      const tempReviewId = `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+
+      // Obtener el usuario actual
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+      if (!user) {
+        alert("Debes estar autenticado para enviar una reseña")
+        return
+      }
+
+      // Subir fotos a Vercel Blob si hay fotos
+      let uploadedPhotoUrls: string[] = []
+      if (photos.length > 0) {
+        console.log("Subiendo fotos a Vercel Blob...")
+
+        // Filtrar solo los archivos File (no strings que ya son URLs)
+        const filesToUpload = photos.map((photo) => photo.file).filter((file): file is File => file instanceof File)
+
+        if (filesToUpload.length > 0) {
+          uploadedPhotoUrls = await uploadMultipleReviewPhotos(filesToUpload, user.id, tempReviewId)
+          console.log("Fotos subidas:", uploadedPhotoUrls)
+        }
+
+        // También incluir URLs que ya existen (strings)
+        const existingUrls = photos
+          .map((photo) => photo.file)
+          .filter((file): file is string => typeof file === "string")
+
+        uploadedPhotoUrls = [...uploadedPhotoUrls, ...existingUrls]
+      }
+
       const placeData = {
         google_place_id: placeId,
         name: placeName,
@@ -135,17 +169,18 @@ export function DetailedReviewForm({
         id: selectedPlace.id || null,
       }
 
+      // Crear el objeto de datos de la reseña con las URLs de las fotos subidas
       const reviewData = {
         place: placeData,
         dish_name: dishName.trim() || null,
         ...ratings,
-        // Agregar las opciones dietéticas
         celiac_friendly: dietaryOptions.celiac_friendly,
         vegetarian_friendly: dietaryOptions.vegetarian_friendly,
         price_range: priceRange,
         restaurant_category: category,
         comment: comment.trim() || null,
-        photos: photos, // Enviar todas las fotos con información de primaria
+        photo_urls: uploadedPhotoUrls, // Enviar las URLs de las fotos subidas
+        primary_photo_url: uploadedPhotoUrls.length > 0 ? uploadedPhotoUrls[0] : null, // Primera foto como primaria
       }
 
       await onSubmit(reviewData)

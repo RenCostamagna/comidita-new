@@ -25,6 +25,7 @@ export function PhotoUpload({ photos, onPhotosChange, maxPhotos = 6, userId }: P
   const [isUploading, setIsUploading] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const cameraInputRef = useRef<HTMLInputElement>(null)
+  const [uploadProgress, setUploadProgress] = useState<string>("")
 
   const handleFileSelect = async (files: FileList | null, fromCamera = false) => {
     if (!files || files.length === 0) return
@@ -37,11 +38,15 @@ export function PhotoUpload({ photos, onPhotosChange, maxPhotos = 6, userId }: P
     }
 
     setIsUploading(true)
+    setUploadProgress("Procesando imágenes...")
 
     try {
       const newPhotos: PhotoData[] = []
 
-      for (const file of selectedFiles) {
+      for (let i = 0; i < selectedFiles.length; i++) {
+        const file = selectedFiles[i]
+        setUploadProgress(`Procesando imagen ${i + 1} de ${selectedFiles.length}...`)
+
         // Validar archivo usando la nueva utilidad
         const validation = validateImageFile(file)
         if (!validation.isValid) {
@@ -61,9 +66,11 @@ export function PhotoUpload({ photos, onPhotosChange, maxPhotos = 6, userId }: P
       }
 
       onPhotosChange([...photos, ...newPhotos])
+      setUploadProgress("")
     } catch (error) {
       console.error("Error processing images:", error)
       alert("Error al procesar las imágenes")
+      setUploadProgress("")
     } finally {
       setIsUploading(false)
     }
@@ -178,6 +185,10 @@ export function PhotoUpload({ photos, onPhotosChange, maxPhotos = 6, userId }: P
         </div>
       )}
 
+      {uploadProgress && (
+        <div className="text-center text-sm text-muted-foreground bg-muted/50 p-2 rounded">{uploadProgress}</div>
+      )}
+
       {/* Botones para agregar fotos */}
       {photos.length < maxPhotos && (
         <div className="flex gap-2">
@@ -233,7 +244,6 @@ export function PhotoUpload({ photos, onPhotosChange, maxPhotos = 6, userId }: P
           </CardContent>
         </Card>
       )}
-
     </div>
   )
 }

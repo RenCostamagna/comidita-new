@@ -1,17 +1,4 @@
-export interface ImageValidationResult {
-  isValid: boolean
-  error?: string
-}
-
-export interface ImageInfo {
-  width: number
-  height: number
-  size: number
-  type: string
-  name: string
-}
-
-export interface CompressionOptions {
+interface CompressionOptions {
   maxWidth?: number
   maxHeight?: number
   quality?: number
@@ -19,162 +6,131 @@ export interface CompressionOptions {
   outputFormat?: "jpeg" | "png" | "webp"
 }
 
-// Validar archivo de imagen
-export function validateImageFile(file: File): ImageValidationResult {
-  // Verificar que sea un archivo
-  if (!file) {
-    return { isValid: false, error: "No se seleccionó ningún archivo" }
-  }
+interface ImageInfo {
+  width: number
+  height: number
+  size: number
+  type: string
+}
 
+interface ValidationResult {
+  isValid: boolean
+  error?: string
+}
+
+export function validateImageFile(file: File): ValidationResult {
   // Verificar tipo de archivo
-  const allowedTypes = ["image/jpeg", "image/jpg", "image/png", "image/webp", "image/gif"]
-  if (!allowedTypes.includes(file.type)) {
-    return {
-      isValid: false,
-      error: "Formato no válido. Solo se permiten JPG, PNG, WebP y GIF",
-    }
+  if (!file.type.startsWith("image/")) {
+    return { isValid: false, error: "El archivo debe ser una imagen" }
   }
 
-  // Verificar tamaño (máximo 10MB)
+  // Verificar tamaño máximo (10MB)
   const maxSize = 10 * 1024 * 1024 // 10MB en bytes
   if (file.size > maxSize) {
-    return {
-      isValid: false,
-      error: "El archivo es demasiado grande. Máximo 10MB",
-    }
+    return { isValid: false, error: "La imagen debe ser menor a 10MB" }
+  }
+
+  // Verificar tipos permitidos
+  const allowedTypes = ["image/jpeg", "image/jpg", "image/png", "image/webp"]
+  if (!allowedTypes.includes(file.type)) {
+    return { isValid: false, error: "Formato no soportado. Usa JPG, PNG o WebP" }
   }
 
   return { isValid: true }
 }
 
-// Obtener información de la imagen
 export async function getImageInfo(file: File): Promise<ImageInfo> {
   return new Promise((resolve, reject) => {
     const img = new Image()
-
     img.onload = () => {
       resolve({
-        width: img.naturalWidth,
-        height: img.naturalHeight,
+        width: img.width,
+        height: img.height,
         size: file.size,
         type: file.type,
-        name: file.name,
       })
-      URL.revokeObjectURL(img.src)
     }
-
-    img.onerror = () => {
-      URL.revokeObjectURL(img.src)
-      reject(new Error("No se pudo cargar la imagen"))
-    }
-
+    img.onerror = () => reject(new Error("No se pudo cargar la imagen"))
     img.src = URL.createObjectURL(file)
   })
 }
 
-// Comprimir imagen con opciones avanzadas
 export async function compressImageAdvanced(file: File, options: CompressionOptions = {}): Promise<File> {
-  const { maxWidth = 800, maxHeight = 600, quality = 0.8, maxSizeKB = 500, outputFormat = "jpeg" } = options
+  const { maxWidth = 800, maxHeight = 600, quality = 0.85, maxSizeKB = 400, outputFormat = "jpeg" } = options
 
   return new Promise((resolve, reject) => {
     const canvas = document.createElement("canvas")
     const ctx = canvas.getContext("2d")
     const img = new Image()
 
+    if (!ctx) {
+      reject(new Error("No se pudo crear el contexto del canvas"))
+      return
+    }
+
     img.onload = () => {
-      try {
-        // Calcular nuevas dimensiones manteniendo aspect ratio
-        let { width, height } = img
+      // Calcular nuevas dimensiones manteniendo aspect ratio
+      let { width, height } = img
 
-        if (width > height) {
-          if (width > maxWidth) {
-            height = (height * maxWidth) / width
-            width = maxWidth
+      if (width > maxWidth || height > maxHeight) {
+        const ratio = Math.min(maxWidth / width, maxHeight / height)
+        width *= ratio
+        height *= ratio
+      }
+
+      canvas.width = width
+      canvas.height = height
+
+      // Dibujar imagen redimensionada
+      ctx.drawImage(img, 0, 0, width, height)
+
+      // Convertir a blob con la calidad especificada
+      canvas.toBlob(
+        (blob) => {
+          if (!blob) {
+            reject(new Error("Error al comprimir la imagen"))
+            return
           }
-        } else {
-          if (height > maxHeight) {
-            width = (width * maxHeight) / height
-            height = maxHeight
-          }
-        }
 
-        // Configurar canvas
-        canvas.width = width
-        canvas.height = height
+          // Verificar si el tamaño está dentro del límite
+          const sizeKB = blob.size / 1024
+          console.log(`Imagen comprimida: ${sizeKB.toFixed(1)}KB (límite: ${maxSizeKB}KB)`)
 
-        // Dibujar imagen redimensionada
-        if (ctx) {
-          ctx.drawImage(img, 0, 0, width, height)
-        }
+          // Si aún es muy grande, reducir más la calidad
+          if (sizeKB > maxSizeKB && quality > 0.3) {
+            const newQuality = Math.max(0.3, quality * 0.8)
+            console.log(`Imagen muy grande, reduciendo calidad a ${newQuality}`)
 
-        // Función para comprimir con calidad ajustable
-        const compressWithQuality = (currentQuality: number) => {
-          const mimeType = `image/${outputFormat}`
-
-          canvas.toBlob(
-            (blob) => {
-              if (blob) {
-                const sizeKB = blob.size / 1024
-
-                // Si el archivo es muy grande y podemos reducir más la calidad
-                if (sizeKB > maxSizeKB && currentQuality > 0.1) {
-                  compressWithQuality(currentQuality - 0.1)
+            canvas.toBlob(
+              (secondBlob) => {
+                if (!secondBlob) {
+                  reject(new Error("Error en segunda compresión"))
                   return
                 }
 
-                // Crear archivo comprimido
-                const compressedFile = new File([blob], file.name, {
-                  type: mimeType,
+                const compressedFile = new File([secondBlob], file.name, {
+                  type: `image/${outputFormat}`,
                   lastModified: Date.now(),
                 })
-
                 resolve(compressedFile)
-              } else {
-                resolve(file) // Fallback al archivo original
-              }
-            },
-            mimeType,
-            currentQuality,
-          )
-        }
-
-        // Iniciar compresión
-        compressWithQuality(quality)
-      } catch (error) {
-        console.error("Error during compression:", error)
-        resolve(file) // Fallback al archivo original
-      }
+              },
+              `image/${outputFormat}`,
+              newQuality,
+            )
+          } else {
+            const compressedFile = new File([blob], file.name, {
+              type: `image/${outputFormat}`,
+              lastModified: Date.now(),
+            })
+            resolve(compressedFile)
+          }
+        },
+        `image/${outputFormat}`,
+        quality,
+      )
     }
 
-    img.onerror = () => {
-      reject(new Error("No se pudo cargar la imagen para comprimir"))
-    }
-
+    img.onerror = () => reject(new Error("Error al cargar la imagen"))
     img.src = URL.createObjectURL(file)
   })
-}
-
-// Redimensionar imagen manteniendo aspect ratio
-export function calculateAspectRatio(
-  originalWidth: number,
-  originalHeight: number,
-  maxWidth: number,
-  maxHeight: number,
-): { width: number; height: number } {
-  let width = originalWidth
-  let height = originalHeight
-
-  if (width > height) {
-    if (width > maxWidth) {
-      height = (height * maxWidth) / width
-      width = maxWidth
-    }
-  } else {
-    if (height > maxHeight) {
-      width = (width * maxHeight) / height
-      height = maxHeight
-    }
-  }
-
-  return { width: Math.round(width), height: Math.round(height) }
 }
