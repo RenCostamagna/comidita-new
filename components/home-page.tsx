@@ -207,17 +207,26 @@ export function HomePage({ user: initialUser }: HomePageProps) {
       return
     }
 
+    // Ensure the place has all required fields
     const normalizedPlace = {
       id: place.id,
       google_place_id: place.google_place_id,
+      place_id: place.google_place_id, // Add this for compatibility
       name: place.name,
       address: place.address,
+      formatted_address: place.address, // Add this for compatibility
       latitude: place.latitude,
       longitude: place.longitude,
       phone: place.phone,
       website: place.website,
       rating: place.rating,
       total_reviews: place.total_reviews,
+      geometry: {
+        location: {
+          lat: place.latitude,
+          lng: place.longitude,
+        },
+      },
     }
 
     setPreSelectedPlaceForReview(normalizedPlace)
@@ -229,13 +238,26 @@ export function HomePage({ user: initialUser }: HomePageProps) {
 
     setIsLoading(true)
     try {
-      if (!reviewData.place || !reviewData.place.google_place_id) {
-        throw new Error("Datos del lugar incompletos")
+      // Enhanced validation
+      if (!reviewData.place) {
+        throw new Error("No se ha seleccionado ningún lugar")
+      }
+
+      if (!reviewData.place.google_place_id) {
+        throw new Error("El lugar seleccionado no tiene un ID válido")
+      }
+
+      if (!reviewData.place.name) {
+        throw new Error("El lugar seleccionado no tiene nombre")
+      }
+
+      if (!reviewData.place.address) {
+        throw new Error("El lugar seleccionado no tiene dirección")
       }
 
       let placeId = reviewData.place.id
 
-      if (!placeId || placeId.startsWith("temp-")) {
+      if (!placeId || placeId.toString().startsWith("temp-")) {
         const { data: existingPlace, error: searchError } = await supabase
           .from("places")
           .select("id")
@@ -244,7 +266,7 @@ export function HomePage({ user: initialUser }: HomePageProps) {
 
         if (searchError && searchError.code !== "PGRST116") {
           console.error("Error searching for existing place:", searchError)
-          throw searchError
+          throw new Error("Error al buscar el lugar en la base de datos")
         }
 
         if (existingPlace) {
@@ -254,8 +276,8 @@ export function HomePage({ user: initialUser }: HomePageProps) {
             google_place_id: reviewData.place.google_place_id,
             name: reviewData.place.name,
             address: reviewData.place.address,
-            latitude: reviewData.place.latitude,
-            longitude: reviewData.place.longitude,
+            latitude: reviewData.place.latitude || -32.9442426,
+            longitude: reviewData.place.longitude || -60.6505388,
             phone: reviewData.place.phone,
             website: reviewData.place.website,
           }
@@ -268,12 +290,13 @@ export function HomePage({ user: initialUser }: HomePageProps) {
 
           if (placeError) {
             console.error("Error creating place:", placeError)
-            throw placeError
+            throw new Error("Error al crear el lugar en la base de datos")
           }
           placeId = createdPlace.id
         }
       }
 
+      // Rest of the function remains the same...
       const { data: existingReview, error: reviewCheckError } = await supabase
         .from("detailed_reviews")
         .select("id")
@@ -332,7 +355,7 @@ export function HomePage({ user: initialUser }: HomePageProps) {
 
       if (error) {
         console.error("Error submitting detailed review:", error)
-        throw error
+        throw new Error("Error al guardar la reseña en la base de datos")
       }
 
       if (reviewData.restaurant_category) {

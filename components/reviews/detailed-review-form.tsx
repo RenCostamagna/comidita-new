@@ -105,7 +105,18 @@ export function DetailedReviewForm({
       return
     }
 
-    if (!selectedPlace.google_place_id || !selectedPlace.name || !selectedPlace.address) {
+    // Enhanced place validation
+    if (!selectedPlace.place_id && !selectedPlace.google_place_id) {
+      alert("Error: Información del lugar incompleta. Por favor selecciona el lugar nuevamente.")
+      return
+    }
+
+    // Ensure we have the required place fields
+    const placeId = selectedPlace.google_place_id || selectedPlace.place_id
+    const placeName = selectedPlace.name
+    const placeAddress = selectedPlace.formatted_address || selectedPlace.address
+
+    if (!placeId || !placeName || !placeAddress) {
       alert("Error: Información del lugar incompleta. Por favor selecciona el lugar nuevamente.")
       return
     }
@@ -114,12 +125,12 @@ export function DetailedReviewForm({
 
     try {
       const placeData = {
-        google_place_id: selectedPlace.google_place_id,
-        name: selectedPlace.name,
-        address: selectedPlace.address,
-        latitude: selectedPlace.latitude || -32.9442426,
-        longitude: selectedPlace.longitude || -60.6505388,
-        phone: selectedPlace.phone || null,
+        google_place_id: placeId,
+        name: placeName,
+        address: placeAddress,
+        latitude: selectedPlace.geometry?.location?.lat || selectedPlace.latitude || -32.9442426,
+        longitude: selectedPlace.geometry?.location?.lng || selectedPlace.longitude || -60.6505388,
+        phone: selectedPlace.formatted_phone_number || selectedPlace.phone || null,
         website: selectedPlace.website || null,
         id: selectedPlace.id || null,
       }
@@ -163,7 +174,8 @@ export function DetailedReviewForm({
                   <PlaceSearch onPlaceSelect={handlePlaceSelect} searchMode="api" />
                   {preSelectedPlace && (
                     <div className="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded text-xs text-yellow-800">
-                      Debug: Lugar preseleccionado detectado pero no cargado correctamente
+                      Debug: Lugar preseleccionado - {preSelectedPlace.name} (ID:{" "}
+                      {preSelectedPlace.google_place_id || preSelectedPlace.place_id})
                     </div>
                   )}
                 </div>
@@ -171,7 +183,9 @@ export function DetailedReviewForm({
                 <div className="flex items-center justify-between p-3 border rounded-md bg-muted">
                   <div>
                     <p className="font-medium">{selectedPlace.name}</p>
-                    <p className="text-sm text-muted-foreground">{selectedPlace.address}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {selectedPlace.formatted_address || selectedPlace.address}
+                    </p>
                   </div>
                   <Button type="button" variant="outline" size="sm" onClick={() => setSelectedPlace(null)}>
                     Cambiar
