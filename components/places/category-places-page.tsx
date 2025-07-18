@@ -200,12 +200,12 @@ export function CategoryPlacesPage({
               <div className="space-y-2">
                 <Label>Categoría</Label>
                 <Select value={filters.category} onValueChange={(value) => setFilters({ ...filters, category: value })}>
-                  <SelectTrigger>
+                  <SelectTrigger >
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="rounded-[var(--radius-dropdown)]">
                     {Object.entries(RESTAURANT_CATEGORIES).map(([key, label]) => (
-                      <SelectItem key={key} value={key}>
+                      <SelectItem key={key} value={key} className="rounded-[var(--radius-dropdown)]">
                         {label}
                       </SelectItem>
                     ))}
@@ -251,10 +251,10 @@ export function CategoryPlacesPage({
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="rating">Mejor puntuación</SelectItem>
-                    <SelectItem value="reviews">Más reseñas</SelectItem>
-                    <SelectItem value="name">Nombre A-Z</SelectItem>
+                  <SelectContent className="rounded-[var(--radius-dropdown)]">
+                    <SelectItem value="rating" className="rounded-[var(--radius-dropdown)]">Mejor puntuación</SelectItem>
+                    <SelectItem value="reviews" className="rounded-[var(--radius-dropdown)]">Más reseñas</SelectItem>
+                    <SelectItem value="name" className="rounded-[var(--radius-dropdown)]">Nombre A-Z</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
