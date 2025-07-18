@@ -265,7 +265,7 @@ export function AchievementsProgress({
                         </div>
 
                         {/* Progress section */}
-                        <div className="space-y-2">
+                        <div className="space-y-1">
                           <div className="flex justify-between items-center text-xs">
                             <span className="text-white/90">
                               {achievement.current_progress}/{achievement.required_reviews} reseñas
@@ -282,7 +282,7 @@ export function AchievementsProgress({
                           </div>
 
                           {/* Progress percentage - with less bottom spacing */}
-                          <div className="text-center pt-1">
+                          <div className="text-center pt-0.5">
                             <span className="text-xs font-medium text-white">
                               {achievement.current_progress > 0
                                 ? `${Math.round(achievement.progress_percentage)}% completado`

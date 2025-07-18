@@ -300,9 +300,9 @@ export function DetailedReviewForm({
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Selecciona una categoría" />
                 </SelectTrigger>
-                <SelectContent className="rounded-[6px]">
+                <SelectContent className="rounded-[var(--radius-dropdown)]">
                   {Object.entries(RESTAURANT_CATEGORIES).map(([key, label]) => (
-                    <SelectItem key={key} value={key}>
+                    <SelectItem key={key} value={key} className="rounded-[var(--radius-dropdown)]">
                       {label}
                     </SelectItem>
                   ))}

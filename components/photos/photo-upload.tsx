@@ -230,10 +230,6 @@ export function PhotoUpload({ photos, onPhotosChange, maxPhotos = 6, userId }: P
             <ImageIcon className="h-12 w-12 text-muted-foreground mb-4" />
             <p className="text-sm text-muted-foreground mb-2">Agrega fotos de tu experiencia</p>
             <p className="text-xs text-muted-foreground">Hasta {maxPhotos} fotos • Máximo 10MB cada una</p>
-            <div className="mt-2">
-              <p className="text-xs text-muted-foreground">Formatos: JPG, PNG, WebP, GIF</p>
-              <p className="text-xs text-muted-foreground mt-1">La primera foto será la imagen principal del plato</p>
-            </div>
           </CardContent>
         </Card>
       )}
