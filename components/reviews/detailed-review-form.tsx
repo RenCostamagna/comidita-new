@@ -49,11 +49,9 @@ export function DetailedReviewForm({
     food_taste: 5,
     presentation: 5,
     portion_size: 5,
-    drinks_variety: 5,
     music_acoustics: 5,
     ambiance: 5,
     furniture_comfort: 5,
-    cleanliness: 5,
     service: 5,
   })
 
@@ -81,12 +79,11 @@ export function DetailedReviewForm({
     food_taste: "Sabor de la comida",
     presentation: "Presentación del plato",
     portion_size: "Tamaño de la porción",
-    drinks_variety: "Carta de bebidas",
     music_acoustics: "Música y acústica",
     ambiance: "Ambientación",
     furniture_comfort: "Confort del mobiliario",
-    cleanliness: "Limpieza",
     service: "Servicio de mesa",
+    // Eliminamos drinks_variety: "Carta de bebidas" y cleanliness: "Limpieza"
   }
 
   const handleRatingChange = (key: string, value: number[]) => {
@@ -222,7 +219,6 @@ export function DetailedReviewForm({
             <div className="space-y-4">
               <div className="space-y-1">
                 <Label className="text-base font-semibold">Opciones dietéticas</Label>
-                
               </div>
 
               <div className="grid grid-cols-1 gap-4">
@@ -316,7 +312,8 @@ export function DetailedReviewForm({
             {/* Comentario */}
             <div className="space-y-2">
               <Label htmlFor="comment">Comentario adicional (opcional)</Label>
-              <Textarea className="py-3"
+              <Textarea
+                className="py-3"
                 id="comment"
                 placeholder="Cuéntanos más detalles..."
                 value={comment}

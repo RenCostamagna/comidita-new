@@ -53,15 +53,13 @@ export interface DetailedReview {
   place_id: string
   dish_name?: string
 
-  // Puntuaciones del 1 al 10 - CAMPOS REDUCIDOS (sin opciones dietéticas)
+  // Puntuaciones del 1 al 10 - CAMPOS ACTUALIZADOS
   food_taste: number
   presentation: number
   portion_size: number
-  drinks_variety: number
   music_acoustics: number
   ambiance: number
   furniture_comfort: number
-  cleanliness: number
   service: number
 
   // Nuevos campos booleanos para opciones dietéticas
