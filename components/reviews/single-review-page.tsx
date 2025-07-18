@@ -13,13 +13,12 @@ import { getRatingColor } from "@/lib/rating-labels"
 import type { DetailedReview } from "@/lib/types"
 import { Header } from "@/components/layout/header"
 import { BottomNavigation } from "@/components/layout/bottom-navigation"
-import { sanitizePhotoUrl, debugPhotoUrl } from "@/lib/debug-photos"
 
 interface SingleReviewPageProps {
   reviewId: string
   onBack: () => void
   onViewPlace?: (place: any) => void
-  onAddReview?: (place: any) => void // Add this new prop
+  onAddReview?: (place: any) => void
   onGoHome?: () => void
   onGoReview?: () => void
   onGoProfile?: () => void
@@ -30,7 +29,7 @@ export function SingleReviewPage({
   reviewId,
   onBack,
   onViewPlace,
-  onAddReview, // Add this parameter
+  onAddReview,
   onGoHome,
   onGoReview,
   onGoProfile,
@@ -173,7 +172,6 @@ export function SingleReviewPage({
     { key: "ambiance", label: "Ambiente" },
     { key: "furniture_comfort", label: "Confort" },
     { key: "service", label: "Servicio" },
-    // ELIMINADOS: veggie_options, gluten_free_options, vegan_options
   ]
 
   if (isLoading) {
@@ -319,17 +317,18 @@ export function SingleReviewPage({
                   <div className="relative">
                     <div className="aspect-video max-w-lg mx-auto">
                       <img
-                        src={sanitizePhotoUrl(primaryPhoto.photo_url) || "/placeholder.svg"}
+                        src={primaryPhoto.photo_url || "/placeholder.svg"}
                         alt="Foto principal de la reseña"
                         className="w-full h-full object-cover rounded-lg cursor-pointer hover:opacity-90 transition-opacity"
-                        onClick={() => handleImageClick(sanitizePhotoUrl(primaryPhoto.photo_url), 0)}
+                        crossOrigin="anonymous"
+                        onClick={() => handleImageClick(primaryPhoto.photo_url, 0)}
                         onError={(e) => {
+                          console.error("Error cargando foto principal:", primaryPhoto.photo_url)
                           const target = e.target as HTMLImageElement
-                          debugPhotoUrl(primaryPhoto.photo_url, "ERROR - Foto principal")
                           target.src = "/placeholder.svg?height=400&width=600&text=Error+cargando+imagen"
                         }}
                         onLoad={() => {
-                          debugPhotoUrl(primaryPhoto.photo_url, "SUCCESS - Foto principal")
+                          console.log("✅ Foto principal cargada:", primaryPhoto.photo_url)
                         }}
                       />
                     </div>
@@ -342,17 +341,18 @@ export function SingleReviewPage({
                     {otherPhotos.map((photo, index) => (
                       <div key={index} className="aspect-square">
                         <img
-                          src={sanitizePhotoUrl(photo.photo_url) || "/placeholder.svg"}
+                          src={photo.photo_url || "/placeholder.svg"}
                           alt={`Foto adicional ${index + 1}`}
                           className="w-full h-full object-cover rounded-md cursor-pointer hover:opacity-90 transition-opacity"
-                          onClick={() => handleImageClick(sanitizePhotoUrl(photo.photo_url), index + 1)}
+                          crossOrigin="anonymous"
+                          onClick={() => handleImageClick(photo.photo_url, index + 1)}
                           onError={(e) => {
+                            console.error(`Error cargando foto ${index + 1}:`, photo.photo_url)
                             const target = e.target as HTMLImageElement
-                            debugPhotoUrl(photo.photo_url, `ERROR - Foto adicional ${index + 1}`)
                             target.src = "/placeholder.svg?height=150&width=150&text=Error"
                           }}
                           onLoad={() => {
-                            debugPhotoUrl(photo.photo_url, `SUCCESS - Foto adicional ${index + 1}`)
+                            console.log(`✅ Foto ${index + 1} cargada:`, photo.photo_url)
                           }}
                         />
                       </div>
@@ -448,17 +448,18 @@ export function SingleReviewPage({
             )}
 
             <img
-              src={sanitizePhotoUrl(selectedImage) || "/placeholder.svg"}
+              src={selectedImage || "/placeholder.svg"}
               alt="Imagen ampliada"
               className="max-w-full max-h-full object-contain rounded-lg"
+              crossOrigin="anonymous"
               onClick={(e) => e.stopPropagation()}
               onError={(e) => {
+                console.error("Error cargando imagen en modal:", selectedImage)
                 const target = e.target as HTMLImageElement
-                debugPhotoUrl(selectedImage, "ERROR - Modal")
                 target.src = "/placeholder.svg?height=600&width=600&text=Error+cargando+imagen"
               }}
               onLoad={() => {
-                debugPhotoUrl(selectedImage, "SUCCESS - Modal")
+                console.log("✅ Imagen cargada en modal:", selectedImage)
               }}
             />
           </div>

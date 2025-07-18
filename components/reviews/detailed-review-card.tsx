@@ -6,7 +6,6 @@ import { Progress } from "@/components/ui/progress"
 import { PRICE_RANGES, RESTAURANT_CATEGORIES } from "@/lib/types"
 import { getRatingColor } from "@/lib/rating-labels"
 import type { DetailedReview } from "@/lib/types"
-import { sanitizePhotoUrl, debugPhotoUrl } from "@/lib/debug-photos"
 
 interface DetailedReviewCardProps {
   review: DetailedReview
@@ -30,7 +29,6 @@ export function DetailedReviewCard({ review }: DetailedReviewCardProps) {
     ambiance: "Ambiente",
     furniture_comfort: "Confort",
     service: "Servicio",
-    // ELIMINADOS: veggie_options, gluten_free_options, vegan_options
   }
 
   // Calcular promedio con los 7 campos actualizados
@@ -150,16 +148,17 @@ export function DetailedReviewCard({ review }: DetailedReviewCardProps) {
               <div className="relative">
                 <div className="aspect-video max-w-sm mx-auto">
                   <img
-                    src={sanitizePhotoUrl(primaryPhoto.photo_url) || "/placeholder.svg"}
+                    src={primaryPhoto.photo_url || "/placeholder.svg"}
                     alt="Foto principal de la reseña"
                     className="w-full h-full object-cover rounded-lg"
+                    crossOrigin="anonymous"
                     onError={(e) => {
+                      console.error("Error cargando foto principal:", primaryPhoto.photo_url)
                       const target = e.target as HTMLImageElement
-                      debugPhotoUrl(primaryPhoto.photo_url, "ERROR - Foto principal")
                       target.src = "/placeholder.svg?height=300&width=300&text=Error+cargando+imagen"
                     }}
                     onLoad={() => {
-                      debugPhotoUrl(primaryPhoto.photo_url, "SUCCESS - Foto principal")
+                      console.log("✅ Foto principal cargada:", primaryPhoto.photo_url)
                     }}
                   />
                 </div>
@@ -172,16 +171,17 @@ export function DetailedReviewCard({ review }: DetailedReviewCardProps) {
                 {otherPhotos.slice(0, 5).map((photo, index) => (
                   <div key={index} className="aspect-square">
                     <img
-                      src={sanitizePhotoUrl(photo.photo_url) || "/placeholder.svg"}
+                      src={photo.photo_url || "/placeholder.svg"}
                       alt={`Foto adicional ${index + 1}`}
                       className="w-full h-full object-cover rounded-md"
+                      crossOrigin="anonymous"
                       onError={(e) => {
+                        console.error(`Error cargando foto ${index + 1}:`, photo.photo_url)
                         const target = e.target as HTMLImageElement
-                        debugPhotoUrl(photo.photo_url, `ERROR - Foto adicional ${index + 1}`)
                         target.src = "/placeholder.svg?height=150&width=150&text=Error"
                       }}
                       onLoad={() => {
-                        debugPhotoUrl(photo.photo_url, `SUCCESS - Foto adicional ${index + 1}`)
+                        console.log(`✅ Foto ${index + 1} cargada:`, photo.photo_url)
                       }}
                     />
                   </div>
