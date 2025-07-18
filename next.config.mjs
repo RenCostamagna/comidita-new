@@ -7,8 +7,26 @@ const nextConfig = {
     ignoreBuildErrors: true,
   },
   images: {
-    domains: ['maps.googleapis.com', 'lh3.googleusercontent.com', 'blob.vercel-storage.com'],
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'maps.googleapis.com',
+        port: '',
+        pathname: '/maps/api/place/photo/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'blob.vercel-storage.com',
+        port: '',
+        pathname: '/**',
+      },
+    ],
     unoptimized: true,
+  },
+  experimental: {
+    serverActions: {
+      allowedOrigins: ['localhost:3000', '*.vercel.app'],
+    },
   },
 }
 

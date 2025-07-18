@@ -15,8 +15,14 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { PlaceSearch } from "@/components/places/place-search"
 import { RESTAURANT_CATEGORIES } from "@/lib/types"
 import { PhotoUpload } from "@/components/photos/photo-upload"
-import { uploadReviewPhoto } from "@/lib/storage"
 import { getRatingColor } from "@/lib/rating-labels"
+import { createClient } from "@/lib/supabase/client"
+
+interface PhotoData {
+  file: File | string
+  isPrimary: boolean
+  id?: string
+}
 
 interface DetailedReviewFormProps {
   onSubmit: (reviewData: any) => Promise<void>
@@ -34,7 +40,7 @@ export function DetailedReviewForm({
   const [selectedPlace, setSelectedPlace] = useState<any>(preSelectedPlace || null)
   const [dishName, setDishName] = useState("")
   const [comment, setComment] = useState("")
-  const [photos, setPhotos] = useState<(File | string)[]>([])
+  const [photos, setPhotos] = useState<PhotoData[]>([])
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [wantsToRecommendDish, setWantsToRecommendDish] = useState(false)
 
@@ -59,6 +65,8 @@ export function DetailedReviewForm({
 
   const [priceRange, setPriceRange] = useState("under_10000")
   const [category, setCategory] = useState("")
+
+  const supabase = createClient()
 
   useEffect(() => {
     if (preSelectedPlace) {
@@ -108,27 +116,6 @@ export function DetailedReviewForm({
     setIsSubmitting(true)
 
     try {
-      let photo1Url = null
-      let photo2Url = null
-
-      if (photos.length > 0) {
-        const reviewId = `review_${Date.now()}`
-
-        if (photos[0] instanceof File) {
-          photo1Url = await uploadReviewPhoto(photos[0], "temp-user", reviewId, 1)
-        } else if (typeof photos[0] === "string") {
-          photo1Url = photos[0]
-        }
-
-        if (photos[1]) {
-          if (photos[1] instanceof File) {
-            photo2Url = await uploadReviewPhoto(photos[1], "temp-user", reviewId, 2)
-          } else if (typeof photos[1] === "string") {
-            photo2Url = photos[1]
-          }
-        }
-      }
-
       const placeData = {
         google_place_id: selectedPlace.google_place_id,
         name: selectedPlace.name,
@@ -150,8 +137,7 @@ export function DetailedReviewForm({
         price_range: priceRange,
         restaurant_category: category,
         comment: comment.trim() || null,
-        photo_1_url: photo1Url,
-        photo_2_url: photo2Url,
+        photos: photos, // Enviar todas las fotos con información de primaria
       }
 
       await onSubmit(reviewData)
@@ -167,7 +153,7 @@ export function DetailedReviewForm({
     <div className="w-full max-w-2xl mx-auto space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle>Nueva Reseña Detallada</CardTitle>
+          <CardTitle>Nueva Reseña</CardTitle>
           <CardDescription>Comparte tu experiencia completa en este lugar</CardDescription>
         </CardHeader>
         <CardContent>
@@ -237,7 +223,7 @@ export function DetailedReviewForm({
               <div className="space-y-1">
                 <Label className="text-base font-semibold">Opciones dietéticas</Label>
                 <p className="text-sm text-muted-foreground">
-                  Marca las opciones que apliquen (información adicional, no afecta la puntuación)
+                  Marca las opciones que apliquen
                 </p>
               </div>
 
@@ -326,8 +312,8 @@ export function DetailedReviewForm({
               </Select>
             </div>
 
-            {/* Fotos */}
-            <PhotoUpload photos={photos} onPhotosChange={setPhotos} maxPhotos={2} userId="temp-user" />
+            {/* Fotos - Componente mejorado */}
+            <PhotoUpload photos={photos} onPhotosChange={setPhotos} maxPhotos={6} userId="temp-user" />
 
             {/* Comentario */}
             <div className="space-y-2">

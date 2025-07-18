@@ -1,4 +1,4 @@
-import { Star, Calendar, Utensils, DollarSign } from "lucide-react"
+import { Star, Calendar, Utensils, DollarSign, ImageIcon } from "lucide-react"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
@@ -39,6 +39,31 @@ export function DetailedReviewCard({ review }: DetailedReviewCardProps) {
       const key = Object.keys(ratingLabels)[index] as keyof typeof ratingLabels
       return sum + review[key]
     }, 0) / Object.keys(ratingLabels).length
+
+  // Obtener fotos - priorizar nueva estructura, fallback a campos legacy
+  const getReviewPhotos = () => {
+    if (review.photos && review.photos.length > 0) {
+      return review.photos.sort((a, b) => {
+        if (a.is_primary && !b.is_primary) return -1
+        if (!a.is_primary && b.is_primary) return 1
+        return a.photo_order - b.photo_order
+      })
+    }
+
+    // Fallback a campos legacy
+    const legacyPhotos = []
+    if (review.photo_1_url) {
+      legacyPhotos.push({ photo_url: review.photo_1_url, is_primary: true, photo_order: 1 })
+    }
+    if (review.photo_2_url && review.photo_2_url !== review.photo_1_url) {
+      legacyPhotos.push({ photo_url: review.photo_2_url, is_primary: false, photo_order: 2 })
+    }
+    return legacyPhotos
+  }
+
+  const photos = getReviewPhotos()
+  const primaryPhoto = photos.find((p) => p.is_primary) || photos[0]
+  const otherPhotos = photos.filter((p) => !p.is_primary)
 
   return (
     <Card className="w-full">
@@ -101,35 +126,60 @@ export function DetailedReviewCard({ review }: DetailedReviewCardProps) {
           </div>
         )}
 
-        {/* Fotos */}
-        {(review.photo_1_url || review.photo_2_url) && (
-          <div className="grid grid-cols-2 gap-2">
-            {review.photo_1_url && (
-              <div className="aspect-square">
-                <img
-                  src={review.photo_1_url || "/placeholder.svg"}
-                  alt="Foto de la reseña 1"
-                  className="w-full h-full object-cover rounded-md"
-                  crossOrigin="anonymous"
-                  onError={(e) => {
-                    const target = e.target as HTMLImageElement
-                    target.src = "/placeholder.svg?height=300&width=300&text=Error+cargando+imagen"
-                  }}
-                />
+        {/* Fotos mejoradas */}
+        {photos.length > 0 && (
+          <div className="space-y-3">
+            {/* Foto principal */}
+            {primaryPhoto && (
+              <div className="relative">
+                <div className="aspect-video max-w-sm mx-auto">
+                  <img
+                    src={primaryPhoto.photo_url || "/placeholder.svg"}
+                    alt="Foto principal de la reseña"
+                    className="w-full h-full object-cover rounded-lg"
+                    crossOrigin="anonymous"
+                    onError={(e) => {
+                      const target = e.target as HTMLImageElement
+                      target.src = "/placeholder.svg?height=300&width=300&text=Error+cargando+imagen"
+                    }}
+                  />
+                  {primaryPhoto.is_primary && (
+                    <Badge className="absolute top-2 left-2 bg-yellow-500 hover:bg-yellow-600">
+                      <Star className="h-3 w-3 mr-1 fill-current" />
+                      Principal
+                    </Badge>
+                  )}
+                </div>
               </div>
             )}
-            {review.photo_2_url && (
-              <div className="aspect-square">
-                <img
-                  src={review.photo_2_url || "/placeholder.svg"}
-                  alt="Foto de la reseña 2"
-                  className="w-full h-full object-cover rounded-md"
-                  crossOrigin="anonymous"
-                  onError={(e) => {
-                    const target = e.target as HTMLImageElement
-                    target.src = "/placeholder.svg?height=300&width=300&text=Error+cargando+imagen"
-                  }}
-                />
+
+            {/* Otras fotos en grid */}
+            {otherPhotos.length > 0 && (
+              <div className="grid grid-cols-3 gap-2">
+                {otherPhotos.slice(0, 5).map((photo, index) => (
+                  <div key={index} className="aspect-square">
+                    <img
+                      src={photo.photo_url || "/placeholder.svg"}
+                      alt={`Foto adicional ${index + 1}`}
+                      className="w-full h-full object-cover rounded-md"
+                      crossOrigin="anonymous"
+                      onError={(e) => {
+                        const target = e.target as HTMLImageElement
+                        target.src = "/placeholder.svg?height=150&width=150&text=Error"
+                      }}
+                    />
+                  </div>
+                ))}
+
+                {/* Indicador de más fotos */}
+                {otherPhotos.length > 5 && (
+                  <div className="aspect-square bg-muted/50 rounded-md flex items-center justify-center">
+                    <div className="text-center">
+                      <ImageIcon className="h-6 w-6 mx-auto text-muted-foreground mb-1" />
+                      <span className="text-xs text-muted-foreground">+{otherPhotos.length - 5}</span>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>

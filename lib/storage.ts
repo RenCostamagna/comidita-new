@@ -42,6 +42,13 @@ export async function uploadReviewPhoto(
   }
 }
 
+export async function uploadMultipleReviewPhotos(files: File[], userId: string, reviewId: string): Promise<string[]> {
+  const uploadPromises = files.map((file, index) => uploadReviewPhoto(file, userId, reviewId, index + 1))
+
+  const results = await Promise.all(uploadPromises)
+  return results.filter((url): url is string => url !== null)
+}
+
 export async function deleteReviewPhoto(photoUrl: string): Promise<boolean> {
   try {
     // Extraer el pathname de la URL para usar con del()
@@ -54,6 +61,11 @@ export async function deleteReviewPhoto(photoUrl: string): Promise<boolean> {
     console.error("Error deleting photo:", error)
     return false
   }
+}
+
+export async function deleteMultipleReviewPhotos(photoUrls: string[]): Promise<boolean[]> {
+  const deletePromises = photoUrls.map((url) => deleteReviewPhoto(url))
+  return Promise.all(deletePromises)
 }
 
 // Función alternativa para desarrollo que simula upload

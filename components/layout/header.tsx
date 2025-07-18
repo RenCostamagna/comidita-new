@@ -41,7 +41,7 @@ export function Header({
               </Button>
             ) : (
               <button onClick={onLogoClick} className="flex items-center gap-2 hover:opacity-80 transition-opacity">
-                <h1 className="text-xl font-bold">Comidita</h1>
+                <h1 className="text-xl font-bold">🍽️</h1>
               </button>
             )}
           </div>

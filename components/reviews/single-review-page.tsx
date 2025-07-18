@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Calendar, Star, DollarSign, Utensils, MapPin, X } from "lucide-react"
+import { Calendar, Star, DollarSign, Utensils, MapPin, X, ChevronLeft, ChevronRight } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -36,6 +36,7 @@ export function SingleReviewPage({
   const [review, setReview] = useState<DetailedReview | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [selectedImage, setSelectedImage] = useState<string | null>(null)
+  const [currentImageIndex, setCurrentImageIndex] = useState(0)
 
   const supabase = createClient()
 
@@ -50,7 +51,8 @@ export function SingleReviewPage({
         .select(`
           *,
           user:users(*),
-          place:places(*)
+          place:places(*),
+          photos:review_photos(*)
         `)
         .eq("id", reviewId)
         .single()
@@ -99,8 +101,9 @@ export function SingleReviewPage({
     }
   }
 
-  const handleImageClick = (imageUrl: string) => {
+  const handleImageClick = (imageUrl: string, index: number) => {
     setSelectedImage(imageUrl)
+    setCurrentImageIndex(index)
   }
 
   const closeImageModal = () => {
@@ -111,6 +114,37 @@ export function SingleReviewPage({
     if (onGoHome) {
       onGoHome()
     }
+  }
+
+  // Obtener fotos - priorizar nueva estructura, fallback a campos legacy
+  const getReviewPhotos = () => {
+    if (review?.photos && review.photos.length > 0) {
+      return review.photos.sort((a, b) => {
+        if (a.is_primary && !b.is_primary) return -1
+        if (!a.is_primary && b.is_primary) return 1
+        return a.photo_order - b.photo_order
+      })
+    }
+
+    // Fallback a campos legacy
+    const legacyPhotos = []
+    if (review?.photo_1_url) {
+      legacyPhotos.push({ photo_url: review.photo_1_url, is_primary: true, photo_order: 1 })
+    }
+    if (review?.photo_2_url && review.photo_2_url !== review.photo_1_url) {
+      legacyPhotos.push({ photo_url: review.photo_2_url, is_primary: false, photo_order: 2 })
+    }
+    return legacyPhotos
+  }
+
+  const navigateImage = (direction: "prev" | "next") => {
+    const photos = getReviewPhotos()
+    if (direction === "prev") {
+      setCurrentImageIndex((prev) => (prev > 0 ? prev - 1 : photos.length - 1))
+    } else {
+      setCurrentImageIndex((prev) => (prev < photos.length - 1 ? prev + 1 : 0))
+    }
+    setSelectedImage(photos[currentImageIndex].photo_url)
   }
 
   // Categorías de rating actualizadas
@@ -154,6 +188,9 @@ export function SingleReviewPage({
 
   const averageRating = calculateAverageRating(review)
   const averageRatingColor = getRatingColor(Math.round(averageRating))
+  const photos = getReviewPhotos()
+  const primaryPhoto = photos.find((p) => p.is_primary) || photos[0]
+  const otherPhotos = photos.filter((p) => !p.is_primary)
 
   return (
     <div className="min-h-screen bg-background">
@@ -254,37 +291,58 @@ export function SingleReviewPage({
               </div>
             )}
 
-            {/* Photos */}
-            {(review.photo_1_url || review.photo_2_url) && (
+            {/* Photos mejoradas */}
+            {photos.length > 0 && (
               <div className="space-y-4">
-                {review.photo_1_url && (
-                  <div className="aspect-square max-w-sm mx-auto">
-                    <img
-                      src={review.photo_1_url || "/placeholder.svg"}
-                      alt="Foto de la reseña"
-                      className="w-full h-full object-cover rounded-lg cursor-pointer hover:opacity-90 transition-opacity"
-                      crossOrigin="anonymous"
-                      onClick={() => handleImageClick(review.photo_1_url!)}
-                      onError={(e) => {
-                        const target = e.target as HTMLImageElement
-                        target.src = "/placeholder.svg?height=300&width=300&text=Error+cargando+imagen"
-                      }}
-                    />
+                {/* Foto principal */}
+                {primaryPhoto && (
+                  <div className="relative">
+                    <div className="aspect-video max-w-lg mx-auto">
+                      <img
+                        src={primaryPhoto.photo_url || "/placeholder.svg"}
+                        alt="Foto principal de la reseña"
+                        className="w-full h-full object-cover rounded-lg cursor-pointer hover:opacity-90 transition-opacity"
+                        crossOrigin="anonymous"
+                        onClick={() => handleImageClick(primaryPhoto.photo_url, 0)}
+                        onError={(e) => {
+                          const target = e.target as HTMLImageElement
+                          target.src = "/placeholder.svg?height=400&width=600&text=Error+cargando+imagen"
+                        }}
+                      />
+                      {primaryPhoto.is_primary && (
+                        <Badge className="absolute top-2 left-2 bg-yellow-500 hover:bg-yellow-600">
+                          <Star className="h-3 w-3 mr-1 fill-current" />
+                          Principal
+                        </Badge>
+                      )}
+                    </div>
                   </div>
                 )}
-                {review.photo_2_url && review.photo_1_url !== review.photo_2_url && (
-                  <div className="aspect-square max-w-sm mx-auto">
-                    <img
-                      src={review.photo_2_url || "/placeholder.svg"}
-                      alt="Foto de la reseña 2"
-                      className="w-full h-full object-cover rounded-lg cursor-pointer hover:opacity-90 transition-opacity"
-                      crossOrigin="anonymous"
-                      onClick={() => handleImageClick(review.photo_2_url!)}
-                      onError={(e) => {
-                        const target = e.target as HTMLImageElement
-                        target.src = "/placeholder.svg?height=300&width=300&text=Error+cargando+imagen"
-                      }}
-                    />
+
+                {/* Otras fotos en grid */}
+                {otherPhotos.length > 0 && (
+                  <div className="grid grid-cols-3 gap-2">
+                    {otherPhotos.map((photo, index) => (
+                      <div key={index} className="aspect-square">
+                        <img
+                          src={photo.photo_url || "/placeholder.svg"}
+                          alt={`Foto adicional ${index + 1}`}
+                          className="w-full h-full object-cover rounded-md cursor-pointer hover:opacity-90 transition-opacity"
+                          crossOrigin="anonymous"
+                          onClick={() => handleImageClick(photo.photo_url, index + 1)}
+                          onError={(e) => {
+                            const target = e.target as HTMLImageElement
+                            target.src = "/placeholder.svg?height=150&width=150&text=Error"
+                          }}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {photos.length > 1 && (
+                  <div className="text-center text-xs text-muted-foreground">
+                    {photos.length} foto{photos.length > 1 ? "s" : ""} • Toca para ampliar
                   </div>
                 )}
               </div>
@@ -323,9 +381,9 @@ export function SingleReviewPage({
         </Card>
       </main>
 
-      {/* Image Modal */}
+      {/* Image Modal mejorado */}
       {selectedImage && (
-        <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4" onClick={closeImageModal}>
+        <div className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-4" onClick={closeImageModal}>
           <div className="relative max-w-4xl max-h-full">
             <Button
               variant="ghost"
@@ -335,6 +393,40 @@ export function SingleReviewPage({
             >
               <X className="h-4 w-4" />
             </Button>
+
+            {/* Navegación de imágenes */}
+            {photos.length > 1 && (
+              <>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="absolute left-2 top-1/2 -translate-y-1/2 z-10 bg-black/50 hover:bg-black/70 text-white"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    navigateImage("prev")
+                  }}
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 z-10 bg-black/50 hover:bg-black/70 text-white"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    navigateImage("next")
+                  }}
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+
+                {/* Contador de fotos */}
+                <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-10 bg-black/50 text-white px-3 py-1 rounded-full text-sm">
+                  {currentImageIndex + 1} / {photos.length}
+                </div>
+              </>
+            )}
+
             <img
               src={selectedImage || "/placeholder.svg"}
               alt="Imagen ampliada"

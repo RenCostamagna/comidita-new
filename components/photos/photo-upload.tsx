@@ -1,20 +1,27 @@
 "use client"
 
 import { useState, useRef } from "react"
-import { Camera, Upload, X, ImageIcon } from "lucide-react"
+import { Camera, Upload, X, ImageIcon, Star, StarOff } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
+import { Badge } from "@/components/ui/badge"
 import { validateImageFile, getImageInfo } from "@/lib/image-compression"
 
+interface PhotoData {
+  file: File | string
+  isPrimary: boolean
+  id?: string
+}
+
 interface PhotoUploadProps {
-  photos: (File | string)[]
-  onPhotosChange: (photos: (File | string)[]) => void
+  photos: PhotoData[]
+  onPhotosChange: (photos: PhotoData[]) => void
   maxPhotos?: number
   userId: string
 }
 
-export function PhotoUpload({ photos, onPhotosChange, maxPhotos = 2, userId }: PhotoUploadProps) {
+export function PhotoUpload({ photos, onPhotosChange, maxPhotos = 6, userId }: PhotoUploadProps) {
   const [isUploading, setIsUploading] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const cameraInputRef = useRef<HTMLInputElement>(null)
@@ -22,14 +29,7 @@ export function PhotoUpload({ photos, onPhotosChange, maxPhotos = 2, userId }: P
   const handleFileSelect = async (files: FileList | null, fromCamera = false) => {
     if (!files || files.length === 0) return
 
-    const file = files[0]
-
-    // Validar archivo usando la nueva utilidad
-    const validation = validateImageFile(file)
-    if (!validation.isValid) {
-      alert(validation.error)
-      return
-    }
+    const selectedFiles = Array.from(files).slice(0, maxPhotos - photos.length)
 
     if (photos.length >= maxPhotos) {
       alert(`Solo puedes subir hasta ${maxPhotos} fotos`)
@@ -39,15 +39,31 @@ export function PhotoUpload({ photos, onPhotosChange, maxPhotos = 2, userId }: P
     setIsUploading(true)
 
     try {
-      // Obtener información de la imagen
-      const imageInfo = await getImageInfo(file)
-      console.log("Información de la imagen:", imageInfo)
+      const newPhotos: PhotoData[] = []
 
-      // Agregar el archivo a la lista de fotos
-      onPhotosChange([...photos, file])
+      for (const file of selectedFiles) {
+        // Validar archivo usando la nueva utilidad
+        const validation = validateImageFile(file)
+        if (!validation.isValid) {
+          alert(`Error en ${file.name}: ${validation.error}`)
+          continue
+        }
+
+        // Obtener información de la imagen
+        const imageInfo = await getImageInfo(file)
+        console.log("Información de la imagen:", imageInfo)
+
+        // Agregar el archivo a la lista de fotos
+        newPhotos.push({
+          file,
+          isPrimary: photos.length === 0 && newPhotos.length === 0, // Primera foto es primaria por defecto
+        })
+      }
+
+      onPhotosChange([...photos, ...newPhotos])
     } catch (error) {
-      console.error("Error processing image:", error)
-      alert("Error al procesar la imagen")
+      console.error("Error processing images:", error)
+      alert("Error al procesar las imágenes")
     } finally {
       setIsUploading(false)
     }
@@ -57,14 +73,28 @@ export function PhotoUpload({ photos, onPhotosChange, maxPhotos = 2, userId }: P
     const photo = photos[index]
 
     // Si es un File (URL temporal), revocar la URL para liberar memoria
-    if (photo instanceof File && typeof window !== "undefined") {
-      const url = getPhotoUrl(photo)
+    if (photo.file instanceof File && typeof window !== "undefined") {
+      const url = getPhotoUrl(photo.file)
       if (url.startsWith("blob:")) {
         URL.revokeObjectURL(url)
       }
     }
 
     const newPhotos = photos.filter((_, i) => i !== index)
+
+    // Si eliminamos la foto primaria y hay otras fotos, hacer primaria la primera
+    if (photo.isPrimary && newPhotos.length > 0) {
+      newPhotos[0].isPrimary = true
+    }
+
+    onPhotosChange(newPhotos)
+  }
+
+  const setPrimaryPhoto = (index: number) => {
+    const newPhotos = photos.map((photo, i) => ({
+      ...photo,
+      isPrimary: i === index,
+    }))
     onPhotosChange(newPhotos)
   }
 
@@ -81,17 +111,22 @@ export function PhotoUpload({ photos, onPhotosChange, maxPhotos = 2, userId }: P
 
   return (
     <div className="space-y-4">
-      <Label className="text-base font-semibold">Fotos (opcional - máximo {maxPhotos})</Label>
+      <div className="flex items-center justify-between">
+        <Label className="text-base font-semibold">Fotos (opcional - máximo {maxPhotos})</Label>
+        <Badge variant="outline" className="text-xs">
+          {photos.length}/{maxPhotos}
+        </Badge>
+      </div>
 
       {/* Fotos subidas */}
       {photos.length > 0 && (
         <div className="grid grid-cols-2 gap-4">
-          {photos.map((photo, index) => (
+          {photos.map((photoData, index) => (
             <Card key={index} className="relative">
               <CardContent className="p-2">
                 <div className="relative aspect-square">
                   <img
-                    src={getPhotoUrl(photo) || "/placeholder.svg"}
+                    src={getPhotoUrl(photoData.file) || "/placeholder.svg"}
                     alt={`Foto ${index + 1}`}
                     className="w-full h-full object-cover rounded-md"
                     onError={(e) => {
@@ -100,6 +135,8 @@ export function PhotoUpload({ photos, onPhotosChange, maxPhotos = 2, userId }: P
                       target.src = "/placeholder.svg?height=300&width=300&text=Error+cargando+imagen"
                     }}
                   />
+
+                  {/* Botón para eliminar */}
                   <Button
                     type="button"
                     variant="destructive"
@@ -109,6 +146,31 @@ export function PhotoUpload({ photos, onPhotosChange, maxPhotos = 2, userId }: P
                   >
                     <X className="h-3 w-3" />
                   </Button>
+
+                  {/* Indicador de foto primaria */}
+                  {photoData.isPrimary && (
+                    <Badge
+                      variant="default"
+                      className="absolute top-1 left-1 text-xs bg-yellow-500 hover:bg-yellow-600"
+                    >
+                      <Star className="h-3 w-3 mr-1 fill-current" />
+                      Principal
+                    </Badge>
+                  )}
+
+                  {/* Botón para hacer primaria */}
+                  {!photoData.isPrimary && (
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      className="absolute bottom-1 left-1 h-6 text-xs px-2"
+                      onClick={() => setPrimaryPhoto(index)}
+                    >
+                      <StarOff className="h-3 w-3 mr-1" />
+                      Hacer principal
+                    </Button>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -152,11 +214,12 @@ export function PhotoUpload({ photos, onPhotosChange, maxPhotos = 2, userId }: P
         onChange={(e) => handleFileSelect(e.target.files, true)}
       />
 
-      {/* Input para galería */}
+      {/* Input para galería - permitir múltiples archivos */}
       <input
         ref={fileInputRef}
         type="file"
         accept="image/*"
+        multiple
         className="hidden"
         onChange={(e) => handleFileSelect(e.target.files, false)}
       />
@@ -169,9 +232,21 @@ export function PhotoUpload({ photos, onPhotosChange, maxPhotos = 2, userId }: P
             <p className="text-xs text-muted-foreground">Hasta {maxPhotos} fotos • Máximo 10MB cada una</p>
             <div className="mt-2">
               <p className="text-xs text-muted-foreground">Formatos: JPG, PNG, WebP, GIF</p>
+              <p className="text-xs text-muted-foreground mt-1">La primera foto será la imagen principal del plato</p>
             </div>
           </CardContent>
         </Card>
+      )}
+
+      {/* Información sobre foto principal */}
+      {photos.length > 0 && (
+        <div className="text-xs text-muted-foreground bg-muted/50 p-3 rounded-md">
+          <p className="flex items-center gap-1">
+            <Star className="h-3 w-3 fill-yellow-500 text-yellow-500" />
+            La foto principal se mostrará destacada en las reseñas
+          </p>
+          <p className="mt-1">Toca "Hacer principal" en cualquier foto para cambiarla</p>
+        </div>
       )}
     </div>
   )

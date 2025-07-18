@@ -37,6 +37,16 @@ export interface Review {
   place?: Place
 }
 
+export interface ReviewPhoto {
+  id: string
+  review_id: string
+  photo_url: string
+  is_primary: boolean
+  photo_order: number
+  created_at: string
+  updated_at: string
+}
+
 export interface DetailedReview {
   id: string
   user_id: string
@@ -62,9 +72,12 @@ export interface DetailedReview {
   restaurant_category: string
   comment?: string
 
-  // URLs de fotos
+  // URLs de fotos - mantener para compatibilidad
   photo_1_url?: string
   photo_2_url?: string
+
+  // Nueva relación con fotos
+  photos?: ReviewPhoto[]
 
   created_at: string
   updated_at: string
