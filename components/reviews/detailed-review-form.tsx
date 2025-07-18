@@ -19,6 +19,8 @@ import { getRatingColor } from "@/lib/rating-labels"
 import { createClient } from "@/lib/supabase/client"
 import { uploadMultipleReviewPhotos } from "@/lib/storage"
 import { Progress } from "@/components/ui/progress"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { AlertCircle } from "lucide-react"
 
 interface PhotoData {
   file: File | string
@@ -46,6 +48,7 @@ export function DetailedReviewForm({
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [uploadProgress, setUploadProgress] = useState(0)
   const [uploadStatus, setUploadStatus] = useState("")
+  const [uploadError, setUploadError] = useState<string | null>(null)
   const [wantsToRecommendDish, setWantsToRecommendDish] = useState(false)
 
   // Puntuaciones (1-10) - valores iniciales en 5
@@ -103,6 +106,8 @@ export function DetailedReviewForm({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    setUploadError(null)
+
     if (!selectedPlace || !priceRange || !category) {
       alert("Por favor completa todos los campos obligatorios")
       return
@@ -152,13 +157,23 @@ export function DetailedReviewForm({
 
         if (filesToUpload.length > 0) {
           try {
+            console.log("Iniciando upload de fotos...")
             uploadedPhotoUrls = await uploadMultipleReviewPhotos(filesToUpload, user.id, tempReviewId)
-            console.log("Fotos subidas:", uploadedPhotoUrls)
+            console.log("Fotos subidas exitosamente:", uploadedPhotoUrls)
             setUploadProgress(75)
           } catch (uploadError) {
             console.error("Error subiendo fotos:", uploadError)
-            // Continuar sin fotos si falla la subida
-            alert("Hubo un problema subiendo las fotos, pero la reseña se enviará sin ellas.")
+            const errorMessage = uploadError instanceof Error ? uploadError.message : "Error desconocido"
+            setUploadError(`Error subiendo fotos: ${errorMessage}`)
+
+            // Preguntar al usuario si quiere continuar sin fotos
+            const continueWithoutPhotos = confirm(
+              "Hubo un problema subiendo las fotos. ¿Quieres enviar la reseña sin fotos?",
+            )
+
+            if (!continueWithoutPhotos) {
+              return
+            }
           }
         }
 
@@ -202,7 +217,8 @@ export function DetailedReviewForm({
       await onSubmit(reviewData)
     } catch (error) {
       console.error("Error submitting review:", error)
-      alert("Error al enviar la reseña. Inténtalo de nuevo.")
+      const errorMessage = error instanceof Error ? error.message : "Error desconocido"
+      setUploadError(`Error al enviar la reseña: ${errorMessage}`)
     } finally {
       setIsSubmitting(false)
       setUploadProgress(0)
@@ -219,6 +235,14 @@ export function DetailedReviewForm({
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-6">
+            {/* Error Alert */}
+            {uploadError && (
+              <Alert variant="destructive">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>{uploadError}</AlertDescription>
+              </Alert>
+            )}
+
             {/* Búsqueda de lugar */}
             <div className="space-y-2">
               <Label>Lugar *</Label>
