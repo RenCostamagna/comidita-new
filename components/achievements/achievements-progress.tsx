@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { ChevronRight, Trophy } from "lucide-react"
+import { ChevronRight } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { RESTAURANT_CATEGORIES } from "@/lib/types"
 
@@ -23,7 +23,7 @@ interface Achievement {
 }
 
 interface AchievementsProgressProps {
-  userId: string
+  userId?: string
   onViewAllAchievements?: () => void
   onAchievementSelect?: (achievement: Achievement) => void
 }
@@ -75,35 +75,69 @@ export function AchievementsProgress({
 
   const fetchIncompleteAchievements = async () => {
     try {
-      // Obtener todos los logros de todas las categorías
       const categories = Object.keys(RESTAURANT_CATEGORIES)
       const allAchievements: Achievement[] = []
 
       for (const category of categories) {
-        const { data, error } = await supabase.rpc("get_category_achievements_progress", {
-          user_id_param: userId,
-          category_param: category,
-        })
+        if (userId) {
+          // User is logged in - get their actual progress
+          const { data, error } = await supabase.rpc("get_category_achievements_progress", {
+            user_id_param: userId,
+            category_param: category,
+          })
 
-        if (error) {
-          console.error(`Error fetching achievements for ${category}:`, error)
-          continue
-        }
+          if (error) {
+            console.error(`Error fetching achievements for ${category}:`, error)
+            continue
+          }
 
-        if (data) {
-          // Agregar categoría a cada logro y filtrar solo los no desbloqueados
-          const categoryAchievements = data
-            .filter((achievement: any) => !achievement.is_unlocked)
-            .map((achievement: any) => ({
-              ...achievement,
+          if (data) {
+            const categoryAchievements = data
+              .filter((achievement: any) => !achievement.is_unlocked)
+              .map((achievement: any) => ({
+                ...achievement,
+                category,
+              }))
+
+            allAchievements.push(...categoryAchievements)
+          }
+        } else {
+          // User not logged in - get all level 1 achievements with zero progress
+          const { data, error } = await supabase
+            .from("category_achievements")
+            .select("*")
+            .eq("category", category)
+            .eq("level", 1)
+            .single()
+
+          if (error) {
+            console.error(`Error fetching level 1 achievement for ${category}:`, error)
+            continue
+          }
+
+          if (data) {
+            // Create achievement object with zero progress
+            const achievement: Achievement = {
+              achievement_id: data.id,
+              name: data.name,
+              description: data.description,
+              level: data.level,
+              required_reviews: data.required_reviews,
+              points_reward: data.points_reward,
+              icon: data.icon,
+              color: data.color,
               category,
-            }))
+              is_unlocked: false,
+              current_progress: 0,
+              progress_percentage: 0,
+            }
 
-          allAchievements.push(...categoryAchievements)
+            allAchievements.push(achievement)
+          }
         }
       }
 
-      // Agrupar por categoría y seleccionar el mejor candidato de cada una
+      // Group by category and select the best candidate from each
       const achievementsByCategory = allAchievements.reduce(
         (acc, achievement) => {
           if (!acc[achievement.category]) {
@@ -111,7 +145,7 @@ export function AchievementsProgress({
           } else {
             const current = acc[achievement.category]
 
-            // Priorizar logros con progreso > 0, luego por mayor progreso
+            // Prioritize achievements with progress > 0, then by higher progress
             if (achievement.current_progress > 0 && current.current_progress === 0) {
               acc[achievement.category] = achievement
             } else if (
@@ -125,7 +159,7 @@ export function AchievementsProgress({
               current.current_progress === 0 &&
               achievement.level < current.level
             ) {
-              // Si ninguno tiene progreso, tomar el de menor nivel (primero a completar)
+              // If neither has progress, take the lower level (first to complete)
               acc[achievement.category] = achievement
             }
           }
@@ -134,20 +168,20 @@ export function AchievementsProgress({
         {} as Record<string, Achievement>,
       )
 
-      // Convertir a array y ordenar: primero los que tienen progreso (por progreso desc), luego los que no tienen progreso (por nivel asc)
+      // Convert to array and sort: first those with progress (by progress desc), then those without progress (by level asc)
       const uniqueAchievements = Object.values(achievementsByCategory)
         .sort((a, b) => {
-          // Si ambos tienen progreso, ordenar por progreso descendente
+          // If both have progress, sort by progress descending
           if (a.current_progress > 0 && b.current_progress > 0) {
             return b.progress_percentage - a.progress_percentage
           }
-          // Si solo uno tiene progreso, ese va primero
+          // If only one has progress, that one goes first
           if (a.current_progress > 0 && b.current_progress === 0) return -1
           if (a.current_progress === 0 && b.current_progress > 0) return 1
-          // Si ninguno tiene progreso, ordenar por nivel ascendente
+          // If neither has progress, sort by level ascending
           return a.level - b.level
         })
-        .slice(0, 6) // Máximo 6 logros
+        .slice(0, 6) // Maximum 6 achievements
 
       setIncompleteAchievements(uniqueAchievements)
     } catch (error) {
@@ -189,22 +223,25 @@ export function AchievementsProgress({
     )
   }
 
+  // Always show achievements, even if empty (though this shouldn't happen now)
   if (incompleteAchievements.length === 0) {
     return (
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <h2 className="text-xl font-semibold">Logros</h2>
-          <Button variant="ghost" size="sm" className="text-primary hover:text-primary/80" onClick={handleViewAllClick}>
-            Ver todos
-            <ChevronRight className="ml-1 h-4 w-4" />
-          </Button>
+          {userId && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-primary hover:text-primary/80"
+              onClick={handleViewAllClick}
+            >
+              Ver todos
+              <ChevronRight className="ml-1 h-4 w-4" />
+            </Button>
+          )}
         </div>
-        <Card>
-          <CardContent className="p-6 text-center">
-            <Trophy className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-            <p className="text-muted-foreground">¡Haz tu primera reseña para comenzar a desbloquear logros!</p>
-          </CardContent>
-        </Card>
+        <div className="text-center py-8 text-muted-foreground">No hay logros disponibles</div>
       </div>
     )
   }
@@ -215,12 +252,16 @@ export function AchievementsProgress({
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-xl font-semibold">Logros</h2>
-          <p className="text-sm text-muted-foreground">Logros que estás cerca de completar</p>
+          <p className="text-sm text-muted-foreground">
+            {userId ? "Logros que estás cerca de completar" : "Inicia sesión para comenzar a desbloquear logros"}
+          </p>
         </div>
-        <Button variant="ghost" size="sm" className="text-primary hover:text-primary/80" onClick={handleViewAllClick}>
-          Ver todos
-          <ChevronRight className="ml-1 h-4 w-4" />
-        </Button>
+        {userId && (
+          <Button variant="ghost" size="sm" className="text-primary hover:text-primary/80" onClick={handleViewAllClick}>
+            Ver todos
+            <ChevronRight className="ml-1 h-4 w-4" />
+          </Button>
+        )}
       </div>
 
       {/* Horizontal scrollable cards */}
@@ -284,9 +325,11 @@ export function AchievementsProgress({
                           {/* Progress percentage - with less bottom spacing */}
                           <div className="text-center pt-0.5">
                             <span className="text-xs font-medium text-white">
-                              {achievement.current_progress > 0
+                              {userId && achievement.current_progress > 0
                                 ? `${Math.round(achievement.progress_percentage)}% completado`
-                                : "Sin progreso aún"}
+                                : userId
+                                  ? "Sin progreso aún"
+                                  : "Inicia sesión para comenzar"}
                             </span>
                           </div>
                         </div>

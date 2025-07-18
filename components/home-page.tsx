@@ -616,7 +616,7 @@ export function HomePage({ user: initialUser }: HomePageProps) {
 
             {/* Logros - MOVED TO THIRD POSITION */}
             <AchievementsProgress
-              userId={currentUser.id}
+              userId={currentUser?.id} // Pass undefined if no user, component will handle it
               onViewAllAchievements={() => setShowProfile(true)}
               onAchievementSelect={(achievement) => {
                 console.log("Selected achievement:", achievement)
