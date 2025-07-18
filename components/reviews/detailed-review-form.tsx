@@ -18,6 +18,7 @@ import { PhotoUpload } from "@/components/photos/photo-upload"
 import { getRatingColor } from "@/lib/rating-labels"
 import { createClient } from "@/lib/supabase/client"
 import { uploadMultipleReviewPhotos } from "@/lib/storage"
+import { Progress } from "@/components/ui/progress"
 
 interface PhotoData {
   file: File | string
@@ -43,6 +44,8 @@ export function DetailedReviewForm({
   const [comment, setComment] = useState("")
   const [photos, setPhotos] = useState<PhotoData[]>([])
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [uploadProgress, setUploadProgress] = useState(0)
+  const [uploadStatus, setUploadStatus] = useState("")
   const [wantsToRecommendDish, setWantsToRecommendDish] = useState(false)
 
   // Puntuaciones (1-10) - valores iniciales en 5
@@ -84,7 +87,6 @@ export function DetailedReviewForm({
     ambiance: "Ambientación",
     furniture_comfort: "Confort del mobiliario",
     service: "Servicio de mesa",
-    // Eliminamos drinks_variety: "Carta de bebidas" y cleanliness: "Limpieza"
   }
 
   const handleRatingChange = (key: string, value: number[]) => {
@@ -123,6 +125,8 @@ export function DetailedReviewForm({
     }
 
     setIsSubmitting(true)
+    setUploadProgress(0)
+    setUploadStatus("Preparando...")
 
     try {
       // Generar un ID temporal para la reseña
@@ -140,14 +144,22 @@ export function DetailedReviewForm({
       // Subir fotos a Vercel Blob si hay fotos
       let uploadedPhotoUrls: string[] = []
       if (photos.length > 0) {
-        console.log("Subiendo fotos a Vercel Blob...")
+        setUploadStatus("Subiendo fotos...")
+        setUploadProgress(25)
 
         // Filtrar solo los archivos File (no strings que ya son URLs)
         const filesToUpload = photos.map((photo) => photo.file).filter((file): file is File => file instanceof File)
 
         if (filesToUpload.length > 0) {
-          uploadedPhotoUrls = await uploadMultipleReviewPhotos(filesToUpload, user.id, tempReviewId)
-          console.log("Fotos subidas:", uploadedPhotoUrls)
+          try {
+            uploadedPhotoUrls = await uploadMultipleReviewPhotos(filesToUpload, user.id, tempReviewId)
+            console.log("Fotos subidas:", uploadedPhotoUrls)
+            setUploadProgress(75)
+          } catch (uploadError) {
+            console.error("Error subiendo fotos:", uploadError)
+            // Continuar sin fotos si falla la subida
+            alert("Hubo un problema subiendo las fotos, pero la reseña se enviará sin ellas.")
+          }
         }
 
         // También incluir URLs que ya existen (strings)
@@ -157,6 +169,9 @@ export function DetailedReviewForm({
 
         uploadedPhotoUrls = [...uploadedPhotoUrls, ...existingUrls]
       }
+
+      setUploadStatus("Guardando reseña...")
+      setUploadProgress(90)
 
       const placeData = {
         google_place_id: placeId,
@@ -179,16 +194,19 @@ export function DetailedReviewForm({
         price_range: priceRange,
         restaurant_category: category,
         comment: comment.trim() || null,
-        photo_urls: uploadedPhotoUrls, // Enviar las URLs de las fotos subidas
-        primary_photo_url: uploadedPhotoUrls.length > 0 ? uploadedPhotoUrls[0] : null, // Primera foto como primaria
+        photo_urls: uploadedPhotoUrls,
+        primary_photo_url: uploadedPhotoUrls.length > 0 ? uploadedPhotoUrls[0] : null,
       }
 
+      setUploadProgress(100)
       await onSubmit(reviewData)
     } catch (error) {
       console.error("Error submitting review:", error)
       alert("Error al enviar la reseña. Inténtalo de nuevo.")
     } finally {
       setIsSubmitting(false)
+      setUploadProgress(0)
+      setUploadStatus("")
     }
   }
 
@@ -371,6 +389,17 @@ export function DetailedReviewForm({
               />
             </div>
 
+            {/* Progress bar durante la subida */}
+            {isSubmitting && (
+              <div className="space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span>{uploadStatus}</span>
+                  <span>{uploadProgress}%</span>
+                </div>
+                <Progress value={uploadProgress} className="w-full" />
+              </div>
+            )}
+
             <div className="flex gap-2">
               <Button
                 type="button"
@@ -382,7 +411,7 @@ export function DetailedReviewForm({
                 Cancelar
               </Button>
               <Button type="submit" disabled={isLoading || isSubmitting} className="flex-1">
-                {isSubmitting ? "Enviando..." : "Enviar reseña"}
+                {isSubmitting ? uploadStatus || "Enviando..." : "Enviar reseña"}
               </Button>
             </div>
           </form>

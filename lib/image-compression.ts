@@ -58,6 +58,53 @@ export async function getImageInfo(file: File): Promise<ImageInfo> {
 export async function compressImageAdvanced(file: File, options: CompressionOptions = {}): Promise<File> {
   const { maxWidth = 800, maxHeight = 600, quality = 0.85, maxSizeKB = 400, outputFormat = "jpeg" } = options
 
+  // Si estamos en el servidor (Node.js), usar sharp
+  if (typeof window === "undefined") {
+    return compressImageServer(file, options)
+  }
+
+  // Si estamos en el cliente, usar Canvas
+  return compressImageClient(file, options)
+}
+
+// Función para comprimir en el servidor usando sharp
+async function compressImageServer(file: File, options: CompressionOptions): Promise<File> {
+  try {
+    const sharp = (await import("sharp")).default
+    const { maxWidth = 800, maxHeight = 600, quality = 85, outputFormat = "jpeg" } = options
+
+    const buffer = Buffer.from(await file.arrayBuffer())
+
+    let sharpInstance = sharp(buffer).resize(maxWidth, maxHeight, {
+      fit: "inside",
+      withoutEnlargement: true,
+    })
+
+    if (outputFormat === "jpeg") {
+      sharpInstance = sharpInstance.jpeg({ quality: Math.round(quality * 100) })
+    } else if (outputFormat === "png") {
+      sharpInstance = sharpInstance.png({ quality: Math.round(quality * 100) })
+    } else if (outputFormat === "webp") {
+      sharpInstance = sharpInstance.webp({ quality: Math.round(quality * 100) })
+    }
+
+    const compressedBuffer = await sharpInstance.toBuffer()
+
+    return new File([compressedBuffer], file.name, {
+      type: `image/${outputFormat}`,
+      lastModified: Date.now(),
+    })
+  } catch (error) {
+    console.error("Error comprimiendo imagen en servidor:", error)
+    // Fallback: retornar archivo original
+    return file
+  }
+}
+
+// Función para comprimir en el cliente usando Canvas
+async function compressImageClient(file: File, options: CompressionOptions): Promise<File> {
+  const { maxWidth = 800, maxHeight = 600, quality = 0.85, maxSizeKB = 400, outputFormat = "jpeg" } = options
+
   return new Promise((resolve, reject) => {
     const canvas = document.createElement("canvas")
     const ctx = canvas.getContext("2d")
