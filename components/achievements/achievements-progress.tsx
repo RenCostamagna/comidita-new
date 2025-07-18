@@ -57,6 +57,9 @@ const CATEGORY_CONFIG = {
   BARES: {
     color: "bg-gradient-to-br from-indigo-500 to-indigo-600",
   },
+  HELADERIAS: {
+    color: "bg-gradient-to-br from-pink-400 to-pink-500",
+  },
 }
 
 export function AchievementsProgress({

@@ -57,6 +57,10 @@ const CATEGORY_CONFIG = {
     icon: Wine,
     color: "bg-gradient-to-br from-indigo-500 to-indigo-600",
   },
+  HELADERIAS: {
+    icon: Coffee, // Using Coffee icon as placeholder for ice cream
+    color: "bg-gradient-to-br from-pink-400 to-pink-500",
+  },
 }
 
 export function AllCategoriesPage({

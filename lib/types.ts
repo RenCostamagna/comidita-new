@@ -67,7 +67,7 @@ export interface DetailedReview {
   vegetarian_friendly?: boolean
 
   price_range: string
-  restaurant_category: string
+  restaurant_category: string // Should be one of: 'PARRILLAS', 'CAFE_Y_DELI', 'BODEGONES', 'RESTAURANTES', 'HAMBURGUESERIAS', 'PIZZERIAS', 'PASTAS', 'CARRITOS', 'BARES', 'HELADERIAS'
   comment?: string
 
   // URLs de fotos - mantener para compatibilidad
@@ -128,4 +128,5 @@ export const RESTAURANT_CATEGORIES = {
   PASTAS: "Pastas",
   CARRITOS: "Carritos",
   BARES: "Bares",
+  HELADERIAS: "Heladerías",
 }
