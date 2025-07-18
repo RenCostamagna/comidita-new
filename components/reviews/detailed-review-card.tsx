@@ -6,6 +6,7 @@ import { Progress } from "@/components/ui/progress"
 import { PRICE_RANGES, RESTAURANT_CATEGORIES } from "@/lib/types"
 import { getRatingColor } from "@/lib/rating-labels"
 import type { DetailedReview } from "@/lib/types"
+import { sanitizePhotoUrl, debugPhotoUrl } from "@/lib/debug-photos"
 
 interface DetailedReviewCardProps {
   review: DetailedReview
@@ -42,20 +43,30 @@ export function DetailedReviewCard({ review }: DetailedReviewCardProps) {
   // Obtener fotos - priorizar nueva estructura, fallback a campos legacy
   const getReviewPhotos = () => {
     if (review.photos && review.photos.length > 0) {
-      return review.photos.sort((a, b) => {
-        if (a.is_primary && !b.is_primary) return -1
-        if (!a.is_primary && b.is_primary) return 1
-        return a.photo_order - b.photo_order
-      })
+      return review.photos
+        .filter((photo) => photo.photo_url) // Filtrar fotos sin URL
+        .sort((a, b) => {
+          if (a.is_primary && !b.is_primary) return -1
+          if (!a.is_primary && b.is_primary) return 1
+          return a.photo_order - b.photo_order
+        })
     }
 
     // Fallback a campos legacy
     const legacyPhotos = []
-    if (review.photo_1_url) {
-      legacyPhotos.push({ photo_url: review.photo_1_url, is_primary: true, photo_order: 1 })
+    if (review.photo_1_url && review.photo_1_url.trim()) {
+      legacyPhotos.push({
+        photo_url: review.photo_1_url.trim(),
+        is_primary: true,
+        photo_order: 1,
+      })
     }
-    if (review.photo_2_url && review.photo_2_url !== review.photo_1_url) {
-      legacyPhotos.push({ photo_url: review.photo_2_url, is_primary: false, photo_order: 2 })
+    if (review.photo_2_url && review.photo_2_url.trim() && review.photo_2_url !== review.photo_1_url) {
+      legacyPhotos.push({
+        photo_url: review.photo_2_url.trim(),
+        is_primary: false,
+        photo_order: 2,
+      })
     }
     return legacyPhotos
   }
@@ -139,13 +150,16 @@ export function DetailedReviewCard({ review }: DetailedReviewCardProps) {
               <div className="relative">
                 <div className="aspect-video max-w-sm mx-auto">
                   <img
-                    src={primaryPhoto.photo_url || "/placeholder.svg"}
+                    src={sanitizePhotoUrl(primaryPhoto.photo_url) || "/placeholder.svg"}
                     alt="Foto principal de la reseña"
                     className="w-full h-full object-cover rounded-lg"
-                    crossOrigin="anonymous"
                     onError={(e) => {
                       const target = e.target as HTMLImageElement
+                      debugPhotoUrl(primaryPhoto.photo_url, "ERROR - Foto principal")
                       target.src = "/placeholder.svg?height=300&width=300&text=Error+cargando+imagen"
+                    }}
+                    onLoad={() => {
+                      debugPhotoUrl(primaryPhoto.photo_url, "SUCCESS - Foto principal")
                     }}
                   />
                 </div>
@@ -158,13 +172,16 @@ export function DetailedReviewCard({ review }: DetailedReviewCardProps) {
                 {otherPhotos.slice(0, 5).map((photo, index) => (
                   <div key={index} className="aspect-square">
                     <img
-                      src={photo.photo_url || "/placeholder.svg"}
+                      src={sanitizePhotoUrl(photo.photo_url) || "/placeholder.svg"}
                       alt={`Foto adicional ${index + 1}`}
                       className="w-full h-full object-cover rounded-md"
-                      crossOrigin="anonymous"
                       onError={(e) => {
                         const target = e.target as HTMLImageElement
+                        debugPhotoUrl(photo.photo_url, `ERROR - Foto adicional ${index + 1}`)
                         target.src = "/placeholder.svg?height=150&width=150&text=Error"
+                      }}
+                      onLoad={() => {
+                        debugPhotoUrl(photo.photo_url, `SUCCESS - Foto adicional ${index + 1}`)
                       }}
                     />
                   </div>

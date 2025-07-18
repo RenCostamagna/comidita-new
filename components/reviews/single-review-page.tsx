@@ -13,6 +13,7 @@ import { getRatingColor } from "@/lib/rating-labels"
 import type { DetailedReview } from "@/lib/types"
 import { Header } from "@/components/layout/header"
 import { BottomNavigation } from "@/components/layout/bottom-navigation"
+import { sanitizePhotoUrl, debugPhotoUrl } from "@/lib/debug-photos"
 
 interface SingleReviewPageProps {
   reviewId: string
@@ -125,20 +126,30 @@ export function SingleReviewPage({
   // Obtener fotos - priorizar nueva estructura, fallback a campos legacy
   const getReviewPhotos = () => {
     if (review?.photos && review.photos.length > 0) {
-      return review.photos.sort((a, b) => {
-        if (a.is_primary && !b.is_primary) return -1
-        if (!a.is_primary && b.is_primary) return 1
-        return a.photo_order - b.photo_order
-      })
+      return review.photos
+        .filter((photo) => photo.photo_url) // Filtrar fotos sin URL
+        .sort((a, b) => {
+          if (a.is_primary && !b.is_primary) return -1
+          if (!a.is_primary && b.is_primary) return 1
+          return a.photo_order - b.photo_order
+        })
     }
 
     // Fallback a campos legacy
     const legacyPhotos = []
-    if (review?.photo_1_url) {
-      legacyPhotos.push({ photo_url: review.photo_1_url, is_primary: true, photo_order: 1 })
+    if (review?.photo_1_url && review.photo_1_url.trim()) {
+      legacyPhotos.push({
+        photo_url: review.photo_1_url.trim(),
+        is_primary: true,
+        photo_order: 1,
+      })
     }
-    if (review?.photo_2_url && review.photo_2_url !== review.photo_1_url) {
-      legacyPhotos.push({ photo_url: review.photo_2_url, is_primary: false, photo_order: 2 })
+    if (review?.photo_2_url && review.photo_2_url.trim() && review.photo_2_url !== review.photo_1_url) {
+      legacyPhotos.push({
+        photo_url: review.photo_2_url.trim(),
+        is_primary: false,
+        photo_order: 2,
+      })
     }
     return legacyPhotos
   }
@@ -308,14 +319,17 @@ export function SingleReviewPage({
                   <div className="relative">
                     <div className="aspect-video max-w-lg mx-auto">
                       <img
-                        src={primaryPhoto.photo_url || "/placeholder.svg"}
+                        src={sanitizePhotoUrl(primaryPhoto.photo_url) || "/placeholder.svg"}
                         alt="Foto principal de la reseña"
                         className="w-full h-full object-cover rounded-lg cursor-pointer hover:opacity-90 transition-opacity"
-                        crossOrigin="anonymous"
-                        onClick={() => handleImageClick(primaryPhoto.photo_url, 0)}
+                        onClick={() => handleImageClick(sanitizePhotoUrl(primaryPhoto.photo_url), 0)}
                         onError={(e) => {
                           const target = e.target as HTMLImageElement
+                          debugPhotoUrl(primaryPhoto.photo_url, "ERROR - Foto principal")
                           target.src = "/placeholder.svg?height=400&width=600&text=Error+cargando+imagen"
+                        }}
+                        onLoad={() => {
+                          debugPhotoUrl(primaryPhoto.photo_url, "SUCCESS - Foto principal")
                         }}
                       />
                     </div>
@@ -328,14 +342,17 @@ export function SingleReviewPage({
                     {otherPhotos.map((photo, index) => (
                       <div key={index} className="aspect-square">
                         <img
-                          src={photo.photo_url || "/placeholder.svg"}
+                          src={sanitizePhotoUrl(photo.photo_url) || "/placeholder.svg"}
                           alt={`Foto adicional ${index + 1}`}
                           className="w-full h-full object-cover rounded-md cursor-pointer hover:opacity-90 transition-opacity"
-                          crossOrigin="anonymous"
-                          onClick={() => handleImageClick(photo.photo_url, index + 1)}
+                          onClick={() => handleImageClick(sanitizePhotoUrl(photo.photo_url), index + 1)}
                           onError={(e) => {
                             const target = e.target as HTMLImageElement
+                            debugPhotoUrl(photo.photo_url, `ERROR - Foto adicional ${index + 1}`)
                             target.src = "/placeholder.svg?height=150&width=150&text=Error"
+                          }}
+                          onLoad={() => {
+                            debugPhotoUrl(photo.photo_url, `SUCCESS - Foto adicional ${index + 1}`)
                           }}
                         />
                       </div>
@@ -431,14 +448,17 @@ export function SingleReviewPage({
             )}
 
             <img
-              src={selectedImage || "/placeholder.svg"}
+              src={sanitizePhotoUrl(selectedImage) || "/placeholder.svg"}
               alt="Imagen ampliada"
               className="max-w-full max-h-full object-contain rounded-lg"
-              crossOrigin="anonymous"
               onClick={(e) => e.stopPropagation()}
               onError={(e) => {
                 const target = e.target as HTMLImageElement
+                debugPhotoUrl(selectedImage, "ERROR - Modal")
                 target.src = "/placeholder.svg?height=600&width=600&text=Error+cargando+imagen"
+              }}
+              onLoad={() => {
+                debugPhotoUrl(selectedImage, "SUCCESS - Modal")
               }}
             />
           </div>
