@@ -20,20 +20,19 @@ export function DetailedReviewCard({ review }: DetailedReviewCardProps) {
     })
   }
 
-  // Labels actualizados sin las opciones dietéticas
+  // Labels actualizados - SOLO 7 CAMPOS ACTIVOS
   const ratingLabels = {
     food_taste: "Sabor",
     presentation: "Presentación",
     portion_size: "Porción",
-    drinks_variety: "Bebidas",
     music_acoustics: "Música",
     ambiance: "Ambiente",
     furniture_comfort: "Confort",
-    cleanliness: "Limpieza",
     service: "Servicio",
+    // ELIMINADOS: veggie_options, gluten_free_options, vegan_options
   }
 
-  // Calcular promedio con los 9 campos actualizados
+  // Calcular promedio con los 7 campos actualizados
   const averageRating =
     Object.values(ratingLabels).reduce((sum, _, index) => {
       const key = Object.keys(ratingLabels)[index] as keyof typeof ratingLabels

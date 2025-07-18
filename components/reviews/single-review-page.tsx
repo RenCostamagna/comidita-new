@@ -82,16 +82,14 @@ export function SingleReviewPage({
   }
 
   const calculateAverageRating = (review: DetailedReview) => {
-    // Calcular promedio con los 9 campos actualizados (sin opciones dietéticas)
+    // Calcular promedio con los 7 campos actualizados
     const ratings = [
       review.food_taste,
       review.presentation,
       review.portion_size,
-      review.drinks_variety,
       review.music_acoustics,
       review.ambiance,
       review.furniture_comfort,
-      review.cleanliness,
       review.service,
     ]
     return ratings.reduce((sum, rating) => sum + rating, 0) / ratings.length
@@ -155,17 +153,16 @@ export function SingleReviewPage({
     setSelectedImage(photos[currentImageIndex].photo_url)
   }
 
-  // Categorías de rating actualizadas
+  // Categorías de rating actualizadas - SOLO 7 CAMPOS ACTIVOS
   const ratingCategories = [
     { key: "food_taste", label: "Sabor" },
     { key: "presentation", label: "Presentación" },
     { key: "portion_size", label: "Porción" },
-    { key: "drinks_variety", label: "Bebidas" },
     { key: "music_acoustics", label: "Música" },
     { key: "ambiance", label: "Ambiente" },
     { key: "furniture_comfort", label: "Confort" },
-    { key: "cleanliness", label: "Limpieza" },
     { key: "service", label: "Servicio" },
+    // ELIMINADOS: veggie_options, gluten_free_options, vegan_options
   ]
 
   if (isLoading) {
@@ -236,11 +233,9 @@ export function SingleReviewPage({
                   variant="outline"
                   className="flex-1 flex items-center gap-1 bg-transparent"
                 >
-                  
                   Ver lugar
                 </Button>
                 <Button onClick={handleAddReview} size="sm" className="flex-1 flex items-center gap-1">
-                  
                   Reseñar
                 </Button>
               </div>

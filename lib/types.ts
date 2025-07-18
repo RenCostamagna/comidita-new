@@ -53,7 +53,7 @@ export interface DetailedReview {
   place_id: string
   dish_name?: string
 
-  // Puntuaciones del 1 al 10 - CAMPOS ACTUALIZADOS
+  // Puntuaciones del 1 al 10 - SOLO 7 CAMPOS ACTIVOS
   food_taste: number
   presentation: number
   portion_size: number
