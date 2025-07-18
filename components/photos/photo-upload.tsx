@@ -234,16 +234,6 @@ export function PhotoUpload({ photos, onPhotosChange, maxPhotos = 6, userId }: P
         </Card>
       )}
 
-      {/* Información sobre foto principal */}
-      {photos.length > 0 && (
-        <div className="text-xs text-muted-foreground bg-muted/50 p-3 rounded-md">
-          <p className="flex items-center gap-1">
-            <Star className="h-3 w-3 fill-yellow-500 text-yellow-500" />
-            La foto principal se mostrará destacada en las reseñas
-          </p>
-          <p className="mt-1">Toca "Hacer principal" en cualquier foto para cambiarla</p>
-        </div>
-      )}
     </div>
   )
 }

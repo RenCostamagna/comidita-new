@@ -3,8 +3,7 @@
 import { useState, useEffect } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import { ChevronRight, Utensils, Coffee, Home, Crown, Beef, Pizza, ChefHat, Truck, Wine } from "lucide-react"
+import { ChevronRight } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { RESTAURANT_CATEGORIES } from "@/lib/types"
 
@@ -13,46 +12,36 @@ interface CategoriesSectionProps {
   onViewAllCategories?: () => void
 }
 
-// Mapeo de categorías a iconos y colores
+// Mapeo de categorías a colores (sin iconos)
 const CATEGORY_CONFIG = {
   PARRILLAS: {
-    icon: Beef,
     color: "bg-gradient-to-br from-red-500 to-red-600",
   },
   CAFE_Y_DELI: {
-    icon: Coffee,
     color: "bg-gradient-to-br from-yellow-400 to-yellow-500",
   },
   BODEGONES: {
-    icon: Home,
     color: "bg-gradient-to-br from-blue-500 to-blue-600",
   },
   RESTAURANTES: {
-    icon: Crown,
     color: "bg-gradient-to-br from-gray-700 to-gray-800",
   },
   HAMBURGUESERIAS: {
-    icon: ChefHat,
     color: "bg-gradient-to-br from-red-600 to-red-700",
   },
   PIZZERIAS: {
-    icon: Pizza,
     color: "bg-gradient-to-br from-green-500 to-green-600",
   },
   PASTAS: {
-    icon: Utensils,
     color: "bg-gradient-to-br from-orange-500 to-orange-600",
   },
   CARRITOS: {
-    icon: Truck,
     color: "bg-gradient-to-br from-purple-500 to-purple-600",
   },
   BARES: {
-    icon: Wine,
     color: "bg-gradient-to-br from-indigo-500 to-indigo-600",
   },
   HELADERIAS: {
-    icon: Coffee, // Using Coffee icon as placeholder for ice cream
     color: "bg-gradient-to-br from-pink-400 to-pink-500",
   },
 }
@@ -118,44 +107,26 @@ export function CategoriesSection({ onCategorySelect, onViewAllCategories }: Cat
         </Button>
       </div>
 
-      {/* Horizontal scrollable cards */}
+      {/* Grid scrollable with 2 rows */}
       <div className="relative">
         <div className="overflow-x-auto pb-4 scrollbar-hide">
-          <div className="flex gap-3 w-max pl-0 pr-16">
-            {Object.entries(RESTAURANT_CATEGORIES).map(([key, label]) => {
+          <div className="grid grid-rows-2 grid-flow-col gap-3 w-max pl-0 pr-16" style={{ gridAutoColumns: "10rem" }}>
+            {Object.entries(RESTAURANT_CATEGORIES).map(([key, label], index) => {
               const config = CATEGORY_CONFIG[key as keyof typeof CATEGORY_CONFIG]
-              const count = categoryCounts[key] || 0
-              const IconComponent = config?.icon || Utensils
 
               return (
                 <Card
                   key={key}
-                  className={`relative overflow-hidden cursor-pointer hover:shadow-lg transition-all duration-300 w-36 h-36 border-0 flex-shrink-0 ${config?.color || "bg-gradient-to-br from-gray-500 to-gray-600"}`}
+                  className={`relative overflow-hidden cursor-pointer hover:shadow-lg transition-all duration-300 h-20 border-0 flex-shrink-0 ${config?.color || "bg-gradient-to-br from-gray-500 to-gray-600"}`}
                   onClick={() => handleCategoryClick(key)}
                 >
-                  <CardContent className="px-2 py-3 h-full flex flex-col justify-between text-white relative">
+                  <CardContent className="px-3 py-2 h-full flex items-center justify-center text-white relative">
                     {/* Background pattern/texture */}
                     <div className="absolute inset-0 bg-black/10"></div>
 
-                    {/* Content */}
-                    <div className="relative z-10">
-                      {/* Top row with icon and count */}
-                      <div className="flex items-start justify-between mb-2">
-                        <div className="p-2 bg-white/20 backdrop-blur-sm rounded-lg">
-                          <IconComponent className="h-5 w-5 text-white" />
-                        </div>
-                        <Badge
-                          variant="secondary"
-                          className="bg-white/20 backdrop-blur-sm text-white border-white/30 text-xs px-1.5 py-0.5"
-                        >
-                          {isLoading ? "..." : count}
-                        </Badge>
-                      </div>
-
-                      {/* Category title */}
-                      <div>
-                        <h3 className="font-semibold text-sm text-white leading-tight">{label}</h3>
-                      </div>
+                    {/* Content - Only category name, centered */}
+                    <div className="relative z-10 text-center">
+                      <h3 className="font-semibold text-sm text-white leading-tight">{label}</h3>
                     </div>
                   </CardContent>
                 </Card>
