@@ -300,7 +300,7 @@ export function DetailedReviewForm({
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Selecciona una categoría" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="rounded-[6px]">
                   {Object.entries(RESTAURANT_CATEGORIES).map(([key, label]) => (
                     <SelectItem key={key} value={key}>
                       {label}
@@ -318,7 +318,7 @@ export function DetailedReviewForm({
               <Label htmlFor="comment">Comentario adicional (opcional)</Label>
               <Textarea className="py-3"
                 id="comment"
-                placeholder="Cuéntanos más detalles sobre tu experiencia..."
+                placeholder="Cuéntanos más detalles..."
                 value={comment}
                 onChange={(e) => setComment(e.target.value)}
                 rows={4}

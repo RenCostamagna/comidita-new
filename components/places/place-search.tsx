@@ -236,7 +236,7 @@ export function PlaceSearch({
       </div>
 
       {isOpen && (
-        <Card className="absolute top-full left-0 right-0 mt-1 max-h-96 overflow-y-auto z-50 shadow-lg">
+        <Card className="absolute top-full left-0 right-0 mt-1 max-h-96 overflow-y-auto z-50 shadow-lg rounded-[var(--radius-dropdown)]">
           {isLoading && <div className="p-4 text-center text-muted-foreground">Buscando lugares...</div>}
 
           {error && <div className="p-4 text-center text-red-500">{error}</div>}
