@@ -161,7 +161,7 @@ export function CategoriesSection({ onCategorySelect, onViewAllCategories }: Cat
         </div>
 
         {/* Gradient overlay to indicate more content */}
-        <div className="absolute top-0 right-0 bottom-4 w-16 bg-gradient-to-l from-background via-background/80 to-transparent pointer-events-none"></div>
+        <div className="absolute top-0 right-0 bottom-0 w-6 bg-gradient-to-l from-background/60 via-background/40 to-transparent pointer-events-none"></div>
       </div>
     </div>
   )

@@ -14,16 +14,16 @@ export function BottomNavigation({ currentPage, onGoHome, onGoReview, onGoProfil
   return (
     <div className="fixed bottom-0 left-0 right-0 z-50">
       {/* Solid background layer */}
-      <div className="absolute inset-0 bg-white dark:bg-gray-950"></div>
+      <div className="absolute inset-0 backdrop-blur-md bg-white/80 dark:bg-gray-950/70 supports-[backdrop-filter]:bg-white/60 dark:supports-[backdrop-filter]:bg-gray-950/50"></div>
 
       {/* Border */}
       <div className="absolute top-0 left-0 right-0 h-px bg-border"></div>
 
       {/* Content layer */}
-      <div className="relative bg-white dark:bg-gray-950 shadow-lg">
+      <div className="relative shadow-lg">
         <div className="container mx-auto px-4">
           {/* Contenedor con altura fija */}
-          <div className="relative h-20 flex items-center justify-center">
+          <div className="relative h-20 flex items-center justify-center py-2">
             {/* Grid con posiciones fijas */}
             <div className="grid grid-cols-3 gap-4 w-full max-w-sm">
               {/* Botón Inicio - Posición fija */}
@@ -31,7 +31,7 @@ export function BottomNavigation({ currentPage, onGoHome, onGoReview, onGoProfil
                 <Button
                   variant="ghost"
                   onClick={onGoHome}
-                  className="absolute inset-0 flex flex-col items-center justify-center gap-1 hover:bg-transparent"
+                  className="absolute top-2 inset-x-0 flex flex-col items-center justify-center gap-1 hover:bg-transparent"
                 >
                   <div
                     className={`p-2 rounded-full transition-all duration-200 ${
@@ -57,7 +57,7 @@ export function BottomNavigation({ currentPage, onGoHome, onGoReview, onGoProfil
                 <Button
                   variant="ghost"
                   onClick={onGoReview}
-                  className="absolute inset-0 flex flex-col items-center justify-center gap-1 hover:bg-transparent"
+                  className="absolute top-2 inset-x-0 flex flex-col items-center justify-center gap-1 hover:bg-transparent"
                 >
                   <div className="relative">
                     {/* Círculo de fondo con color sólido - SIN transform para evitar movimiento */}
@@ -92,7 +92,7 @@ export function BottomNavigation({ currentPage, onGoHome, onGoReview, onGoProfil
                 <Button
                   variant="ghost"
                   onClick={onGoProfile}
-                  className="absolute inset-0 flex flex-col items-center justify-center gap-1 hover:bg-transparent"
+                  className="absolute top-2 inset-x-0 flex flex-col items-center justify-center gap-1 hover:bg-transparent"
                 >
                   <div
                     className={`p-2 rounded-full transition-all duration-200 ${

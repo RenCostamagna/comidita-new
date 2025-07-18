@@ -285,7 +285,7 @@ export function TopRatedPlaces({ onPlaceSelect, onReviewSelect }: TopRatedPlaces
 
       {/* Card */}
       <Card
-        className="overflow-hidden relative cursor-pointer hover:shadow-lg transition-all duration-300 h-80"
+        className="overflow-hidden relative cursor-pointer hover:shadow-lg transition-all duration-300 aspect-video w-full"
         onMouseEnter={() => setIsAutoPlaying(false)}
         onMouseLeave={() => setIsAutoPlaying(true)}
         onClick={handleCardClick}
@@ -362,7 +362,7 @@ export function TopRatedPlaces({ onPlaceSelect, onReviewSelect }: TopRatedPlaces
                   isTransitioning ? "opacity-0 transform translate-y-2" : "opacity-100 transform translate-y-0"
                 }`}
               >
-                <div className="text-base font-medium text-white leading-tight">
+                <div className="text-sm font-medium text-white leading-tight">
                   <div>
                     <span className="text-white font-medium">{currentRecommendation.dish_name}</span>
                     <span className="text-white font-medium"> de</span>
