@@ -451,6 +451,7 @@ export function HomePage({ user: initialUser }: HomePageProps) {
           setSelectedReviewId(null)
         }}
         onViewPlace={handleViewPlaceFromReview}
+        onAddReview={handleAddReview} // Add this line
         onGoHome={goToHome}
         onGoReview={goToReview}
         onGoProfile={goToProfile}

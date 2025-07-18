@@ -18,6 +18,7 @@ interface SingleReviewPageProps {
   reviewId: string
   onBack: () => void
   onViewPlace?: (place: any) => void
+  onAddReview?: (place: any) => void // Add this new prop
   onGoHome?: () => void
   onGoReview?: () => void
   onGoProfile?: () => void
@@ -28,6 +29,7 @@ export function SingleReviewPage({
   reviewId,
   onBack,
   onViewPlace,
+  onAddReview, // Add this parameter
   onGoHome,
   onGoReview,
   onGoProfile,
@@ -98,6 +100,12 @@ export function SingleReviewPage({
   const handleViewPlace = () => {
     if (review?.place && onViewPlace) {
       onViewPlace(review.place)
+    }
+  }
+
+  const handleAddReview = () => {
+    if (review?.place && onAddReview) {
+      onAddReview(review.place)
     }
   }
 
@@ -221,15 +229,21 @@ export function SingleReviewPage({
                 </div>
               </div>
 
-              <Button
-                onClick={handleViewPlace}
-                size="sm"
-                variant="outline"
-                className="w-full flex items-center gap-1 bg-transparent"
-              >
-                <MapPin className="h-3 w-3" />
-                Ver lugar completo
-              </Button>
+              <div className="flex gap-2">
+                <Button
+                  onClick={handleViewPlace}
+                  size="sm"
+                  variant="outline"
+                  className="flex-1 flex items-center gap-1 bg-transparent"
+                >
+                  
+                  Ver lugar
+                </Button>
+                <Button onClick={handleAddReview} size="sm" className="flex-1 flex items-center gap-1">
+                  
+                  Reseñar
+                </Button>
+              </div>
 
               <div className="text-center">
                 <span className="text-sm text-muted-foreground">
@@ -309,12 +323,6 @@ export function SingleReviewPage({
                           target.src = "/placeholder.svg?height=400&width=600&text=Error+cargando+imagen"
                         }}
                       />
-                      {primaryPhoto.is_primary && (
-                        <Badge className="absolute top-2 left-2 bg-yellow-500 hover:bg-yellow-600">
-                          <Star className="h-3 w-3 mr-1 fill-current" />
-                          Principal
-                        </Badge>
-                      )}
                     </div>
                   </div>
                 )}

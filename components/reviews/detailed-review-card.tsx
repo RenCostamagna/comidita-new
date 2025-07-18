@@ -143,12 +143,6 @@ export function DetailedReviewCard({ review }: DetailedReviewCardProps) {
                       target.src = "/placeholder.svg?height=300&width=300&text=Error+cargando+imagen"
                     }}
                   />
-                  {primaryPhoto.is_primary && (
-                    <Badge className="absolute top-2 left-2 bg-yellow-500 hover:bg-yellow-600">
-                      <Star className="h-3 w-3 mr-1 fill-current" />
-                      Principal
-                    </Badge>
-                  )}
                 </div>
               </div>
             )}
