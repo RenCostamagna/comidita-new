@@ -194,13 +194,13 @@ export function AchievementsShowcase({ userId }: AchievementsShowcaseProps) {
           <div className="space-y-6">
             {/* Dropdown selector */}
             <div className="w-full">
-              <Select defaultValue="PARRILLAS" onValueChange={setSelectedCategory}>
+              <Select defaultValue="PARRILLAS" onValueChange={setSelectedCategory} >
                 <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Selecciona una categoría" />
+                  <SelectValue placeholder="Selecciona una categoría" className="rounded-[var(--radius-dropdown)]" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="rounded-[var(--radius-dropdown)]">
                   {Object.entries(RESTAURANT_CATEGORIES).map(([key, label]) => (
-                    <SelectItem key={key} value={key}>
+                    <SelectItem key={key} value={key} className="rounded-[var(--radius-dropdown)]">
                       {label}
                     </SelectItem>
                   ))}
