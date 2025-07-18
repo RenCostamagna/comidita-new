@@ -3,12 +3,9 @@
 import { ArrowLeft } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { PlaceSearch } from "@/components/places/place-search"
-
-// Importar el componente de notificaciones
 import { NotificationBell } from "@/components/notifications/notification-bell"
 import type { Notification } from "@/lib/notifications"
 
-// Agregar props para manejar notificaciones
 interface HeaderProps {
   user?: any
   onViewProfile?: () => void
@@ -16,10 +13,9 @@ interface HeaderProps {
   onBack?: () => void
   onLogoClick?: () => void
   onPlaceSelect?: (place: any) => void
-  onNotificationClick?: (notification: Notification) => void // Nueva prop
+  onNotificationClick?: (notification: Notification) => void
 }
 
-// Actualizar el componente Header para incluir las notificaciones
 export function Header({
   user,
   onViewProfile,
@@ -27,7 +23,7 @@ export function Header({
   onBack,
   onLogoClick,
   onPlaceSelect,
-  onNotificationClick, // Nueva prop
+  onNotificationClick,
 }: HeaderProps) {
   return (
     <header className="fixed top-0 left-0 right-0 z-50 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b h-16">
@@ -49,7 +45,7 @@ export function Header({
           {/* Center - Search bar (always visible when user is logged in) */}
           {user && (
             <div className="flex-1 mx-4">
-              <PlaceSearch onPlaceSelect={onPlaceSelect || (() => {})} searchMode="local" />
+              <PlaceSearch onPlaceSelect={onPlaceSelect || (() => {})} searchMode="header" />
             </div>
           )}
 

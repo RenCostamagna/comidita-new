@@ -154,7 +154,7 @@ export function DetailedReviewForm({
       <Card>
         <CardHeader>
           <CardTitle>Nueva Reseña</CardTitle>
-          <CardDescription>Comparte tu experiencia completa en este lugar</CardDescription>
+          <CardDescription>Comparte tu experiencia completa</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-6">
@@ -222,9 +222,7 @@ export function DetailedReviewForm({
             <div className="space-y-4">
               <div className="space-y-1">
                 <Label className="text-base font-semibold">Opciones dietéticas</Label>
-                <p className="text-sm text-muted-foreground">
-                  Marca las opciones que apliquen
-                </p>
+                
               </div>
 
               <div className="grid grid-cols-1 gap-4">
@@ -318,7 +316,7 @@ export function DetailedReviewForm({
             {/* Comentario */}
             <div className="space-y-2">
               <Label htmlFor="comment">Comentario adicional (opcional)</Label>
-              <Textarea
+              <Textarea className="py-3"
                 id="comment"
                 placeholder="Cuéntanos más detalles sobre tu experiencia..."
                 value={comment}
