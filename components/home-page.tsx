@@ -296,7 +296,7 @@ export function HomePage({ user: initialUser }: HomePageProps) {
         }
       }
 
-      // Rest of the function remains the same...
+      // Check for existing review
       const { data: existingReview, error: reviewCheckError } = await supabase
         .from("detailed_reviews")
         .select("id")
@@ -313,7 +313,17 @@ export function HomePage({ user: initialUser }: HomePageProps) {
         throw new Error("Ya tienes una reseña para este lugar. Solo puedes tener una reseña por lugar.")
       }
 
-      const hasPhotos = !!(reviewData.photo_1_url || reviewData.photo_2_url)
+      // Extract up to 6 photo URLs from the photo_urls array
+      const photoUrls = reviewData.photo_urls || []
+      const photo1Url = photoUrls.length > 0 ? photoUrls[0] : null
+      const photo2Url = photoUrls.length > 1 ? photoUrls[1] : null
+      const photo3Url = photoUrls.length > 2 ? photoUrls[2] : null
+      const photo4Url = photoUrls.length > 3 ? photoUrls[3] : null
+      const photo5Url = photoUrls.length > 4 ? photoUrls[4] : null
+      const photo6Url = photoUrls.length > 5 ? photoUrls[5] : null
+
+      // Calculate points based on photos and other factors
+      const hasPhotos = photoUrls.length > 0
       const commentLength = reviewData.comment ? reviewData.comment.length : 0
 
       const { data: reviewCount } = await supabase
@@ -325,10 +335,11 @@ export function HomePage({ user: initialUser }: HomePageProps) {
 
       const basePoints = 100
       const firstReviewBonus = isFirstReview ? 500 : 0
-      const photoBonus = hasPhotos ? 50 : 0
+      const photoBonus = hasPhotos ? Math.min(photoUrls.length * 25, 150) : 0 // 25 points per photo, max 150
       const extendedReviewBonus = commentLength >= 300 ? 50 : 0
       const totalPoints = basePoints + firstReviewBonus + photoBonus + extendedReviewBonus
 
+      // Prepare review data with all 6 photo fields
       const reviewToInsert = {
         user_id: currentUser.id,
         place_id: placeId,
@@ -347,17 +358,49 @@ export function HomePage({ user: initialUser }: HomePageProps) {
         price_range: reviewData.price_range,
         restaurant_category: reviewData.restaurant_category,
         comment: reviewData.comment,
-        photo_1_url: reviewData.photo_1_url,
-        photo_2_url: reviewData.photo_2_url,
+        photo_1_url: photo1Url,
+        photo_2_url: photo2Url,
+        photo_3_url: photo3Url,
+        photo_4_url: photo4Url,
+        photo_5_url: photo5Url,
+        photo_6_url: photo6Url,
       }
 
-      const { error } = await supabase.from("detailed_reviews").insert(reviewToInsert)
+      // Insert the review
+      const { data: insertedReview, error: insertError } = await supabase
+        .from("detailed_reviews")
+        .insert(reviewToInsert)
+        .select("id")
+        .single()
 
-      if (error) {
-        console.error("Error submitting detailed review:", error)
+      if (insertError) {
+        console.error("Error submitting detailed review:", insertError)
         throw new Error("Error al guardar la reseña en la base de datos")
       }
 
+      // If we have photos and the new photos system exists, also insert into review_photos table
+      if (hasPhotos && insertedReview?.id) {
+        try {
+          const photoRecords = photoUrls.map((photoUrl: string, index: number) => ({
+            review_id: insertedReview.id,
+            photo_url: photoUrl,
+            is_primary: index === 0, // First photo is primary
+            photo_order: index + 1,
+          }))
+
+          const { error: photosError } = await supabase.from("review_photos").insert(photoRecords)
+
+          if (photosError) {
+            console.warn("Error inserting into review_photos table (may not exist):", photosError)
+            // Don't throw error here as the main review was saved successfully
+          }
+        } catch (photosError) {
+          console.warn("Review_photos table may not exist:", photosError)
+          // Continue without throwing error
+        }
+      }
+
+      // Check for achievements
       if (reviewData.restaurant_category) {
         try {
           const { data: achievementsData, error: achievementsError } = await supabase.rpc(
@@ -383,7 +426,9 @@ export function HomePage({ user: initialUser }: HomePageProps) {
       setShowDetailedReviewForm(false)
       setPreSelectedPlaceForReview(null)
       resetView()
-      alert(`¡Reseña enviada exitosamente! Ganaste ${totalPoints} puntos.`)
+
+      const photoMessage = hasPhotos ? ` (incluyendo ${photoUrls.length} foto${photoUrls.length > 1 ? "s" : ""})` : ""
+      alert(`¡Reseña enviada exitosamente${photoMessage}! Ganaste ${totalPoints} puntos.`)
     } catch (error) {
       console.error("Error submitting detailed review:", error)
       alert(`Error al enviar la reseña: ${error.message}`)
@@ -474,7 +519,7 @@ export function HomePage({ user: initialUser }: HomePageProps) {
           setSelectedReviewId(null)
         }}
         onViewPlace={handleViewPlaceFromReview}
-        onAddReview={handleAddReview} // Add this line
+        onAddReview={handleAddReview}
         onGoHome={goToHome}
         onGoReview={goToReview}
         onGoProfile={goToProfile}
