@@ -11,12 +11,19 @@ import { X, Upload, Camera, ImageIcon, AlertCircle } from "lucide-react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { validateImageFile, getImageInfo } from "@/lib/image-compression"
 
+interface PhotoData {
+  file: File | string
+  isPrimary: boolean
+  id?: string
+}
+
 interface PhotoUploadProps {
-  photos: File[]
-  onPhotosChange: (photos: File[]) => void
+  photos: PhotoData[]
+  onPhotosChange: (photos: PhotoData[]) => void
   maxPhotos?: number
   maxSizePerPhoto?: number // in MB
   acceptedFormats?: string[]
+  userId?: string
 }
 
 export function PhotoUpload({
@@ -25,6 +32,7 @@ export function PhotoUpload({
   maxPhotos = 6,
   maxSizePerPhoto = 10,
   acceptedFormats = ["image/jpeg", "image/jpg", "image/png", "image/webp"],
+  userId = "temp-user",
 }: PhotoUploadProps) {
   const [dragActive, setDragActive] = useState(false)
   const [uploadError, setUploadError] = useState<string | null>(null)
@@ -37,7 +45,7 @@ export function PhotoUpload({
     setIsProcessing(true)
     setProcessingProgress(0)
 
-    const newFiles: File[] = []
+    const newPhotoData: PhotoData[] = []
     const errors: string[] = []
 
     // Verificar límite total de fotos
@@ -53,7 +61,7 @@ export function PhotoUpload({
 
       try {
         // Validar archivo
-        const validation = await validateImageFile(file, maxSizePerPhoto, acceptedFormats)
+        const validation = validateImageFile(file, maxSizePerPhoto, acceptedFormats)
         if (!validation.isValid) {
           errors.push(`${file.name}: ${validation.error}`)
           continue
@@ -67,7 +75,14 @@ export function PhotoUpload({
           type: file.type,
         })
 
-        newFiles.push(file)
+        // Crear PhotoData object
+        const photoData: PhotoData = {
+          file: file,
+          isPrimary: photos.length === 0 && newPhotoData.length === 0, // First photo is primary
+          id: `photo-${Date.now()}-${i}`,
+        }
+
+        newPhotoData.push(photoData)
       } catch (error) {
         console.error(`Error procesando ${file.name}:`, error)
         errors.push(`${file.name}: Error al procesar`)
@@ -78,9 +93,9 @@ export function PhotoUpload({
       setUploadError(errors.join(", "))
     }
 
-    if (newFiles.length > 0) {
-      onPhotosChange([...photos, ...newFiles])
-      console.log(`✅ ${newFiles.length} fotos agregadas correctamente`)
+    if (newPhotoData.length > 0) {
+      onPhotosChange([...photos, ...newPhotoData])
+      console.log(`✅ ${newPhotoData.length} fotos agregadas correctamente`)
     }
 
     setIsProcessing(false)
@@ -121,6 +136,30 @@ export function PhotoUpload({
 
   const openFileDialog = () => {
     fileInputRef.current?.click()
+  }
+
+  const getPhotoPreviewUrl = (photo: PhotoData): string => {
+    if (typeof photo.file === "string") {
+      return photo.file // Already a URL
+    } else {
+      return URL.createObjectURL(photo.file) // File object
+    }
+  }
+
+  const getPhotoName = (photo: PhotoData): string => {
+    if (typeof photo.file === "string") {
+      return "Imagen subida"
+    } else {
+      return photo.file.name
+    }
+  }
+
+  const getPhotoSize = (photo: PhotoData): string => {
+    if (typeof photo.file === "string") {
+      return "N/A"
+    } else {
+      return `${(photo.file.size / 1024 / 1024).toFixed(1)}MB`
+    }
   }
 
   return (
@@ -194,10 +233,10 @@ export function PhotoUpload({
       {photos.length > 0 && (
         <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
           {photos.map((photo, index) => (
-            <Card key={index} className="relative group overflow-hidden">
+            <Card key={photo.id || index} className="relative group overflow-hidden">
               <div className="aspect-square relative">
                 <img
-                  src={URL.createObjectURL(photo) || "/placeholder.svg"}
+                  src={getPhotoPreviewUrl(photo) || "/placeholder.svg"}
                   alt={`Preview ${index + 1}`}
                   className="w-full h-full object-cover"
                 />
@@ -213,15 +252,15 @@ export function PhotoUpload({
                 >
                   <X className="h-3 w-3" />
                 </Button>
-                {index === 0 && (
+                {photo.isPrimary && (
                   <Badge className="absolute bottom-2 left-2 text-xs" variant="secondary">
                     Principal
                   </Badge>
                 )}
               </div>
               <CardContent className="p-2">
-                <p className="text-xs text-muted-foreground truncate">{photo.name}</p>
-                <p className="text-xs text-muted-foreground">{(photo.size / 1024 / 1024).toFixed(1)}MB</p>
+                <p className="text-xs text-muted-foreground truncate">{getPhotoName(photo)}</p>
+                <p className="text-xs text-muted-foreground">{getPhotoSize(photo)}</p>
               </CardContent>
             </Card>
           ))}

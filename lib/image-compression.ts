@@ -23,7 +23,11 @@ export interface ValidationResult {
 }
 
 // Función para validar archivos de imagen
-export function validateImageFile(file: File): ValidationResult {
+export function validateImageFile(
+  file: File,
+  maxSizePerPhoto = 10,
+  acceptedFormats: string[] = ["image/jpeg", "image/jpg", "image/png", "image/webp"],
+): ValidationResult {
   // Verificar que es un archivo
   if (!file) {
     return { isValid: false, error: "No se proporcionó archivo" }
@@ -34,15 +38,14 @@ export function validateImageFile(file: File): ValidationResult {
     return { isValid: false, error: "El archivo no es una imagen" }
   }
 
-  // Verificar tamaño (máximo 10MB)
-  const maxSize = 10 * 1024 * 1024 // 10MB
+  // Verificar tamaño (convertir MB a bytes)
+  const maxSize = maxSizePerPhoto * 1024 * 1024
   if (file.size > maxSize) {
-    return { isValid: false, error: "El archivo es muy grande (máximo 10MB)" }
+    return { isValid: false, error: `El archivo es muy grande (máximo ${maxSizePerPhoto}MB)` }
   }
 
   // Verificar tipos permitidos
-  const allowedTypes = ["image/jpeg", "image/jpg", "image/png", "image/webp"]
-  if (!allowedTypes.includes(file.type)) {
+  if (!acceptedFormats.includes(file.type)) {
     return { isValid: false, error: "Tipo de archivo no permitido. Use JPG, PNG o WebP" }
   }
 

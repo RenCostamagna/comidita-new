@@ -155,6 +155,12 @@ export function DetailedReviewForm({
         // Filtrar solo los archivos File (no strings que ya son URLs)
         const filesToUpload = photos.map((photo) => photo.file).filter((file): file is File => file instanceof File)
 
+        console.log("=== DEBUG PHOTO UPLOAD ===")
+        console.log("Total photos:", photos.length)
+        console.log("Files to upload:", filesToUpload.length)
+        console.log("Photos array:", photos)
+        console.log("Files array:", filesToUpload)
+
         if (filesToUpload.length > 0) {
           try {
             console.log("Iniciando upload de fotos...")
@@ -230,6 +236,7 @@ export function DetailedReviewForm({
         photo_urls: reviewData.photo_urls,
         vercel_blob_urls: reviewData.vercel_blob_urls,
         primary_photo_url: reviewData.primary_photo_url,
+        total_photos: uploadedPhotoUrls.length,
       })
 
       setUploadProgress(100)
