@@ -313,14 +313,10 @@ export function HomePage({ user: initialUser }: HomePageProps) {
         throw new Error("Ya tienes una reseña para este lugar. Solo puedes tener una reseña por lugar.")
       }
 
-      // Extract up to 6 photo URLs from the photo_urls array
+      // Extract photo URLs from the photo_urls array
       const photoUrls = reviewData.photo_urls || []
       const photo1Url = photoUrls.length > 0 ? photoUrls[0] : null
       const photo2Url = photoUrls.length > 1 ? photoUrls[1] : null
-      const photo3Url = photoUrls.length > 2 ? photoUrls[2] : null
-      const photo4Url = photoUrls.length > 3 ? photoUrls[3] : null
-      const photo5Url = photoUrls.length > 4 ? photoUrls[4] : null
-      const photo6Url = photoUrls.length > 5 ? photoUrls[5] : null
 
       // Calculate points based on photos and other factors
       const hasPhotos = photoUrls.length > 0
@@ -339,8 +335,8 @@ export function HomePage({ user: initialUser }: HomePageProps) {
       const extendedReviewBonus = commentLength >= 300 ? 50 : 0
       const totalPoints = basePoints + firstReviewBonus + photoBonus + extendedReviewBonus
 
-      // Prepare review data with all 6 photo fields
-      const reviewToInsert = {
+      // Prepare base review data (only with columns that definitely exist)
+      const baseReviewData = {
         user_id: currentUser.id,
         place_id: placeId,
         dish_name: reviewData.dish_name,
@@ -360,44 +356,71 @@ export function HomePage({ user: initialUser }: HomePageProps) {
         comment: reviewData.comment,
         photo_1_url: photo1Url,
         photo_2_url: photo2Url,
-        photo_3_url: photo3Url,
-        photo_4_url: photo4Url,
-        photo_5_url: photo5Url,
-        photo_6_url: photo6Url,
       }
 
-      // Insert the review
-      const { data: insertedReview, error: insertError } = await supabase
-        .from("detailed_reviews")
-        .insert(reviewToInsert)
-        .select("id")
-        .single()
+      // Try to add additional photo columns if they exist
+      const reviewToInsert = { ...baseReviewData }
 
-      if (insertError) {
-        console.error("Error submitting detailed review:", insertError)
-        throw new Error("Error al guardar la reseña en la base de datos")
-      }
+      // Check if additional photo columns exist by trying to get table schema
+      try {
+        // First, try inserting with just the base data (2 photos)
+        const { data: insertedReview, error: insertError } = await supabase
+          .from("detailed_reviews")
+          .insert(baseReviewData)
+          .select("id")
+          .single()
 
-      // If we have photos and the new photos system exists, also insert into review_photos table
-      if (hasPhotos && insertedReview?.id) {
-        try {
-          const photoRecords = photoUrls.map((photoUrl: string, index: number) => ({
-            review_id: insertedReview.id,
-            photo_url: photoUrl,
-            is_primary: index === 0, // First photo is primary
-            photo_order: index + 1,
-          }))
-
-          const { error: photosError } = await supabase.from("review_photos").insert(photoRecords)
-
-          if (photosError) {
-            console.warn("Error inserting into review_photos table (may not exist):", photosError)
-            // Don't throw error here as the main review was saved successfully
-          }
-        } catch (photosError) {
-          console.warn("Review_photos table may not exist:", photosError)
-          // Continue without throwing error
+        if (insertError) {
+          console.error("Error submitting detailed review:", insertError)
+          throw new Error("Error al guardar la reseña en la base de datos")
         }
+
+        // If we have more than 2 photos and the review was inserted successfully,
+        // try to update with additional photos if the columns exist
+        if (photoUrls.length > 2 && insertedReview?.id) {
+          const additionalPhotos: any = {}
+
+          if (photoUrls.length > 2) additionalPhotos.photo_3_url = photoUrls[2]
+          if (photoUrls.length > 3) additionalPhotos.photo_4_url = photoUrls[3]
+          if (photoUrls.length > 4) additionalPhotos.photo_5_url = photoUrls[4]
+          if (photoUrls.length > 5) additionalPhotos.photo_6_url = photoUrls[5]
+
+          // Try to update with additional photos
+          const { error: updateError } = await supabase
+            .from("detailed_reviews")
+            .update(additionalPhotos)
+            .eq("id", insertedReview.id)
+
+          if (updateError) {
+            console.warn("Could not update additional photos (columns may not exist):", updateError)
+            // Don't throw error here, the review was saved successfully with 2 photos
+          }
+        }
+
+        // If we have photos and the new photos system exists, also insert into review_photos table
+        if (hasPhotos && insertedReview?.id) {
+          try {
+            const photoRecords = photoUrls.map((photoUrl: string, index: number) => ({
+              review_id: insertedReview.id,
+              photo_url: photoUrl,
+              is_primary: index === 0, // First photo is primary
+              photo_order: index + 1,
+            }))
+
+            const { error: photosError } = await supabase.from("review_photos").insert(photoRecords)
+
+            if (photosError) {
+              console.warn("Error inserting into review_photos table (may not exist):", photosError)
+              // Don't throw error here as the main review was saved successfully
+            }
+          } catch (photosError) {
+            console.warn("Review_photos table may not exist:", photosError)
+            // Continue without throwing error
+          }
+        }
+      } catch (error) {
+        console.error("Error submitting detailed review:", error)
+        throw new Error("Error al guardar la reseña en la base de datos")
       }
 
       // Check for achievements
@@ -427,7 +450,9 @@ export function HomePage({ user: initialUser }: HomePageProps) {
       setPreSelectedPlaceForReview(null)
       resetView()
 
-      const photoMessage = hasPhotos ? ` (incluyendo ${photoUrls.length} foto${photoUrls.length > 1 ? "s" : ""})` : ""
+      const photoMessage = hasPhotos
+        ? ` (incluyendo ${Math.min(photoUrls.length, 2)} foto${photoUrls.length > 1 ? "s" : ""})`
+        : ""
       alert(`¡Reseña enviada exitosamente${photoMessage}! Ganaste ${totalPoints} puntos.`)
     } catch (error) {
       console.error("Error submitting detailed review:", error)
