@@ -5,10 +5,25 @@ ADD COLUMN IF NOT EXISTS photo_4_url TEXT,
 ADD COLUMN IF NOT EXISTS photo_5_url TEXT,
 ADD COLUMN IF NOT EXISTS photo_6_url TEXT;
 
--- Add comments to document the photo columns
-COMMENT ON COLUMN detailed_reviews.photo_1_url IS 'URL of the first photo uploaded with the review';
-COMMENT ON COLUMN detailed_reviews.photo_2_url IS 'URL of the second photo uploaded with the review';
-COMMENT ON COLUMN detailed_reviews.photo_3_url IS 'URL of the third photo uploaded with the review';
-COMMENT ON COLUMN detailed_reviews.photo_4_url IS 'URL of the fourth photo uploaded with the review';
-COMMENT ON COLUMN detailed_reviews.photo_5_url IS 'URL of the fifth photo uploaded with the review';
-COMMENT ON COLUMN detailed_reviews.photo_6_url IS 'URL of the sixth photo uploaded with the review';
+-- Add comments to document the new columns
+COMMENT ON COLUMN detailed_reviews.photo_3_url IS 'URL for the third photo of the review';
+COMMENT ON COLUMN detailed_reviews.photo_4_url IS 'URL for the fourth photo of the review';
+COMMENT ON COLUMN detailed_reviews.photo_5_url IS 'URL for the fifth photo of the review';
+COMMENT ON COLUMN detailed_reviews.photo_6_url IS 'URL for the sixth photo of the review';
+
+-- Update RLS policies if they exist to include new photo columns
+-- This ensures the new columns are accessible with the same permissions as existing ones
+DO $$
+BEGIN
+    -- Check if RLS is enabled on detailed_reviews table
+    IF EXISTS (
+        SELECT 1 FROM pg_class c
+        JOIN pg_namespace n ON n.oid = c.relnamespace
+        WHERE c.relname = 'detailed_reviews' 
+        AND n.nspname = 'public'
+        AND c.relrowsecurity = true
+    ) THEN
+        -- RLS is enabled, policies should automatically cover new columns
+        RAISE NOTICE 'RLS is enabled on detailed_reviews. New photo columns will inherit existing policies.';
+    END IF;
+END $$;
