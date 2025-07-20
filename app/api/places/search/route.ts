@@ -9,7 +9,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Query parameter is required" }, { status: 400 })
     }
 
-    const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
+    const apiKey = process.env.GOOGLE_MAPS_API_KEY
     if (!apiKey) {
       console.error("Google Maps API key not found")
       return NextResponse.json({ error: "API key not configured" }, { status: 500 })

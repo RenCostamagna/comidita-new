@@ -1,70 +1,60 @@
-interface CompressionOptions {
-  maxWidth?: number
-  maxHeight?: number
-  quality?: number
-  maxSizeMB?: number
-}
-
-interface ImageInfo {
+// Tipos para la información de imagen
+export interface ImageInfo {
   width: number
   height: number
   size: number
   type: string
+  name: string
 }
 
-interface ValidationResult {
+// Opciones de compresión
+export interface CompressionOptions {
+  maxWidth?: number
+  maxHeight?: number
+  quality?: number
+  maxSizeKB?: number
+  outputFormat?: "jpeg" | "png" | "webp"
+}
+
+// Validación de archivos de imagen
+export interface ValidationResult {
   isValid: boolean
   error?: string
 }
 
+// Función para validar archivos de imagen
 export function validateImageFile(
   file: File,
-  maxSizeMB = 50,
+  maxSizePerPhoto = 10,
   acceptedFormats: string[] = ["image/jpeg", "image/jpg", "image/png", "image/webp"],
 ): ValidationResult {
-  // Verificar que sea un File válido
-  if (!(file instanceof File)) {
-    return {
-      isValid: false,
-      error: "No es un archivo válido",
-    }
+  // Verificar que es un archivo
+  if (!file) {
+    return { isValid: false, error: "No se proporcionó archivo" }
   }
 
   // Verificar tipo de archivo
-  if (!acceptedFormats.includes(file.type)) {
-    return {
-      isValid: false,
-      error: `Formato no soportado. Use: ${acceptedFormats.join(", ")}`,
-    }
+  if (!file.type.startsWith("image/")) {
+    return { isValid: false, error: "El archivo no es una imagen" }
   }
 
   // Verificar tamaño (convertir MB a bytes)
-  const maxSizeBytes = maxSizeMB * 1024 * 1024
-  if (file.size > maxSizeBytes) {
-    return {
-      isValid: false,
-      error: `Archivo muy grande. Máximo ${maxSizeMB}MB`,
-    }
+  const maxSize = maxSizePerPhoto * 1024 * 1024
+  if (file.size > maxSize) {
+    return { isValid: false, error: `El archivo es muy grande (máximo ${maxSizePerPhoto}MB)` }
   }
 
-  // Verificar que el archivo tenga contenido
-  if (file.size === 0) {
-    return {
-      isValid: false,
-      error: "El archivo está vacío",
-    }
+  // Verificar tipos permitidos
+  if (!acceptedFormats.includes(file.type)) {
+    return { isValid: false, error: "Tipo de archivo no permitido. Use JPG, PNG o WebP" }
   }
 
   return { isValid: true }
 }
 
+// Función para obtener información de la imagen
 export async function getImageInfo(file: File): Promise<ImageInfo> {
   return new Promise((resolve, reject) => {
-    if (!(file instanceof File)) {
-      reject(new Error("No es un archivo válido"))
-      return
-    }
-
     const img = new Image()
     const url = URL.createObjectURL(file)
 
@@ -75,51 +65,45 @@ export async function getImageInfo(file: File): Promise<ImageInfo> {
         height: img.naturalHeight,
         size: file.size,
         type: file.type,
+        name: file.name,
       })
     }
 
     img.onerror = () => {
       URL.revokeObjectURL(url)
-      reject(new Error("No se pudo cargar la imagen"))
+      reject(new Error("Error cargando la imagen"))
     }
 
     img.src = url
   })
 }
 
-export async function compressImage(file: File, options: CompressionOptions = {}): Promise<File> {
-  const { maxWidth = 1920, maxHeight = 1920, quality = 0.8, maxSizeMB = 2 } = options
-
-  // Verificar que sea un File válido
-  if (!(file instanceof File)) {
-    throw new Error("No es un archivo válido")
-  }
-
-  // Si el archivo ya es pequeño, devolverlo sin comprimir
-  const maxSizeBytes = maxSizeMB * 1024 * 1024
-  if (file.size <= maxSizeBytes) {
-    console.log(`Archivo ${file.name} ya es suficientemente pequeño (${file.size} bytes)`)
-    return file
-  }
+// Función para comprimir imagen usando Canvas (solo cliente)
+export async function compressImageAdvanced(file: File, options: CompressionOptions = {}): Promise<File> {
+  const { maxWidth = 800, maxHeight = 600, quality = 0.8, outputFormat = "jpeg" } = options
 
   return new Promise((resolve, reject) => {
+    const img = new Image()
     const canvas = document.createElement("canvas")
     const ctx = canvas.getContext("2d")
-    const img = new Image()
 
     if (!ctx) {
-      reject(new Error("No se pudo crear el contexto del canvas"))
+      reject(new Error("No se pudo crear contexto de canvas"))
       return
     }
 
     img.onload = () => {
-      // Calcular nuevas dimensiones manteniendo la proporción
+      // Calcular nuevas dimensiones manteniendo proporción
       let { width, height } = img
 
-      if (width > maxWidth || height > maxHeight) {
-        const ratio = Math.min(maxWidth / width, maxHeight / height)
-        width *= ratio
-        height *= ratio
+      if (width > maxWidth) {
+        height = (height * maxWidth) / width
+        width = maxWidth
+      }
+
+      if (height > maxHeight) {
+        width = (width * maxHeight) / height
+        height = maxHeight
       }
 
       // Configurar canvas
@@ -129,59 +113,31 @@ export async function compressImage(file: File, options: CompressionOptions = {}
       // Dibujar imagen redimensionada
       ctx.drawImage(img, 0, 0, width, height)
 
-      // Convertir a blob con compresión
+      // Convertir a blob
       canvas.toBlob(
         (blob) => {
           if (!blob) {
-            reject(new Error("Error al comprimir la imagen"))
+            reject(new Error("Error comprimiendo imagen"))
             return
           }
 
-          // Crear nuevo archivo con el blob comprimido
+          // Crear nuevo archivo
           const compressedFile = new File([blob], file.name, {
-            type: file.type,
+            type: `image/${outputFormat}`,
             lastModified: Date.now(),
           })
 
-          console.log(`Imagen comprimida: ${file.size} -> ${compressedFile.size} bytes`)
           resolve(compressedFile)
         },
-        file.type,
+        `image/${outputFormat}`,
         quality,
       )
     }
 
     img.onerror = () => {
-      reject(new Error("Error al cargar la imagen para comprimir"))
+      reject(new Error("Error cargando imagen para comprimir"))
     }
 
-    // Cargar imagen desde el archivo
-    const url = URL.createObjectURL(file)
-    img.src = url
-  })
-}
-
-export function createImagePreview(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    if (!(file instanceof File)) {
-      reject(new Error("No es un archivo válido"))
-      return
-    }
-
-    const reader = new FileReader()
-
-    reader.onload = (e) => {
-      if (e.target?.result) {
-        resolve(e.target.result as string)
-      } else {
-        reject(new Error("Error al crear preview"))
-      }
-    }
-
-    reader.onerror = () => {
-      reject(new Error("Error al leer el archivo"))
-    }
-
-    reader.readAsDataURL(file)
+    img.src = URL.createObjectURL(file)
   })
 }

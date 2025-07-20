@@ -5,65 +5,15 @@ export async function uploadMultipleReviewPhotos(files: File[], userId: string, 
   try {
     const formData = new FormData()
 
-    // Filtrar y validar que todos los elementos sean archivos válidos
-    const validFiles: File[] = []
-
-    for (let index = 0; index < files.length; index++) {
-      const file = files[index]
-
-      // Verificar que sea un File válido y no un string
-      if (!(file instanceof File)) {
-        console.warn(`Elemento ${index + 1} no es un File válido:`, typeof file, file)
-        continue
-      }
-
-      console.log(`Validando archivo ${index + 1}: ${file.name} (${file.size} bytes)`)
-
-      if (!file.type.startsWith("image/")) {
-        console.warn(`Archivo ${file.name} no es una imagen, saltando...`)
-        continue
-      }
-
-      // Verificar que el archivo tenga contenido
-      if (file.size === 0) {
-        console.warn(`Archivo ${file.name} está vacío, saltando...`)
-        continue
-      }
-
-      let cleanFile = file
-      if (!file.name || file.name === "blob" || file.name === "image" || file.name.includes("�")) {
-        const timestamp = Date.now()
-        const extension = file.type.split("/")[1] || "jpg"
-        const newName = `photo_${timestamp}_${index}.${extension}`
-
-        try {
-          cleanFile = new File([file], newName, {
-            type: file.type,
-            lastModified: file.lastModified,
-          })
-          console.log(`Archivo renombrado: ${file.name} -> ${newName}`)
-        } catch (error) {
-          console.error(`Error renombrando archivo ${file.name}:`, error)
-          continue
-        }
-      }
-
-      validFiles.push(cleanFile)
-    }
-
-    if (validFiles.length === 0) {
-      throw new Error("No se encontraron archivos válidos para subir")
-    }
-
-    // Agregar solo archivos válidos al FormData
-    validFiles.forEach((file, index) => {
-      console.log(`Agregando al FormData: ${file.name} (${file.size} bytes, tipo: ${file.type})`)
+    // Agregar archivos al FormData con el nombre correcto
+    files.forEach((file, index) => {
+      console.log(`Agregando archivo ${index + 1}: ${file.name} (${file.size} bytes)`)
       formData.append("photos", file)
     })
 
     formData.append("reviewId", reviewId)
 
-    console.log(`Enviando ${validFiles.length} archivos válidos a /api/upload-photos...`)
+    console.log("Enviando request a /api/upload-photos...")
 
     const response = await fetch("/api/upload-photos", {
       method: "POST",
@@ -81,6 +31,7 @@ export async function uploadMultipleReviewPhotos(files: File[], userId: string, 
     const data = await response.json()
     console.log("Upload response:", data)
 
+    // Debug: verificar que las URLs sean de Vercel Blob
     console.log("URLs devueltas por la API:", data.uploadedUrls)
     data.uploadedUrls?.forEach((url: string, index: number) => {
       console.log(`URL ${index + 1}:`, url)
@@ -102,36 +53,7 @@ export async function uploadMultipleReviewPhotos(files: File[], userId: string, 
   }
 }
 
-// Función para extraer solo los archivos File del array de fotos
-export function extractFilesFromPhotos(
-  photos: Array<{ file: File | string; isPrimary: boolean; id?: string }>,
-): File[] {
-  console.log(`Extrayendo archivos File de ${photos.length} fotos...`)
-
-  const files: File[] = []
-
-  photos.forEach((photo, index) => {
-    console.log(`Foto ${index + 1}:`, {
-      type: typeof photo.file,
-      isFile: photo.file instanceof File,
-      isString: typeof photo.file === "string",
-      constructor: photo.file?.constructor?.name,
-    })
-
-    if (photo.file instanceof File) {
-      files.push(photo.file)
-      console.log(`✅ Archivo File agregado: ${photo.file.name}`)
-    } else if (typeof photo.file === "string") {
-      console.log(`⚠️ Saltando URL string: ${photo.file.substring(0, 50)}...`)
-    } else {
-      console.warn(`❌ Tipo de archivo no reconocido:`, typeof photo.file, photo.file)
-    }
-  })
-
-  console.log(`Resultado: ${files.length} archivos File extraídos de ${photos.length} fotos`)
-  return files
-}
-
+// Función para eliminar una foto usando la API route
 export async function deleteReviewPhoto(photoUrl: string): Promise<boolean> {
   try {
     console.log("Eliminando foto:", photoUrl)
@@ -159,19 +81,15 @@ export async function deleteMultipleReviewPhotos(photoUrls: string[]): Promise<b
   return Promise.all(deletePromises)
 }
 
+// Función para generar nombre único de archivo
 export function generateUniqueFileName(originalName: string, userId: string, reviewId: string): string {
   const timestamp = Date.now()
   const randomString = Math.random().toString(36).substring(2, 15)
-
-  const cleanName = originalName
-    .replace(/[^a-zA-Z0-9.-]/g, "_")
-    .replace(/_{2,}/g, "_")
-    .toLowerCase()
-
-  const fileExtension = cleanName.split(".").pop() || "jpg"
+  const fileExtension = originalName.split(".").pop() || "jpg"
   return `reviews/${userId}/${reviewId}/${timestamp}_${randomString}.${fileExtension}`
 }
 
+// Función alternativa para desarrollo que simula upload
 export function createLocalPhotoUrl(file: File, photoIndex: number): string {
   if (typeof window !== "undefined") {
     return URL.createObjectURL(file)
