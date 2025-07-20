@@ -53,19 +53,35 @@ export function PhotoUpload({
     setIsProcessing(true)
     setProcessingProgress(0)
 
+    // Validación dura de FileList en el cliente
+    const cleanedFiles = Array.from(fileList).map((file, i) => {
+      const extension = file.type?.split("/")[1] || "jpg"
+      const name =
+        !file.name || file.name === "blob" || file.name === "image"
+          ? `mobile_photo_${Date.now()}_${i}.${extension}`
+          : file.name
+
+      const type = file.type || "image/jpeg"
+
+      return new File([file], name, {
+        type,
+        lastModified: file.lastModified,
+      })
+    })
+
     const newPhotoData: PhotoData[] = []
     const errors: string[] = []
 
     // Verificar límite total de fotos
-    if (photos.length + fileList.length > maxPhotos) {
+    if (photos.length + cleanedFiles.length > maxPhotos) {
       setUploadError(`Máximo ${maxPhotos} fotos permitidas`)
       setIsProcessing(false)
       return
     }
 
-    for (let i = 0; i < fileList.length; i++) {
-      const file = fileList[i]
-      setProcessingProgress(((i + 1) / fileList.length) * 100)
+    for (let i = 0; i < cleanedFiles.length; i++) {
+      const file = cleanedFiles[i]
+      setProcessingProgress(((i + 1) / cleanedFiles.length) * 100)
 
       try {
         // Validar archivo
@@ -81,6 +97,7 @@ export function PhotoUpload({
           size: `${(file.size / 1024 / 1024).toFixed(2)}MB`,
           dimensions: `${imageInfo.width}x${imageInfo.height}`,
           type: file.type,
+          originalName: fileList[i].name, // Log del nombre original para debugging
         })
 
         // Crear PhotoData object
