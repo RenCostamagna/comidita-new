@@ -31,34 +31,34 @@ interface AchievementsProgressProps {
 // Mapeo de categorías a colores (mismo que categories-section)
 const CATEGORY_CONFIG = {
   PARRILLAS: {
-    color: "bg-gradient-to-br from-red-500 to-red-600",
+    color: "bg-[#FEC80C]",
   },
   CAFE_Y_DELI: {
-    color: "bg-gradient-to-br from-yellow-400 to-yellow-500",
+    color: "bg-[#FE1B08]",
   },
   BODEGONES: {
-    color: "bg-gradient-to-br from-blue-500 to-blue-600",
+    color: "bg-[#0D83FE]",
   },
   RESTAURANTES: {
-    color: "bg-gradient-to-br from-gray-700 to-gray-800",
+    color: "bg-[#FEEFCE]",
   },
   HAMBURGUESERIAS: {
-    color: "bg-gradient-to-br from-red-600 to-red-700",
+    color: "bg-[#151515]",
   },
   PIZZERIAS: {
-    color: "bg-gradient-to-br from-green-500 to-green-600",
+    color: "bg-[#FFD84D]",
   },
   PASTAS: {
-    color: "bg-gradient-to-br from-orange-500 to-orange-600",
+    color: "bg-[#FF5A36]",
   },
   CARRITOS: {
-    color: "bg-gradient-to-br from-purple-500 to-purple-600",
+    color: "bg-[#559DFF]",
   },
   BARES: {
-    color: "bg-gradient-to-br from-indigo-500 to-indigo-600",
+    color: "bg-[#FFF5E1]",
   },
   HELADERIAS: {
-    color: "bg-gradient-to-br from-pink-400 to-pink-500",
+    color: "bg-[#2A2A2A]",
   },
 }
 
