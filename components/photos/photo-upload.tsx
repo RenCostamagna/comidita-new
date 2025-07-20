@@ -65,51 +65,139 @@ export function PhotoUpload({
     setDebugLogs([])
   }
 
+  // Función para procesar archivos de forma secuencial (no paralela)
+  const processFilesSequentially = async (files: File[]) => {
+    const results: PhotoData[] = []
+    const errors: string[] = []
+
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i]
+      setProcessingProgress(((i + 1) / files.length) * 100)
+
+      addDebugLog("info", `🔄 Procesando secuencialmente archivo ${i + 1}/${files.length}: ${file.name}`)
+
+      try {
+        // Pequeña pausa para evitar sobrecarga del navegador móvil
+        await new Promise((resolve) => setTimeout(resolve, 100))
+
+        // Validar archivo
+        const validation = validateImageFile(file, maxSizePerPhoto, acceptedFormats)
+        if (!validation.isValid) {
+          const errorMsg = `${file.name}: ${validation.error}`
+          addDebugLog("error", `❌ Validación falló: ${errorMsg}`)
+          errors.push(errorMsg)
+          continue
+        }
+
+        addDebugLog("info", `✅ Validación OK para ${file.name}`)
+
+        // Obtener información de la imagen de forma más robusta
+        let imageInfo
+        try {
+          imageInfo = await getImageInfo(file)
+          addDebugLog("info", `📊 Info de imagen obtenida`, {
+            file: file.name,
+            size: `${(file.size / 1024 / 1024).toFixed(2)}MB`,
+            dimensions: `${imageInfo.width}x${imageInfo.height}`,
+            type: file.type,
+          })
+        } catch (imageError) {
+          addDebugLog(
+            "warning",
+            `⚠️ Error obteniendo info de imagen para ${file.name}, usando valores por defecto`,
+            imageError,
+          )
+          // Continuar con valores por defecto si falla getImageInfo
+          imageInfo = { width: 800, height: 600 }
+        }
+
+        // Crear PhotoData object
+        const photoData: PhotoData = {
+          file: file,
+          isPrimary: false,
+          id: `photo-${Date.now()}-${i}-${Math.random().toString(36).substr(2, 9)}`,
+        }
+
+        results.push(photoData)
+        addDebugLog("info", `✅ PhotoData creado para ${file.name}`, { id: photoData.id })
+      } catch (error) {
+        const errorMsg = `Error procesando ${file.name}: ${error instanceof Error ? error.message : "Error desconocido"}`
+        addDebugLog("error", `💥 ${errorMsg}`, error)
+        errors.push(errorMsg)
+      }
+    }
+
+    return { results, errors }
+  }
+
   const handleFiles = async (fileList: FileList) => {
-    addDebugLog("info", `🚀 Iniciando procesamiento de ${fileList.length} archivos`)
+    addDebugLog("info", `🚀 MÚLTIPLES ARCHIVOS: Iniciando procesamiento de ${fileList.length} archivos`)
+
+    // Debug específico para selección múltiple
+    if (fileList.length > 1) {
+      addDebugLog("warning", `📱 SELECCIÓN MÚLTIPLE DETECTADA: ${fileList.length} archivos seleccionados de una vez`)
+    }
 
     setUploadError(null)
     setIsProcessing(true)
     setProcessingProgress(0)
 
-    // Debug: Log initial FileList info
-    addDebugLog("info", "FileList recibida", {
+    // Debug: Log initial FileList info con más detalle
+    const fileListInfo = Array.from(fileList).map((f, i) => ({
+      index: i,
+      name: f.name,
+      size: f.size,
+      type: f.type,
+      lastModified: f.lastModified,
+      isBlob: f.name === "blob" || f.name === "image",
+      hasValidType: f.type && f.type.startsWith("image/"),
+    }))
+
+    addDebugLog("info", "📋 FileList detallada recibida", {
       length: fileList.length,
-      files: Array.from(fileList).map((f, i) => ({
-        index: i,
-        name: f.name,
-        size: f.size,
-        type: f.type,
-        lastModified: f.lastModified,
-      })),
+      totalSize: Array.from(fileList).reduce((sum, f) => sum + f.size, 0),
+      files: fileListInfo,
+      blobFiles: fileListInfo.filter((f) => f.isBlob).length,
+      invalidTypes: fileListInfo.filter((f) => !f.hasValidType).length,
     })
 
-    // Validación dura de FileList en el cliente
-    const cleanedFiles = Array.from(fileList).map((file, i) => {
-      const extension = file.type?.split("/")[1] || "jpg"
-      const originalName = file.name
-      const name =
-        !file.name || file.name === "blob" || file.name === "image"
-          ? `mobile_photo_${Date.now()}_${i}.${extension}`
-          : file.name
+    // Validación dura de FileList en el cliente con mejor manejo de errores
+    let cleanedFiles: File[] = []
+    try {
+      cleanedFiles = Array.from(fileList).map((file, i) => {
+        const extension = file.type?.split("/")[1] || "jpg"
+        const originalName = file.name
+        const name =
+          !file.name || file.name === "blob" || file.name === "image"
+            ? `mobile_photo_${Date.now()}_${i}.${extension}`
+            : file.name
 
-      const type = file.type || "image/jpeg"
+        const type = file.type || "image/jpeg"
 
-      const cleanedFile = new File([file], name, {
-        type,
-        lastModified: file.lastModified,
+        // Verificar que el archivo tenga contenido
+        if (file.size === 0) {
+          throw new Error(`Archivo ${originalName} está vacío`)
+        }
+
+        const cleanedFile = new File([file], name, {
+          type,
+          lastModified: file.lastModified,
+        })
+
+        addDebugLog("info", `📝 Archivo ${i + 1} limpiado`, {
+          original: { name: originalName, type: file.type, size: file.size },
+          cleaned: { name: cleanedFile.name, type: cleanedFile.type, size: cleanedFile.size },
+          wasRenamed: originalName !== name,
+        })
+
+        return cleanedFile
       })
-
-      addDebugLog("info", `📝 Archivo ${i + 1} limpiado`, {
-        original: { name: originalName, type: file.type, size: file.size },
-        cleaned: { name: cleanedFile.name, type: cleanedFile.type, size: cleanedFile.size },
-      })
-
-      return cleanedFile
-    })
-
-    const newPhotoData: PhotoData[] = []
-    const errors: string[] = []
+    } catch (cleanError) {
+      addDebugLog("error", `💥 Error en limpieza de archivos: ${cleanError}`)
+      setUploadError(`Error procesando archivos: ${cleanError}`)
+      setIsProcessing(false)
+      return
+    }
 
     // Verificar límite total de fotos
     if (photos.length + cleanedFiles.length > maxPhotos) {
@@ -122,48 +210,8 @@ export function PhotoUpload({
 
     addDebugLog("info", `✅ Límite de fotos OK: ${photos.length + cleanedFiles.length}/${maxPhotos}`)
 
-    for (let i = 0; i < cleanedFiles.length; i++) {
-      const file = cleanedFiles[i]
-      setProcessingProgress(((i + 1) / cleanedFiles.length) * 100)
-
-      addDebugLog("info", `🔍 Procesando archivo ${i + 1}/${cleanedFiles.length}: ${file.name}`)
-
-      try {
-        // Validar archivo
-        const validation = validateImageFile(file, maxSizePerPhoto, acceptedFormats)
-        if (!validation.isValid) {
-          const errorMsg = `${file.name}: ${validation.error}`
-          addDebugLog("error", `❌ Validación falló: ${errorMsg}`)
-          errors.push(errorMsg)
-          continue
-        }
-
-        addDebugLog("info", `✅ Validación OK para ${file.name}`)
-
-        // Obtener información de la imagen
-        const imageInfo = await getImageInfo(file)
-        addDebugLog("info", `📊 Info de imagen obtenida`, {
-          file: file.name,
-          size: `${(file.size / 1024 / 1024).toFixed(2)}MB`,
-          dimensions: `${imageInfo.width}x${imageInfo.height}`,
-          type: file.type,
-        })
-
-        // Crear PhotoData object
-        const photoData: PhotoData = {
-          file: file,
-          isPrimary: false,
-          id: `photo-${Date.now()}-${i}`,
-        }
-
-        newPhotoData.push(photoData)
-        addDebugLog("info", `✅ PhotoData creado para ${file.name}`, { id: photoData.id })
-      } catch (error) {
-        const errorMsg = `Error procesando ${file.name}: ${error instanceof Error ? error.message : "Error desconocido"}`
-        addDebugLog("error", `💥 ${errorMsg}`, error)
-        errors.push(errorMsg)
-      }
-    }
+    // Procesar archivos secuencialmente para evitar problemas de memoria en móvil
+    const { results: newPhotoData, errors } = await processFilesSequentially(cleanedFiles)
 
     if (errors.length > 0) {
       addDebugLog("warning", `⚠️ ${errors.length} errores encontrados`, errors)
@@ -173,12 +221,17 @@ export function PhotoUpload({
     if (newPhotoData.length > 0) {
       const updatedPhotos = updatePrimaryPhoto([...photos, ...newPhotoData])
       onPhotosChange(updatedPhotos)
-      addDebugLog("info", `🎉 ${newPhotoData.length} fotos agregadas correctamente`, {
-        totalPhotos: updatedPhotos.length,
-        newPhotos: newPhotoData.map((p) => ({ id: p.id, isPrimary: p.isPrimary })),
-      })
+      addDebugLog(
+        "info",
+        `🎉 ${newPhotoData.length} fotos agregadas correctamente de ${cleanedFiles.length} intentadas`,
+        {
+          totalPhotos: updatedPhotos.length,
+          newPhotos: newPhotoData.map((p) => ({ id: p.id, isPrimary: p.isPrimary })),
+          successRate: `${newPhotoData.length}/${cleanedFiles.length}`,
+        },
+      )
     } else {
-      addDebugLog("warning", "⚠️ No se agregaron fotos nuevas")
+      addDebugLog("warning", "⚠️ No se agregaron fotos nuevas - todas fallaron")
     }
 
     setIsProcessing(false)
@@ -208,12 +261,19 @@ export function PhotoUpload({
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     addDebugLog("info", "📁 Input change detectado")
+
     if (e.target.files && e.target.files.length > 0) {
-      addDebugLog("info", `📁 ${e.target.files.length} archivos seleccionados`)
+      addDebugLog("info", `📁 ${e.target.files.length} archivos seleccionados`, {
+        isMultiple: e.target.files.length > 1,
+        inputType: e.target.multiple ? "multiple" : "single",
+      })
       handleFiles(e.target.files)
     } else {
       addDebugLog("warning", "⚠️ No hay archivos en el input")
     }
+
+    // Limpiar el input para permitir seleccionar los mismos archivos de nuevo
+    e.target.value = ""
   }
 
   const removePhoto = (index: number) => {
@@ -261,7 +321,7 @@ export function PhotoUpload({
             <div className="space-y-2">
               <div className="flex items-center gap-2 mb-3">
                 <Bug className="h-4 w-4 text-yellow-600" />
-                <h4 className="font-semibold text-yellow-800">Debug Mobile Upload</h4>
+                <h4 className="font-semibold text-yellow-800">Debug Mobile Upload - Selección Múltiple</h4>
                 <Badge variant="outline" className="text-xs">
                   {debugLogs.length} logs
                 </Badge>
@@ -269,7 +329,9 @@ export function PhotoUpload({
 
               <div className="max-h-40 overflow-y-auto space-y-1 text-xs font-mono">
                 {debugLogs.length === 0 ? (
-                  <p className="text-gray-500 italic">No hay logs aún...</p>
+                  <p className="text-gray-500 italic">
+                    No hay logs aún... Intenta seleccionar múltiples fotos de una vez
+                  </p>
                 ) : (
                   debugLogs.map((log, index) => (
                     <div
