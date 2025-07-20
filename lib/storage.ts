@@ -31,7 +31,7 @@ export async function uploadMultipleReviewPhotos(files: File[], userId: string, 
       }
 
       let cleanFile = file
-      if (!file.name || file.name === "blob" || file.name === "image" || file.name.includes("")) {
+      if (!file.name || file.name === "blob" || file.name === "image" || file.name.includes("�")) {
         const timestamp = Date.now()
         const extension = file.type.split("/")[1] || "jpg"
         const newName = `photo_${timestamp}_${index}.${extension}`
@@ -100,6 +100,36 @@ export async function uploadMultipleReviewPhotos(files: File[], userId: string, 
     console.error("Error en uploadMultipleReviewPhotos:", error)
     throw error
   }
+}
+
+// Función para extraer solo los archivos File del array de fotos
+export function extractFilesFromPhotos(
+  photos: Array<{ file: File | string; isPrimary: boolean; id?: string }>,
+): File[] {
+  console.log(`Extrayendo archivos File de ${photos.length} fotos...`)
+
+  const files: File[] = []
+
+  photos.forEach((photo, index) => {
+    console.log(`Foto ${index + 1}:`, {
+      type: typeof photo.file,
+      isFile: photo.file instanceof File,
+      isString: typeof photo.file === "string",
+      constructor: photo.file?.constructor?.name,
+    })
+
+    if (photo.file instanceof File) {
+      files.push(photo.file)
+      console.log(`✅ Archivo File agregado: ${photo.file.name}`)
+    } else if (typeof photo.file === "string") {
+      console.log(`⚠️ Saltando URL string: ${photo.file.substring(0, 50)}...`)
+    } else {
+      console.warn(`❌ Tipo de archivo no reconocido:`, typeof photo.file, photo.file)
+    }
+  })
+
+  console.log(`Resultado: ${files.length} archivos File extraídos de ${photos.length} fotos`)
+  return files
 }
 
 export async function deleteReviewPhoto(photoUrl: string): Promise<boolean> {

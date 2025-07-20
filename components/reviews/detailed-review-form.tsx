@@ -4,24 +4,18 @@ import type React from "react"
 
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { Textarea } from "@/components/ui/textarea"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { RatingSlider } from "@/components/ui/rating-slider"
-import { PriceSlider } from "@/components/ui/price-slider"
-import { Checkbox } from "@/components/ui/checkbox"
-import { PlaceSearch } from "@/components/places/place-search"
-import { RESTAURANT_CATEGORIES } from "@/lib/types"
-import { PhotoUpload } from "@/components/photos/photo-upload"
-import { getRatingColor } from "@/lib/rating-labels"
-import { createClient } from "@/lib/supabase/client"
-import { uploadMultipleReviewPhotos } from "@/lib/storage"
-import { Progress } from "@/components/ui/progress"
+import { Textarea } from "@/components/ui/textarea"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { AlertCircle } from "lucide-react"
-import { cleanAddress, formatPlaceForStorage } from "@/lib/address-utils"
+import { Progress } from "@/components/ui/progress"
+import { MapPin, Star, Upload, AlertCircle, CheckCircle2, Loader2 } from "lucide-react"
+import { createClient } from "@/lib/supabase/client"
+import { PhotoUpload } from "@/components/photos/photo-upload"
+import { RatingSlider } from "@/components/ui/rating-slider"
+import { uploadMultipleReviewPhotos, extractFilesFromPhotos } from "@/lib/storage"
+import { compressImage } from "@/lib/image-compression"
+import type { User } from "@supabase/supabase-js"
 
 interface PhotoData {
   file: File | string
@@ -29,452 +23,412 @@ interface PhotoData {
   id?: string
 }
 
-interface DetailedReviewFormProps {
-  onSubmit: (reviewData: any) => Promise<void>
-  onCancel: () => void
-  isLoading?: boolean
-  preSelectedPlace?: any
+interface Place {
+  place_id: string
+  name: string
+  formatted_address: string
+  rating?: number
+  price_level?: number
+  types?: string[]
+  geometry?: {
+    location: {
+      lat: number
+      lng: number
+    }
+  }
 }
 
-export function DetailedReviewForm({
-  onSubmit,
-  onCancel,
-  isLoading = false,
-  preSelectedPlace,
-}: DetailedReviewFormProps) {
-  const [selectedPlace, setSelectedPlace] = useState<any>(preSelectedPlace || null)
-  const [dishName, setDishName] = useState("")
-  const [comment, setComment] = useState("")
-  const [photos, setPhotos] = useState<PhotoData[]>([])
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const [uploadProgress, setUploadProgress] = useState(0)
-  const [uploadStatus, setUploadStatus] = useState("")
-  const [uploadError, setUploadError] = useState<string | null>(null)
-  const [wantsToRecommendDish, setWantsToRecommendDish] = useState(false)
+interface DetailedReviewFormProps {
+  place: Place
+  onSuccess?: () => void
+  onCancel?: () => void
+}
 
-  // Puntuaciones (1-10) - valores iniciales en 5
+export function DetailedReviewForm({ place, onSuccess, onCancel }: DetailedReviewFormProps) {
+  const [user, setUser] = useState<User | null>(null)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [submitProgress, setSubmitProgress] = useState(0)
+  const [error, setError] = useState<string | null>(null)
+  const [success, setSuccess] = useState(false)
+
+  // Form state
+  const [reviewText, setReviewText] = useState("")
+  const [photos, setPhotos] = useState<PhotoData[]>([])
   const [ratings, setRatings] = useState({
+    overall: 5,
     food_taste: 5,
     presentation: 5,
     portion_size: 5,
-    music_acoustics: 5,
+    value_for_money: 5,
+    service_quality: 5,
     ambiance: 5,
-    furniture_comfort: 5,
-    service: 5,
+    cleanliness: 5,
   })
 
-  // Nuevos campos booleanos para opciones dietéticas
+  // Dietary options
   const [dietaryOptions, setDietaryOptions] = useState({
-    celiac_friendly: false,
     vegetarian_friendly: false,
+    vegan_options: false,
+    gluten_free: false,
+    halal: false,
+    kosher: false,
   })
-
-  const [priceRange, setPriceRange] = useState("under_10000")
-  const [category, setCategory] = useState("")
 
   const supabase = createClient()
 
   useEffect(() => {
-    if (preSelectedPlace) {
-      if (preSelectedPlace.name) {
-        setSelectedPlace(preSelectedPlace)
-      }
+    const getUser = async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+      setUser(user)
     }
-  }, [preSelectedPlace])
-
-  // Labels actualizados sin las opciones dietéticas
-  const ratingLabels = {
-    food_taste: "Sabor de la comida",
-    presentation: "Presentación del plato",
-    portion_size: "Tamaño de la porción",
-    music_acoustics: "Música y acústica",
-    ambiance: "Ambientación",
-    furniture_comfort: "Confort del mobiliario",
-    service: "Servicio de mesa",
-  }
-
-  const handleRatingChange = (key: string, value: number[]) => {
-    setRatings((prev) => ({ ...prev, [key]: value[0] }))
-  }
-
-  const handlePlaceSelect = (place: any) => {
-    // Format the place with cleaned address before setting it
-    const formattedPlace = formatPlaceForStorage(place)
-    setSelectedPlace(formattedPlace)
-  }
-
-  const handleDietaryOptionChange = (option: string, checked: boolean) => {
-    setDietaryOptions((prev) => ({ ...prev, [option]: checked }))
-  }
+    getUser()
+  }, [supabase.auth])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setUploadError(null)
-
-    if (!selectedPlace || !priceRange || !category) {
-      alert("Por favor completa todos los campos obligatorios")
-      return
-    }
-
-    // Enhanced place validation
-    if (!selectedPlace.place_id && !selectedPlace.google_place_id) {
-      alert("Error: Información del lugar incompleta. Por favor selecciona el lugar nuevamente.")
-      return
-    }
-
-    // Ensure we have the required place fields
-    const placeId = selectedPlace.google_place_id || selectedPlace.place_id
-    const placeName = selectedPlace.name
-    const placeAddress = selectedPlace.formatted_address || selectedPlace.address
-
-    if (!placeId || !placeName || !placeAddress) {
-      alert("Error: Información del lugar incompleta. Por favor selecciona el lugar nuevamente.")
+    if (!user) {
+      setError("Debes iniciar sesión para escribir una reseña")
       return
     }
 
     setIsSubmitting(true)
-    setUploadProgress(0)
-    setUploadStatus("Preparando...")
+    setError(null)
+    setSubmitProgress(0)
 
     try {
-      // Generar un ID temporal para la reseña
-      const tempReviewId = `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+      // Step 1: Create review record (10%)
+      setSubmitProgress(10)
+      const { data: reviewData, error: reviewError } = await supabase
+        .from("reviews")
+        .insert({
+          user_id: user.id,
+          place_id: place.place_id,
+          place_name: place.name,
+          place_address: place.formatted_address,
+          review_text: reviewText,
+          overall_rating: ratings.overall,
+          food_taste: ratings.food_taste,
+          presentation: ratings.presentation,
+          portion_size: ratings.portion_size,
+          value_for_money: ratings.value_for_money,
+          service_quality: ratings.service_quality,
+          ambiance: ratings.ambiance,
+          cleanliness: ratings.cleanliness,
+          vegetarian_friendly: dietaryOptions.vegetarian_friendly,
+          vegan_options: dietaryOptions.vegan_options,
+          gluten_free: dietaryOptions.gluten_free,
+          halal: dietaryOptions.halal,
+          kosher: dietaryOptions.kosher,
+        })
+        .select()
+        .single()
 
-      // Obtener el usuario actual
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
-      if (!user) {
-        alert("Debes estar autenticado para enviar una reseña")
-        return
-      }
+      if (reviewError) throw reviewError
 
-      // Subir fotos a Vercel Blob si hay fotos
-      let uploadedPhotoUrls: string[] = []
+      const reviewId = reviewData.id
+      console.log("✅ Reseña creada con ID:", reviewId)
+
+      // Step 2: Process and upload photos if any (20-80%)
+      let photoUrls: string[] = []
       if (photos.length > 0) {
-        setUploadStatus("Subiendo fotos...")
-        setUploadProgress(25)
+        console.log(`📸 Procesando ${photos.length} fotos...`)
 
-        // Filtrar solo los archivos File (no strings que ya son URLs)
-        const filesToUpload = photos.map((photo) => photo.file).filter((file): file is File => file instanceof File)
-
-        console.log("=== DEBUG PHOTO UPLOAD ===")
-        console.log("Total photos:", photos.length)
-        console.log("Files to upload:", filesToUpload.length)
-        console.log("Photos array:", photos)
-        console.log("Files array:", filesToUpload)
+        // Extract only File objects from photos array
+        const filesToUpload = extractFilesFromPhotos(photos)
+        console.log(`📸 ${filesToUpload.length} archivos File encontrados para subir`)
 
         if (filesToUpload.length > 0) {
-          try {
-            console.log("Iniciando upload de fotos...")
-            uploadedPhotoUrls = await uploadMultipleReviewPhotos(filesToUpload, user.id, tempReviewId)
-            console.log("Fotos subidas exitosamente:", uploadedPhotoUrls)
+          setSubmitProgress(30)
 
-            // DEBUG: Verificar que las URLs sean de Vercel Blob
-            uploadedPhotoUrls.forEach((url, index) => {
-              console.log(`[DEBUG VERCEL BLOB URL ${index}]`, {
-                url,
-                isVercelBlob: url.includes("blob.vercel-storage.com"),
-                isSupabase: url.includes("supabase.co"),
-                urlLength: url.length,
+          // Compress images before upload
+          const compressedFiles: File[] = []
+          for (let i = 0; i < filesToUpload.length; i++) {
+            const file = filesToUpload[i]
+            console.log(`🗜️ Comprimiendo imagen ${i + 1}/${filesToUpload.length}: ${file.name}`)
+
+            try {
+              const compressedFile = await compressImage(file, {
+                maxWidth: 1920,
+                maxHeight: 1920,
+                quality: 0.8,
+                maxSizeMB: 2,
               })
-            })
-
-            setUploadProgress(75)
-          } catch (uploadError) {
-            console.error("Error subiendo fotos:", uploadError)
-            const errorMessage = uploadError instanceof Error ? uploadError.message : "Error desconocido"
-            setUploadError(`Error subiendo fotos: ${errorMessage}`)
-
-            // Preguntar al usuario si quiere continuar sin fotos
-            const continueWithoutPhotos = confirm(
-              "Hubo un problema subiendo las fotos. ¿Quieres enviar la reseña sin fotos?",
-            )
-
-            if (!continueWithoutPhotos) {
-              return
+              compressedFiles.push(compressedFile)
+              console.log(`✅ Imagen ${i + 1} comprimida: ${file.size} -> ${compressedFile.size} bytes`)
+            } catch (compressionError) {
+              console.warn(`⚠️ Error comprimiendo ${file.name}, usando original:`, compressionError)
+              compressedFiles.push(file)
             }
+
+            setSubmitProgress(30 + (i / filesToUpload.length) * 20)
           }
+
+          // Upload compressed images
+          setSubmitProgress(50)
+          console.log(`📤 Subiendo ${compressedFiles.length} imágenes comprimidas...`)
+
+          photoUrls = await uploadMultipleReviewPhotos(compressedFiles, user.id, reviewId.toString())
+          console.log(`✅ ${photoUrls.length} fotos subidas exitosamente`)
         }
-
-        // También incluir URLs que ya existen (strings)
-        const existingUrls = photos
-          .map((photo) => photo.file)
-          .filter((file): file is string => typeof file === "string")
-
-        uploadedPhotoUrls = [...uploadedPhotoUrls, ...existingUrls]
       }
 
-      setUploadStatus("Guardando reseña...")
-      setUploadProgress(90)
+      // Step 3: Update review with photo URLs (85%)
+      setSubmitProgress(85)
+      if (photoUrls.length > 0) {
+        const { error: updateError } = await supabase
+          .from("reviews")
+          .update({
+            photo_url: photoUrls[0], // Primary photo
+            photo_url_2: photoUrls[1] || null,
+            photo_url_3: photoUrls[2] || null,
+            photo_url_4: photoUrls[3] || null,
+            photo_url_5: photoUrls[4] || null,
+            photo_url_6: photoUrls[5] || null,
+          })
+          .eq("id", reviewId)
 
-      // Clean the address before saving to database
-      const cleanedAddress = cleanAddress(placeAddress)
-
-      const placeData = {
-        google_place_id: placeId,
-        name: placeName,
-        address: cleanedAddress, // Use cleaned address
-        latitude: selectedPlace.geometry?.location?.lat || selectedPlace.latitude || -32.9442426,
-        longitude: selectedPlace.geometry?.location?.lng || selectedPlace.longitude || -60.6505388,
-        phone: selectedPlace.formatted_phone_number || selectedPlace.phone || null,
-        website: selectedPlace.website || null,
-        id: selectedPlace.id || null,
+        if (updateError) throw updateError
+        console.log("✅ URLs de fotos actualizadas en la reseña")
       }
 
-      // Crear el objeto de datos de la reseña con las URLs de las fotos subidas
-      const reviewData = {
-        place: placeData,
-        dish_name: dishName.trim() || null,
-        ...ratings,
-        celiac_friendly: dietaryOptions.celiac_friendly,
-        vegetarian_friendly: dietaryOptions.vegetarian_friendly,
-        price_range: priceRange,
-        restaurant_category: category,
-        comment: comment.trim() || null,
-        photo_urls: uploadedPhotoUrls,
-        primary_photo_url: uploadedPhotoUrls.length > 0 ? uploadedPhotoUrls[0] : null,
-        // DEBUG: Campo adicional para verificar las URLs
-        vercel_blob_urls: uploadedPhotoUrls.filter((url) => url.includes("blob.vercel-storage.com")),
+      // Step 4: Award points and check achievements (95%)
+      setSubmitProgress(95)
+      try {
+        const { error: pointsError } = await supabase.rpc("award_review_points", {
+          p_user_id: user.id,
+          p_review_id: reviewId,
+          p_photo_count: photoUrls.length,
+        })
+
+        if (pointsError) {
+          console.warn("Error otorgando puntos:", pointsError)
+        } else {
+          console.log("✅ Puntos otorgados exitosamente")
+        }
+      } catch (pointsError) {
+        console.warn("Error en sistema de puntos:", pointsError)
       }
 
-      console.log("[DEBUG REVIEW DATA]", {
-        photo_urls: reviewData.photo_urls,
-        vercel_blob_urls: reviewData.vercel_blob_urls,
-        primary_photo_url: reviewData.primary_photo_url,
-        total_photos: uploadedPhotoUrls.length,
-        cleaned_address: cleanedAddress,
-        original_address: placeAddress,
-      })
+      // Step 5: Complete (100%)
+      setSubmitProgress(100)
+      setSuccess(true)
 
-      setUploadProgress(100)
-      await onSubmit(reviewData)
+      // Reset form
+      setTimeout(() => {
+        setReviewText("")
+        setPhotos([])
+        setRatings({
+          overall: 5,
+          food_taste: 5,
+          presentation: 5,
+          portion_size: 5,
+          value_for_money: 5,
+          service_quality: 5,
+          ambiance: 5,
+          cleanliness: 5,
+        })
+        setDietaryOptions({
+          vegetarian_friendly: false,
+          vegan_options: false,
+          gluten_free: false,
+          halal: false,
+          kosher: false,
+        })
+        onSuccess?.()
+      }, 2000)
     } catch (error) {
-      console.error("Error submitting review:", error)
-      const errorMessage = error instanceof Error ? error.message : "Error desconocido"
-      setUploadError(`Error al enviar la reseña: ${errorMessage}`)
+      console.error("Error enviando reseña:", error)
+      setError(error instanceof Error ? error.message : "Error desconocido")
     } finally {
       setIsSubmitting(false)
-      setUploadProgress(0)
-      setUploadStatus("")
+      setSubmitProgress(0)
     }
   }
 
-  return (
-    <div className="w-full max-w-2xl mx-auto space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle>Nueva Reseña</CardTitle>
-          <CardDescription>Comparte tu experiencia completa</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Error Alert */}
-            {uploadError && (
-              <Alert variant="destructive">
-                <AlertCircle className="h-4 w-4" />
-                <AlertDescription>{uploadError}</AlertDescription>
-              </Alert>
-            )}
+  const handleRatingChange = (category: string, value: number) => {
+    setRatings((prev) => ({
+      ...prev,
+      [category]: value,
+    }))
+  }
 
-            {/* Búsqueda de lugar */}
-            <div className="space-y-2">
-              <Label>Lugar *</Label>
-              {!selectedPlace ? (
-                <div className="w-full">
-                  <PlaceSearch onPlaceSelect={handlePlaceSelect} searchMode="api" />
-                  {preSelectedPlace && (
-                    <div className="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded text-xs text-yellow-800">
-                      Debug: Lugar preseleccionado - {preSelectedPlace.name} (ID:{" "}
-                      {preSelectedPlace.google_place_id || preSelectedPlace.place_id})
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <div className="flex items-center justify-between p-3 border rounded-md bg-muted">
-                  <div>
-                    <p className="font-medium">{selectedPlace.name}</p>
-                    <p className="text-sm text-muted-foreground">
-                      {cleanAddress(selectedPlace.formatted_address || selectedPlace.address)}
-                    </p>
-                  </div>
-                  <Button type="button" variant="outline" size="sm" onClick={() => setSelectedPlace(null)}>
-                    Cambiar
-                  </Button>
-                </div>
-              )}
-            </div>
+  const handleDietaryChange = (option: string, checked: boolean) => {
+    setDietaryOptions((prev) => ({
+      ...prev,
+      [option]: checked,
+    }))
+  }
 
-            {/* Puntuaciones */}
-            <div className="space-y-4">
-              <div className="space-y-1">
-                <Label className="text-base font-semibold">Puntuaciones (1-10)</Label>
-              </div>
-
-              {Object.entries(ratingLabels).map(([key, label]) => {
-                const currentRating = ratings[key as keyof typeof ratings]
-                const ratingColor = getRatingColor(currentRating)
-
-                return (
-                  <div key={key} className="space-y-1.5">
-                    <div className="flex justify-between items-center">
-                      <Label className="text-sm font-medium">{label}</Label>
-                      <div className="flex items-center gap-2">
-                        <span
-                          className={`text-lg font-bold ${ratingColor} bg-muted/50 px-2 py-1 rounded-md min-w-[50px] text-center`}
-                        >
-                          {currentRating}/10
-                        </span>
-                      </div>
-                    </div>
-                    <RatingSlider
-                      value={[currentRating]}
-                      onValueChange={(value) => handleRatingChange(key, value)}
-                      min={1}
-                      max={10}
-                      step={1}
-                      className="w-full"
-                    />
-                  </div>
-                )
-              })}
-            </div>
-
-            {/* Opciones dietéticas - NUEVAS CHECKBOXES */}
-            <div className="space-y-4">
-              <div className="space-y-1">
-                <Label className="text-base font-semibold">Opciones dietéticas</Label>
-              </div>
-
-              <div className="grid grid-cols-1 gap-4">
-                <div className="flex items-center space-x-3 p-3 border rounded-lg bg-muted/30">
-                  <Checkbox
-                    id="celiac-friendly"
-                    checked={dietaryOptions.celiac_friendly}
-                    onCheckedChange={(checked) => handleDietaryOptionChange("celiac_friendly", !!checked)}
-                  />
-                  <div className="flex-1">
-                    <Label htmlFor="celiac-friendly" className="text-sm font-medium cursor-pointer">
-                      🌾 Celíaco friendly
-                    </Label>
-                    <p className="text-xs text-muted-foreground">Tiene opciones sin gluten/TACC</p>
-                  </div>
-                </div>
-
-                <div className="flex items-center space-x-3 p-3 border rounded-lg bg-muted/30">
-                  <Checkbox
-                    id="vegetarian-friendly"
-                    checked={dietaryOptions.vegetarian_friendly}
-                    onCheckedChange={(checked) => handleDietaryOptionChange("vegetarian_friendly", !!checked)}
-                  />
-                  <div className="flex-1">
-                    <Label htmlFor="vegetarian-friendly" className="text-sm font-medium cursor-pointer">
-                      🥬 Vegetariano friendly
-                    </Label>
-                    <p className="text-xs text-muted-foreground">Tiene buenas opciones vegetarianas/veganas</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Checkbox para recomendar plato */}
-            <div className="space-y-3">
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="recommend-dish"
-                  checked={wantsToRecommendDish}
-                  onCheckedChange={(checked) => {
-                    setWantsToRecommendDish(!!checked)
-                    if (!checked) {
-                      setDishName("")
-                    }
-                  }}
-                />
-                <Label htmlFor="recommend-dish" className="text-sm font-medium">
-                  ¿Querés recomendar algún plato?
-                </Label>
-              </div>
-
-              {wantsToRecommendDish && (
-                <div className="space-y-2 ml-6">
-                  <Label htmlFor="dish">Nombre del plato</Label>
-                  <Input
-                    id="dish"
-                    placeholder="Ej: Milanesa napolitana, Pizza margherita..."
-                    value={dishName}
-                    onChange={(e) => setDishName(e.target.value)}
-                  />
-                </div>
-              )}
-            </div>
-
-            {/* Precio por persona - Slider */}
-            <div className="space-y-3">
-              <Label className="text-base font-semibold">Precio por persona *</Label>
-              <PriceSlider value={priceRange} onValueChange={setPriceRange} className="w-full" />
-            </div>
-
-            {/* Categorías - Dropdown */}
-            <div className="space-y-2">
-              <Label className="text-base font-semibold">Categoría del restaurante *</Label>
-              <Select value={category} onValueChange={setCategory}>
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Selecciona una categoría" />
-                </SelectTrigger>
-                <SelectContent className="rounded-[var(--radius-dropdown)]">
-                  {Object.entries(RESTAURANT_CATEGORIES).map(([key, label]) => (
-                    <SelectItem key={key} value={key} className="rounded-[var(--radius-dropdown)]">
-                      {label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* Fotos - Componente mejorado */}
-            <PhotoUpload photos={photos} onPhotosChange={setPhotos} maxPhotos={6} userId="temp-user" />
-
-            {/* Comentario */}
-            <div className="space-y-2">
-              <Label htmlFor="comment">Comentario adicional (opcional)</Label>
-              <Textarea
-                className="py-3"
-                id="comment"
-                placeholder="Cuéntanos más detalles..."
-                value={comment}
-                onChange={(e) => setComment(e.target.value)}
-                rows={4}
-              />
-            </div>
-
-            {/* Progress bar durante la subida */}
-            {isSubmitting && (
-              <div className="space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span>{uploadStatus}</span>
-                  <span>{uploadProgress}%</span>
-                </div>
-                <Progress value={uploadProgress} className="w-full" />
-              </div>
-            )}
-
-            <div className="flex gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={onCancel}
-                disabled={isLoading || isSubmitting}
-                className="flex-1 bg-transparent"
-              >
-                Cancelar
-              </Button>
-              <Button type="submit" disabled={isLoading || isSubmitting} className="flex-1">
-                {isSubmitting ? uploadStatus || "Enviando..." : "Enviar reseña"}
-              </Button>
-            </div>
-          </form>
+  if (success) {
+    return (
+      <Card className="w-full max-w-2xl mx-auto">
+        <CardContent className="p-8 text-center">
+          <CheckCircle2 className="h-16 w-16 text-green-500 mx-auto mb-4" />
+          <h3 className="text-2xl font-bold text-green-700 mb-2">¡Reseña Enviada!</h3>
+          <p className="text-muted-foreground mb-4">
+            Tu reseña ha sido publicada exitosamente. ¡Gracias por compartir tu experiencia!
+          </p>
+          <div className="flex justify-center space-x-4">
+            <Button onClick={onSuccess} variant="default">
+              Ver Reseñas
+            </Button>
+            <Button onClick={onCancel} variant="outline">
+              Cerrar
+            </Button>
+          </div>
         </CardContent>
       </Card>
-    </div>
+    )
+  }
+
+  return (
+    <Card className="w-full max-w-2xl mx-auto">
+      <CardHeader>
+        <CardTitle className="flex items-center space-x-2">
+          <Star className="h-5 w-5 text-yellow-500" />
+          <span>Nueva Reseña</span>
+        </CardTitle>
+        <div className="flex items-center space-x-2 text-sm text-muted-foreground">
+          <MapPin className="h-4 w-4" />
+          <span>{place.name}</span>
+        </div>
+        <p className="text-xs text-muted-foreground">{place.formatted_address}</p>
+      </CardHeader>
+
+      <CardContent className="space-y-6">
+        <form onSubmit={handleSubmit} className="space-y-6">
+          {/* Review Text */}
+          <div className="space-y-2">
+            <Label htmlFor="review">Tu Experiencia</Label>
+            <Textarea
+              id="review"
+              placeholder="Comparte los detalles de tu experiencia en este lugar..."
+              value={reviewText}
+              onChange={(e) => setReviewText(e.target.value)}
+              className="min-h-[120px]"
+              required
+            />
+          </div>
+
+          {/* Photo Upload */}
+          <div className="space-y-2">
+            <Label>Fotos del Plato</Label>
+            <PhotoUpload photos={photos} onPhotosChange={setPhotos} maxPhotos={6} userId={user?.id} />
+          </div>
+
+          {/* Ratings */}
+          <div className="space-y-4">
+            <Label>Puntuaciones (1-10)</Label>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <RatingSlider
+                label="Sabor de la comida"
+                value={ratings.food_taste}
+                onChange={(value) => handleRatingChange("food_taste", value)}
+              />
+              <RatingSlider
+                label="Presentación del plato"
+                value={ratings.presentation}
+                onChange={(value) => handleRatingChange("presentation", value)}
+              />
+              <RatingSlider
+                label="Tamaño de la porción"
+                value={ratings.portion_size}
+                onChange={(value) => handleRatingChange("portion_size", value)}
+              />
+              <RatingSlider
+                label="Relación calidad-precio"
+                value={ratings.value_for_money}
+                onChange={(value) => handleRatingChange("value_for_money", value)}
+              />
+              <RatingSlider
+                label="Calidad del servicio"
+                value={ratings.service_quality}
+                onChange={(value) => handleRatingChange("service_quality", value)}
+              />
+              <RatingSlider
+                label="Ambiente"
+                value={ratings.ambiance}
+                onChange={(value) => handleRatingChange("ambiance", value)}
+              />
+              <RatingSlider
+                label="Limpieza"
+                value={ratings.cleanliness}
+                onChange={(value) => handleRatingChange("cleanliness", value)}
+              />
+              <RatingSlider
+                label="Puntuación General"
+                value={ratings.overall}
+                onChange={(value) => handleRatingChange("overall", value)}
+              />
+            </div>
+          </div>
+
+          {/* Dietary Options */}
+          <div className="space-y-3">
+            <Label>Opciones Dietéticas Disponibles</Label>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+              {[
+                { key: "vegetarian_friendly", label: "Vegetariano" },
+                { key: "vegan_options", label: "Vegano" },
+                { key: "gluten_free", label: "Sin Gluten" },
+                { key: "halal", label: "Halal" },
+                { key: "kosher", label: "Kosher" },
+              ].map((option) => (
+                <label key={option.key} className="flex items-center space-x-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={dietaryOptions[option.key as keyof typeof dietaryOptions]}
+                    onChange={(e) => handleDietaryChange(option.key, e.target.checked)}
+                    className="rounded border-gray-300"
+                  />
+                  <span className="text-sm">{option.label}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+
+          {/* Progress Bar */}
+          {isSubmitting && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between text-sm">
+                <span>Enviando reseña...</span>
+                <span>{submitProgress}%</span>
+              </div>
+              <Progress value={submitProgress} className="w-full" />
+            </div>
+          )}
+
+          {/* Error Alert */}
+          {error && (
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
+
+          {/* Submit Buttons */}
+          <div className="flex justify-end space-x-4">
+            <Button type="button" variant="outline" onClick={onCancel} disabled={isSubmitting}>
+              Cancelar
+            </Button>
+            <Button type="submit" disabled={isSubmitting || !user}>
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Enviando...
+                </>
+              ) : (
+                <>
+                  <Upload className="h-4 w-4 mr-2" />
+                  Enviar Reseña
+                </>
+              )}
+            </Button>
+          </div>
+        </form>
+      </CardContent>
+    </Card>
   )
 }
