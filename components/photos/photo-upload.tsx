@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
-import { X, Upload, Camera, ImageIcon, AlertCircle } from "lucide-react"
+import { X, Upload, Camera, AlertCircle, Plus, GripVertical } from "lucide-react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { validateImageFile, getImageInfo } from "@/lib/image-compression"
 
@@ -38,6 +38,8 @@ export function PhotoUpload({
   const [uploadError, setUploadError] = useState<string | null>(null)
   const [isProcessing, setIsProcessing] = useState(false)
   const [processingProgress, setProcessingProgress] = useState(0)
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null)
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const handleFiles = async (fileList: FileList) => {
@@ -78,7 +80,7 @@ export function PhotoUpload({
         // Crear PhotoData object
         const photoData: PhotoData = {
           file: file,
-          isPrimary: photos.length === 0 && newPhotoData.length === 0, // First photo is primary
+          isPrimary: false, // Will be set based on position
           id: `photo-${Date.now()}-${i}`,
         }
 
@@ -94,12 +96,21 @@ export function PhotoUpload({
     }
 
     if (newPhotoData.length > 0) {
-      onPhotosChange([...photos, ...newPhotoData])
+      const updatedPhotos = updatePrimaryPhoto([...photos, ...newPhotoData])
+      onPhotosChange(updatedPhotos)
       console.log(`✅ ${newPhotoData.length} fotos agregadas correctamente`)
     }
 
     setIsProcessing(false)
     setProcessingProgress(0)
+  }
+
+  // Update primary photo based on position (first photo is always primary)
+  const updatePrimaryPhoto = (photoList: PhotoData[]): PhotoData[] => {
+    return photoList.map((photo, index) => ({
+      ...photo,
+      isPrimary: index === 0,
+    }))
   }
 
   const handleDrag = (e: React.DragEvent) => {
@@ -130,7 +141,8 @@ export function PhotoUpload({
 
   const removePhoto = (index: number) => {
     const newPhotos = photos.filter((_, i) => i !== index)
-    onPhotosChange(newPhotos)
+    const updatedPhotos = updatePrimaryPhoto(newPhotos)
+    onPhotosChange(updatedPhotos)
     console.log(`🗑️ Foto ${index + 1} eliminada`)
   }
 
@@ -146,20 +158,56 @@ export function PhotoUpload({
     }
   }
 
-  const getPhotoName = (photo: PhotoData): string => {
-    if (typeof photo.file === "string") {
-      return "Imagen subida"
-    } else {
-      return photo.file.name
+  // Photo reordering handlers
+  const handlePhotosDragStart = (e: React.DragEvent, index: number) => {
+    setDraggedIndex(index)
+    e.dataTransfer.effectAllowed = "move"
+    e.dataTransfer.setData("text/html", "photo-reorder")
+  }
+
+  const handlePhotosDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault()
+    e.dataTransfer.dropEffect = "move"
+
+    // Only handle photo reordering, not file uploads
+    if (e.dataTransfer.types.includes("text/html")) {
+      setDragOverIndex(index)
     }
   }
 
-  const getPhotoSize = (photo: PhotoData): string => {
-    if (typeof photo.file === "string") {
-      return "N/A"
-    } else {
-      return `${(photo.file.size / 1024 / 1024).toFixed(1)}MB`
+  const handlePhotosDragLeave = () => {
+    setDragOverIndex(null)
+  }
+
+  const handlePhotosDrop = (e: React.DragEvent, dropIndex: number) => {
+    e.preventDefault()
+    e.stopPropagation()
+
+    // Only handle photo reordering
+    if (draggedIndex !== null && e.dataTransfer.getData("text/html") === "photo-reorder") {
+      const newPhotos = [...photos]
+      const draggedPhoto = newPhotos[draggedIndex]
+
+      // Remove dragged photo from its original position
+      newPhotos.splice(draggedIndex, 1)
+
+      // Insert at new position
+      newPhotos.splice(dropIndex, 0, draggedPhoto)
+
+      // Update primary photo based on new positions
+      const updatedPhotos = updatePrimaryPhoto(newPhotos)
+      onPhotosChange(updatedPhotos)
+
+      console.log(`📷 Foto movida de posición ${draggedIndex + 1} a ${dropIndex + 1}`)
     }
+
+    setDraggedIndex(null)
+    setDragOverIndex(null)
+  }
+
+  const handlePhotosDragEnd = () => {
+    setDraggedIndex(null)
+    setDragOverIndex(null)
   }
 
   return (
@@ -179,22 +227,18 @@ export function PhotoUpload({
         onDrop={handleDrop}
         onClick={photos.length < maxPhotos ? openFileDialog : undefined}
       >
-        <CardContent className="flex flex-col items-center justify-center py-8 text-center">
+        <CardContent className="p-6">
           {isProcessing ? (
-            <div className="space-y-4 w-full max-w-xs">
+            <div className="flex flex-col items-center justify-center py-8 space-y-4">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto" />
-              <div className="space-y-2">
-                <p className="text-sm text-muted-foreground">Procesando fotos...</p>
+              <div className="space-y-2 w-full max-w-xs">
+                <p className="text-sm text-muted-foreground text-center">Procesando fotos...</p>
                 <Progress value={processingProgress} className="w-full" />
               </div>
             </div>
-          ) : photos.length >= maxPhotos ? (
-            <div className="space-y-2">
-              <ImageIcon className="h-8 w-8 text-muted-foreground mx-auto" />
-              <p className="text-sm text-muted-foreground">Máximo {maxPhotos} fotos alcanzado</p>
-            </div>
-          ) : (
-            <div className="space-y-4">
+          ) : photos.length === 0 ? (
+            // Empty state - show upload instructions
+            <div className="flex flex-col items-center justify-center py-8 text-center space-y-4">
               <div className="flex items-center justify-center space-x-2">
                 <Upload className="h-8 w-8 text-muted-foreground" />
                 <Camera className="h-8 w-8 text-muted-foreground" />
@@ -205,6 +249,88 @@ export function PhotoUpload({
                   Máximo {maxPhotos} fotos • {maxSizePerPhoto}MB por foto
                 </p>
                 <p className="text-xs text-muted-foreground">JPG, PNG, WebP</p>
+              </div>
+            </div>
+          ) : (
+            // Photos grid with add more option
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                {photos.map((photo, index) => (
+                  <div
+                    key={photo.id || index}
+                    className={`relative group ${dragOverIndex === index ? "ring-2 ring-primary ring-offset-2" : ""} ${
+                      draggedIndex === index ? "opacity-50" : ""
+                    }`}
+                    draggable
+                    onDragStart={(e) => handlePhotosDragStart(e, index)}
+                    onDragOver={(e) => handlePhotosDragOver(e, index)}
+                    onDragLeave={handlePhotosDragLeave}
+                    onDrop={(e) => handlePhotosDrop(e, index)}
+                    onDragEnd={handlePhotosDragEnd}
+                  >
+                    <div className="aspect-square relative overflow-hidden rounded-lg border cursor-move">
+                      <img
+                        src={getPhotoPreviewUrl(photo) || "/placeholder.svg"}
+                        alt={`Preview ${index + 1}`}
+                        className="w-full h-full object-cover"
+                      />
+                      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors" />
+
+                      {/* Drag handle */}
+                      <div className="absolute top-2 left-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <div className="bg-black/50 rounded p-1">
+                          <GripVertical className="h-3 w-3 text-white" />
+                        </div>
+                      </div>
+
+                      {/* Delete button */}
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        className="absolute top-2 right-2 h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          removePhoto(index)
+                        }}
+                      >
+                        <X className="h-3 w-3" />
+                      </Button>
+
+                      {/* Primary badge */}
+                      {photo.isPrimary && (
+                        <Badge className="absolute bottom-2 left-2 text-xs" variant="secondary">
+                          Principal
+                        </Badge>
+                      )}
+                    </div>
+                  </div>
+                ))}
+
+                {/* Add more photos button */}
+                {photos.length < maxPhotos && (
+                  <div
+                    className="aspect-square relative overflow-hidden rounded-lg border-2 border-dashed border-muted-foreground/25 hover:border-primary hover:bg-primary/5 transition-colors flex items-center justify-center cursor-pointer"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      openFileDialog()
+                    }}
+                  >
+                    <div className="text-center space-y-2">
+                      <Plus className="h-6 w-6 text-muted-foreground mx-auto" />
+                      <p className="text-xs text-muted-foreground">Agregar más</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Instructions when photos are present */}
+              <div className="text-center space-y-2">
+                <p className="text-xs text-muted-foreground">
+                  Arrastra las fotos para reordenar • La primera foto será la principal
+                </p>
+                <Badge variant="outline">
+                  {photos.length} de {maxPhotos} fotos
+                </Badge>
               </div>
             </div>
           )}
@@ -227,53 +353,6 @@ export function PhotoUpload({
           <AlertCircle className="h-4 w-4" />
           <AlertDescription>{uploadError}</AlertDescription>
         </Alert>
-      )}
-
-      {/* Photo Preview Grid */}
-      {photos.length > 0 && (
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-          {photos.map((photo, index) => (
-            <Card key={photo.id || index} className="relative group overflow-hidden">
-              <div className="aspect-square relative">
-                <img
-                  src={getPhotoPreviewUrl(photo) || "/placeholder.svg"}
-                  alt={`Preview ${index + 1}`}
-                  className="w-full h-full object-cover"
-                />
-                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors" />
-                <Button
-                  variant="destructive"
-                  size="sm"
-                  className="absolute top-2 right-2 h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    removePhoto(index)
-                  }}
-                >
-                  <X className="h-3 w-3" />
-                </Button>
-                {photo.isPrimary && (
-                  <Badge className="absolute bottom-2 left-2 text-xs" variant="secondary">
-                    Principal
-                  </Badge>
-                )}
-              </div>
-              <CardContent className="p-2">
-                <p className="text-xs text-muted-foreground truncate">{getPhotoName(photo)}</p>
-                <p className="text-xs text-muted-foreground">{getPhotoSize(photo)}</p>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      )}
-
-      {/* Photo Counter */}
-      {photos.length > 0 && (
-        <div className="text-center">
-          <Badge variant="outline">
-            {photos.length} de {maxPhotos} fotos
-          </Badge>
-        </div>
       )}
     </div>
   )
