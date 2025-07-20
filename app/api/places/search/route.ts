@@ -26,7 +26,7 @@ export async function GET(request: NextRequest) {
     url.searchParams.append("radius", radius.toString())
     url.searchParams.append("region", "ar")
     url.searchParams.append("language", "es")
-    url.searchParams.append("type", "restaurant|food|meal_takeaway|bakery|cafe")
+    url.searchParams.append("type", "establishment")
     url.searchParams.append("key", apiKey)
 
     console.log("Searching places with URL:", url.toString())
@@ -45,9 +45,12 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: data.error_message || "API request failed" }, { status: 500 })
     }
 
+    const tiposComida = ["restaurant", "food", "meal_takeaway", "bakery", "cafe", "bar"]
+    const soloLugaresParaComer = json.results.filter((lugar) =>
+        lugar.types.some((tipo: string) => tiposComida.includes(tipo)))
+
     // Filter results to ensure they are in Rosario/Santa Fe area
-    const filteredResults =
-      data.results?.filter((place: any) => {
+    const filteredResults = soloLugaresParaComer.filter((place: any) => {
         const address = place.formatted_address?.toLowerCase() || ""
         return (
           address.includes("rosario") ||
