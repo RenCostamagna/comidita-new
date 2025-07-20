@@ -21,6 +21,7 @@ import { uploadMultipleReviewPhotos } from "@/lib/storage"
 import { Progress } from "@/components/ui/progress"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { AlertCircle } from "lucide-react"
+import { cleanAddress, formatPlaceForStorage } from "@/lib/address-utils"
 
 interface PhotoData {
   file: File | string
@@ -97,7 +98,9 @@ export function DetailedReviewForm({
   }
 
   const handlePlaceSelect = (place: any) => {
-    setSelectedPlace(place)
+    // Format the place with cleaned address before setting it
+    const formattedPlace = formatPlaceForStorage(place)
+    setSelectedPlace(formattedPlace)
   }
 
   const handleDietaryOptionChange = (option: string, checked: boolean) => {
@@ -205,10 +208,13 @@ export function DetailedReviewForm({
       setUploadStatus("Guardando reseña...")
       setUploadProgress(90)
 
+      // Clean the address before saving to database
+      const cleanedAddress = cleanAddress(placeAddress)
+
       const placeData = {
         google_place_id: placeId,
         name: placeName,
-        address: placeAddress,
+        address: cleanedAddress, // Use cleaned address
         latitude: selectedPlace.geometry?.location?.lat || selectedPlace.latitude || -32.9442426,
         longitude: selectedPlace.geometry?.location?.lng || selectedPlace.longitude || -60.6505388,
         phone: selectedPlace.formatted_phone_number || selectedPlace.phone || null,
@@ -237,6 +243,8 @@ export function DetailedReviewForm({
         vercel_blob_urls: reviewData.vercel_blob_urls,
         primary_photo_url: reviewData.primary_photo_url,
         total_photos: uploadedPhotoUrls.length,
+        cleaned_address: cleanedAddress,
+        original_address: placeAddress,
       })
 
       setUploadProgress(100)
@@ -287,7 +295,7 @@ export function DetailedReviewForm({
                   <div>
                     <p className="font-medium">{selectedPlace.name}</p>
                     <p className="text-sm text-muted-foreground">
-                      {selectedPlace.formatted_address || selectedPlace.address}
+                      {cleanAddress(selectedPlace.formatted_address || selectedPlace.address)}
                     </p>
                   </div>
                   <Button type="button" variant="outline" size="sm" onClick={() => setSelectedPlace(null)}>

@@ -46,21 +46,24 @@ export async function GET(request: NextRequest) {
     }
 
     const tiposComida = ["restaurant", "food", "meal_takeaway", "bakery", "cafe", "bar"]
-    const soloLugaresParaComer = json.results.filter((lugar) =>
-        lugar.types.some((tipo: string) => tiposComida.includes(tipo)))
+    const soloLugaresParaComer = data.results.filter((lugar) =>
+      lugar.types.some((tipo: string) => tiposComida.includes(tipo)),
+    )
 
     // Filter results to ensure they are in Rosario/Santa Fe area
-    const filteredResults = soloLugaresParaComer.filter((place: any) => {
-        const address = place.formatted_address?.toLowerCase() || ""
-        return (
-          address.includes("rosario") ||
-          address.includes("santa fe") ||
-          address.includes("sf") ||
-          /\b20\d{2}\b/.test(address) // Rosario postal codes (2000-2099)
-        )
-      }) || []
+    const filteredResults = (soloLugaresParaComer || []).filter((place: any) => {
+      const address = place.formatted_address?.toLowerCase() || ""
+      return (
+        address.includes("rosario") ||
+        address.includes("santa fe") ||
+        address.includes("sf") ||
+        /\b20\d{2}\b/.test(address) // Rosario postal codes (2000-2099)
+      )
+    })
 
-    console.log(`Found ${data.results?.length || 0} total results, ${filteredResults.length} in Rosario area`)
+    console.log(
+      `Found ${data.results?.length || 0} total results, ${soloLugaresParaComer?.length || 0} food places, ${filteredResults.length} in Rosario area`,
+    )
 
     return NextResponse.json({
       results: filteredResults,

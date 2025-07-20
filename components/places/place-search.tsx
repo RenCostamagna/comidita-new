@@ -8,6 +8,7 @@ import { Card } from "@/components/ui/card"
 import { searchPlaces, type Place } from "@/lib/google-maps"
 import { useDebounce } from "@/hooks/use-debounce"
 import { createClient } from "@/lib/supabase/client"
+import { cleanAddress } from "@/lib/address-utils"
 
 interface PlaceSearchProps {
   onPlaceSelect: (place: Place) => void
@@ -257,7 +258,7 @@ export function PlaceSearch({
                 <MapPin className="h-4 w-4 mt-1 text-muted-foreground flex-shrink-0" />
                 <div className="flex-1 min-w-0">
                   <div className="font-medium truncate">{place.name}</div>
-                  <div className="text-sm text-muted-foreground truncate">{place.address}</div>
+                  <div className="text-sm text-muted-foreground truncate">{cleanAddress(place.address)}</div>
                   {renderLocalPlaceRating(place)}
                 </div>
               </div>
@@ -277,7 +278,7 @@ export function PlaceSearch({
                 <div className="flex-1 min-w-0">
                   <div className="font-medium truncate">{place.name}</div>
                   <div className="text-sm text-muted-foreground truncate">
-                    {(place as any).localAddress || place.formatted_address}
+                    {cleanAddress((place as any).localAddress || place.formatted_address)}
                   </div>
                   {renderGooglePlaceRating(place)}
                 </div>
