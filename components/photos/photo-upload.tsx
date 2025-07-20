@@ -325,10 +325,8 @@ export function PhotoUpload({
               </div>
               <div className="space-y-2">
                 <p className="text-sm font-medium">Arrastra fotos aquí o haz clic para seleccionar</p>
-                <p className="text-xs text-muted-foreground">
-                  Máximo {maxPhotos} fotos • {maxSizePerPhoto}MB por foto
-                </p>
-                <p className="text-xs text-muted-foreground">JPG, PNG, WebP</p>
+                
+                
               </div>
             </div>
           ) : (
