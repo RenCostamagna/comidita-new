@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState, useRef } from "react"
+import { useState, useRef, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -40,6 +40,12 @@ export function PhotoUpload({
   const [processingProgress, setProcessingProgress] = useState(0)
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null)
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null)
+
+  // Touch/mobile drag state
+  const [touchDragIndex, setTouchDragIndex] = useState<number | null>(null)
+  const [touchStartPos, setTouchStartPos] = useState<{ x: number; y: number } | null>(null)
+  const [isDragging, setIsDragging] = useState(false)
+
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const handleFiles = async (fileList: FileList) => {
@@ -158,7 +164,30 @@ export function PhotoUpload({
     }
   }
 
-  // Photo reordering handlers
+  // Reorder photos function
+  const reorderPhotos = useCallback(
+    (fromIndex: number, toIndex: number) => {
+      if (fromIndex === toIndex) return
+
+      const newPhotos = [...photos]
+      const draggedPhoto = newPhotos[fromIndex]
+
+      // Remove dragged photo from its original position
+      newPhotos.splice(fromIndex, 1)
+
+      // Insert at new position
+      newPhotos.splice(toIndex, 0, draggedPhoto)
+
+      // Update primary photo based on new positions
+      const updatedPhotos = updatePrimaryPhoto(newPhotos)
+      onPhotosChange(updatedPhotos)
+
+      console.log(`📷 Foto movida de posición ${fromIndex + 1} a ${toIndex + 1}`)
+    },
+    [photos, onPhotosChange],
+  )
+
+  // Desktop drag handlers
   const handlePhotosDragStart = (e: React.DragEvent, index: number) => {
     setDraggedIndex(index)
     e.dataTransfer.effectAllowed = "move"
@@ -185,20 +214,7 @@ export function PhotoUpload({
 
     // Only handle photo reordering
     if (draggedIndex !== null && e.dataTransfer.getData("text/html") === "photo-reorder") {
-      const newPhotos = [...photos]
-      const draggedPhoto = newPhotos[draggedIndex]
-
-      // Remove dragged photo from its original position
-      newPhotos.splice(draggedIndex, 1)
-
-      // Insert at new position
-      newPhotos.splice(dropIndex, 0, draggedPhoto)
-
-      // Update primary photo based on new positions
-      const updatedPhotos = updatePrimaryPhoto(newPhotos)
-      onPhotosChange(updatedPhotos)
-
-      console.log(`📷 Foto movida de posición ${draggedIndex + 1} a ${dropIndex + 1}`)
+      reorderPhotos(draggedIndex, dropIndex)
     }
 
     setDraggedIndex(null)
@@ -207,6 +223,70 @@ export function PhotoUpload({
 
   const handlePhotosDragEnd = () => {
     setDraggedIndex(null)
+    setDragOverIndex(null)
+  }
+
+  // Mobile touch handlers
+  const handleTouchStart = (e: React.TouchEvent, index: number) => {
+    const touch = e.touches[0]
+    setTouchStartPos({ x: touch.clientX, y: touch.clientY })
+    setTouchDragIndex(index)
+
+    // Add a small delay to distinguish between tap and drag
+    setTimeout(() => {
+      if (touchDragIndex === index && touchStartPos) {
+        setIsDragging(true)
+      }
+    }, 150)
+  }
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (!isDragging || touchDragIndex === null || !touchStartPos) return
+
+    e.preventDefault() // Prevent scrolling while dragging
+
+    const touch = e.touches[0]
+    const deltaX = Math.abs(touch.clientX - touchStartPos.x)
+    const deltaY = Math.abs(touch.clientY - touchStartPos.y)
+
+    // Only start dragging if moved significantly
+    if (deltaX > 10 || deltaY > 10) {
+      // Find which photo we're over
+      const element = document.elementFromPoint(touch.clientX, touch.clientY)
+      const photoElement = element?.closest("[data-photo-index]")
+
+      if (photoElement) {
+        const overIndex = Number.parseInt(photoElement.getAttribute("data-photo-index") || "0")
+        setDragOverIndex(overIndex)
+      }
+    }
+  }
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (!isDragging || touchDragIndex === null) {
+      // Reset states for tap
+      setTouchDragIndex(null)
+      setTouchStartPos(null)
+      setIsDragging(false)
+      return
+    }
+
+    // Handle drop
+    if (dragOverIndex !== null && dragOverIndex !== touchDragIndex) {
+      reorderPhotos(touchDragIndex, dragOverIndex)
+    }
+
+    // Reset all touch states
+    setTouchDragIndex(null)
+    setTouchStartPos(null)
+    setIsDragging(false)
+    setDragOverIndex(null)
+  }
+
+  const handleTouchCancel = () => {
+    setTouchDragIndex(null)
+    setTouchStartPos(null)
+    setIsDragging(false)
     setDragOverIndex(null)
   }
 
@@ -258,26 +338,31 @@ export function PhotoUpload({
                 {photos.map((photo, index) => (
                   <div
                     key={photo.id || index}
+                    data-photo-index={index}
                     className={`relative group ${dragOverIndex === index ? "ring-2 ring-primary ring-offset-2" : ""} ${
-                      draggedIndex === index ? "opacity-50" : ""
-                    }`}
+                      draggedIndex === index || touchDragIndex === index ? "opacity-50" : ""
+                    } ${isDragging && touchDragIndex === index ? "scale-105 z-10" : ""} transition-all duration-200`}
                     draggable
                     onDragStart={(e) => handlePhotosDragStart(e, index)}
                     onDragOver={(e) => handlePhotosDragOver(e, index)}
                     onDragLeave={handlePhotosDragLeave}
                     onDrop={(e) => handlePhotosDrop(e, index)}
                     onDragEnd={handlePhotosDragEnd}
+                    onTouchStart={(e) => handleTouchStart(e, index)}
+                    onTouchMove={handleTouchMove}
+                    onTouchEnd={handleTouchEnd}
+                    onTouchCancel={handleTouchCancel}
                   >
-                    <div className="aspect-square relative overflow-hidden rounded-lg border cursor-move">
+                    <div className="aspect-square relative overflow-hidden rounded-lg border cursor-move touch-none">
                       <img
                         src={getPhotoPreviewUrl(photo) || "/placeholder.svg"}
                         alt={`Preview ${index + 1}`}
-                        className="w-full h-full object-cover"
+                        className="w-full h-full object-cover pointer-events-none"
                       />
                       <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors" />
 
                       {/* Drag handle */}
-                      <div className="absolute top-2 left-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <div className="absolute top-2 left-2 opacity-0 group-hover:opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
                         <div className="bg-black/50 rounded p-1">
                           <GripVertical className="h-3 w-3 text-white" />
                         </div>
@@ -287,9 +372,15 @@ export function PhotoUpload({
                       <Button
                         variant="destructive"
                         size="sm"
-                        className="absolute top-2 right-2 h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                        className="absolute top-2 right-2 h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity z-20"
                         onClick={(e) => {
                           e.stopPropagation()
+                          e.preventDefault()
+                          removePhoto(index)
+                        }}
+                        onTouchEnd={(e) => {
+                          e.stopPropagation()
+                          e.preventDefault()
                           removePhoto(index)
                         }}
                       >
@@ -298,9 +389,14 @@ export function PhotoUpload({
 
                       {/* Primary badge */}
                       {photo.isPrimary && (
-                        <Badge className="absolute bottom-2 left-2 text-xs" variant="secondary">
-                          Principal
+                        <Badge className="absolute bottom-2 left-2 text-xs pointer-events-none" variant="secondary">
+                          Plato
                         </Badge>
+                      )}
+
+                      {/* Mobile drag indicator */}
+                      {isDragging && touchDragIndex === index && (
+                        <div className="absolute inset-0 bg-primary/20 border-2 border-primary rounded-lg" />
                       )}
                     </div>
                   </div>
@@ -325,9 +421,7 @@ export function PhotoUpload({
 
               {/* Instructions when photos are present */}
               <div className="text-center space-y-2">
-                <p className="text-xs text-muted-foreground">
-                  Arrastra las fotos para reordenar • La primera foto será la principal
-                </p>
+                <p className="text-xs text-muted-foreground">Mantén presionado y arrastra las fotos para reordenar</p>
                 <Badge variant="outline">
                   {photos.length} de {maxPhotos} fotos
                 </Badge>
