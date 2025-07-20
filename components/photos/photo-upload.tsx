@@ -2,12 +2,12 @@
 
 import type React from "react"
 
-import { useState, useRef, useCallback, useEffect } from "react"
+import { useState, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
-import { X, Upload, Camera, AlertCircle, Plus, GripVertical, Star } from "lucide-react"
+import { X, Upload, Camera, Star } from "lucide-react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { validateImageFile, getImageInfo } from "@/lib/image-compression"
 
@@ -34,33 +34,11 @@ export function PhotoUpload({
   acceptedFormats = ["image/jpeg", "image/jpg", "image/png", "image/webp"],
   userId = "temp-user",
 }: PhotoUploadProps) {
-  const [dragActive, setDragActive] = useState(false)
   const [uploadError, setUploadError] = useState<string | null>(null)
   const [isProcessing, setIsProcessing] = useState(false)
   const [processingProgress, setProcessingProgress] = useState(0)
-  const [draggedIndex, setDraggedIndex] = useState<number | null>(null)
-  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null)
-  const [isMobile, setIsMobile] = useState(false)
 
   const fileInputRef = useRef<HTMLInputElement>(null)
-
-  // Detect mobile device
-  useEffect(() => {
-    const checkMobile = () => {
-      const userAgent = navigator.userAgent || navigator.vendor || (window as any).opera
-      const isMobileDevice = /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/i.test(
-        userAgent.toLowerCase(),
-      )
-      const isTouchDevice = "ontouchstart" in window || navigator.maxTouchPoints > 0
-      const isSmallScreen = window.innerWidth <= 768
-
-      setIsMobile(isMobileDevice || (isTouchDevice && isSmallScreen))
-    }
-
-    checkMobile()
-    window.addEventListener("resize", checkMobile)
-    return () => window.removeEventListener("resize", checkMobile)
-  }, [])
 
   const handleFiles = async (fileList: FileList) => {
     setUploadError(null)
@@ -117,7 +95,7 @@ export function PhotoUpload({
         // Crear PhotoData object
         const photoData: PhotoData = {
           file: file,
-          isPrimary: false, // Will be set based on position or user selection
+          isPrimary: false, // Will be set based on user selection
           id: `photo-${Date.now()}-${i}`,
         }
 
@@ -142,9 +120,8 @@ export function PhotoUpload({
     setProcessingProgress(0)
   }
 
-  // Update primary photo based on position (first photo is always primary by default)
+  // Update primary photo - if no photo is marked as primary, make the first one primary
   const updatePrimaryPhoto = (photoList: PhotoData[]): PhotoData[] => {
-    // If no photo is marked as primary, make the first one primary
     const hasPrimary = photoList.some((photo) => photo.isPrimary)
 
     return photoList.map((photo, index) => ({
@@ -163,32 +140,6 @@ export function PhotoUpload({
     console.log(`⭐ Foto ${targetIndex + 1} marcada como principal`)
   }
 
-  const handleDrag = (e: React.DragEvent) => {
-    // Disable drag and drop on mobile
-    if (isMobile) return
-
-    e.preventDefault()
-    e.stopPropagation()
-    if (e.type === "dragenter" || e.type === "dragover") {
-      setDragActive(true)
-    } else if (e.type === "dragleave") {
-      setDragActive(false)
-    }
-  }
-
-  const handleDrop = (e: React.DragEvent) => {
-    // Disable drag and drop on mobile
-    if (isMobile) return
-
-    e.preventDefault()
-    e.stopPropagation()
-    setDragActive(false)
-
-    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-      handleFiles(e.dataTransfer.files)
-    }
-  }
-
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
       handleFiles(e.target.files)
@@ -202,7 +153,10 @@ export function PhotoUpload({
     console.log(`🗑️ Foto ${index + 1} eliminada`)
   }
 
-  const openFileDialog = () => {
+  const openFileDialog = (e: React.MouseEvent) => {
+    // Prevenir que el evento se propague al formulario padre
+    e.preventDefault()
+    e.stopPropagation()
     fileInputRef.current?.click()
   }
 
@@ -214,229 +168,117 @@ export function PhotoUpload({
     }
   }
 
-  // Reorder photos function (only for desktop)
-  const reorderPhotos = useCallback(
-    (fromIndex: number, toIndex: number) => {
-      if (fromIndex === toIndex || isMobile) return
-
-      const newPhotos = [...photos]
-      const draggedPhoto = newPhotos[fromIndex]
-
-      // Remove dragged photo from its original position
-      newPhotos.splice(fromIndex, 1)
-
-      // Insert at new position
-      newPhotos.splice(toIndex, 0, draggedPhoto)
-
-      // Update photos without changing primary status
-      onPhotosChange(newPhotos)
-
-      console.log(`📷 Foto movida de posición ${fromIndex + 1} a ${toIndex + 1}`)
-    },
-    [photos, onPhotosChange, isMobile],
-  )
-
-  // Desktop drag handlers (disabled on mobile)
-  const handlePhotosDragStart = (e: React.DragEvent, index: number) => {
-    if (isMobile) {
-      e.preventDefault()
-      return
-    }
-
-    setDraggedIndex(index)
-    e.dataTransfer.effectAllowed = "move"
-    e.dataTransfer.setData("text/html", "photo-reorder")
-  }
-
-  const handlePhotosDragOver = (e: React.DragEvent, index: number) => {
-    if (isMobile) return
-
-    e.preventDefault()
-    e.dataTransfer.dropEffect = "move"
-
-    // Only handle photo reordering, not file uploads
-    if (e.dataTransfer.types.includes("text/html")) {
-      setDragOverIndex(index)
-    }
-  }
-
-  const handlePhotosDragLeave = () => {
-    if (isMobile) return
-    setDragOverIndex(null)
-  }
-
-  const handlePhotosDrop = (e: React.DragEvent, dropIndex: number) => {
-    if (isMobile) return
-
-    e.preventDefault()
-    e.stopPropagation()
-
-    // Only handle photo reordering
-    if (draggedIndex !== null && e.dataTransfer.getData("text/html") === "photo-reorder") {
-      reorderPhotos(draggedIndex, dropIndex)
-    }
-
-    setDraggedIndex(null)
-    setDragOverIndex(null)
-  }
-
-  const handlePhotosDragEnd = () => {
-    if (isMobile) return
-    setDraggedIndex(null)
-    setDragOverIndex(null)
-  }
-
   return (
-    <div className="space-y-4">
-      {/* Upload Area */}
-      <Card
-        className={`border-2 border-dashed transition-colors cursor-pointer ${
-          dragActive && !isMobile
-            ? "border-primary bg-primary/5"
-            : photos.length >= maxPhotos
-              ? "border-muted bg-muted/20"
-              : "border-muted-foreground/25 hover:border-primary hover:bg-primary/5"
-        }`}
-        onDragEnter={!isMobile ? handleDrag : undefined}
-        onDragLeave={!isMobile ? handleDrag : undefined}
-        onDragOver={!isMobile ? handleDrag : undefined}
-        onDrop={!isMobile ? handleDrop : undefined}
-        onClick={photos.length < maxPhotos ? openFileDialog : undefined}
-      >
-        <CardContent className="p-6">
-          {isProcessing ? (
-            <div className="flex flex-col items-center justify-center py-8 space-y-4">
+    <div className="space-y-6">
+      {/* Upload Button - More compact/narrow */}
+      <div className="space-y-3">
+        <div className="flex justify-center">
+          <Button
+            type="button"
+            onClick={openFileDialog}
+            disabled={photos.length >= maxPhotos || isProcessing}
+            className="max-w-md bg-red-500 hover:bg-red-600 text-white font-medium rounded-full h-8 w-full"
+            size="lg"
+          >
+            <Upload className="h-4 w-4 mr-2" />
+            <Camera className="h-4 w-4 mr-2" />
+            Subir fotos
+          </Button>
+        </div>
+
+        <div className="text-center space-y-1">
+          
+          
+          
+        </div>
+      </div>
+
+      {/* Processing State */}
+      {isProcessing && (
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex flex-col items-center justify-center space-y-4">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto" />
               <div className="space-y-2 w-full max-w-xs">
                 <p className="text-sm text-muted-foreground text-center">Procesando fotos...</p>
                 <Progress value={processingProgress} className="w-full" />
               </div>
             </div>
-          ) : photos.length === 0 ? (
-            // Empty state - show upload instructions
-            <div className="flex flex-col items-center justify-center py-8 text-center space-y-4">
-              <div className="flex items-center justify-center space-x-2">
-                <Upload className="h-8 w-8 text-muted-foreground" />
-                <Camera className="h-8 w-8 text-muted-foreground" />
-              </div>
-              <div className="space-y-2">
-                <p className="text-sm font-medium">
-                  {isMobile ? "Toca para seleccionar fotos" : "Arrastra fotos aquí o haz clic para seleccionar"}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  Máximo {maxPhotos} fotos • {maxSizePerPhoto}MB por foto
-                </p>
-                <p className="text-xs text-muted-foreground">JPG, PNG, WebP</p>
-              </div>
-            </div>
-          ) : (
-            // Photos grid with add more option
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                {photos.map((photo, index) => (
-                  <div
-                    key={photo.id || index}
-                    data-photo-index={index}
-                    className={`relative group ${
-                      !isMobile && dragOverIndex === index ? "ring-2 ring-primary ring-offset-2" : ""
-                    } ${!isMobile && draggedIndex === index ? "opacity-50" : ""} transition-all duration-200`}
-                    draggable={!isMobile}
-                    onDragStart={!isMobile ? (e) => handlePhotosDragStart(e, index) : undefined}
-                    onDragOver={!isMobile ? (e) => handlePhotosDragOver(e, index) : undefined}
-                    onDragLeave={!isMobile ? handlePhotosDragLeave : undefined}
-                    onDrop={!isMobile ? (e) => handlePhotosDrop(e, index) : undefined}
-                    onDragEnd={!isMobile ? handlePhotosDragEnd : undefined}
-                  >
-                    <div
-                      className={`aspect-square relative overflow-hidden rounded-lg border ${!isMobile ? "cursor-move" : ""}`}
-                    >
-                      <img
-                        src={getPhotoPreviewUrl(photo) || "/placeholder.svg"}
-                        alt={`Preview ${index + 1}`}
-                        className="w-full h-full object-cover pointer-events-none"
-                      />
-                      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors" />
+          </CardContent>
+        </Card>
+      )}
 
-                      {/* Drag handle - only on desktop */}
-                      {!isMobile && (
-                        <div className="absolute top-2 left-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <div className="bg-black/50 rounded p-1">
-                            <GripVertical className="h-3 w-3 text-white" />
-                          </div>
-                        </div>
-                      )}
+      {/* Photos Preview Section */}
+      {photos.length > 0 && !isProcessing && (
+        <div className="space-y-4">
+          <h3 className="text-lg font-semibold text-foreground">Fotos de la reseña</h3>
 
-                      {/* Primary button - always visible on mobile, hover on desktop */}
-                      <Button
-                        variant={photo.isPrimary ? "default" : "secondary"}
-                        size="sm"
-                        className={`absolute ${isMobile ? "top-2 left-2" : "top-2 left-2 opacity-0 group-hover:opacity-100"} h-8 w-8 p-0 transition-opacity z-20`}
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          e.preventDefault()
-                          setPrimaryPhoto(index)
-                        }}
-                        title="Marcar como foto principal"
-                      >
-                        <Star className={`h-3 w-3 ${photo.isPrimary ? "fill-current" : ""}`} />
-                      </Button>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+            {photos.map((photo, index) => (
+              <div key={photo.id || index} className="relative group">
+                <div className="aspect-square relative overflow-hidden rounded-lg border">
+                  <img
+                    src={getPhotoPreviewUrl(photo) || "/placeholder.svg"}
+                    alt={`Preview ${index + 1}`}
+                    className="w-full h-full object-cover"
+                  />
 
-                      {/* Delete button */}
-                      <Button
-                        variant="destructive"
-                        size="sm"
-                        className={`absolute top-2 right-2 h-8 w-8 p-0 ${isMobile ? "" : "opacity-0 group-hover:opacity-100"} transition-opacity z-20`}
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          e.preventDefault()
-                          removePhoto(index)
-                        }}
-                      >
-                        <X className="h-3 w-3" />
-                      </Button>
+                  {/* Overlay for better button visibility */}
+                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors" />
 
-                      {/* Primary badge */}
-                      {photo.isPrimary && (
-                        <Badge className="absolute bottom-2 left-2 text-xs pointer-events-none" variant="secondary">
-                          Principal
-                        </Badge>
-                      )}
-                    </div>
-                  </div>
-                ))}
-
-                {/* Add more photos button */}
-                {photos.length < maxPhotos && (
-                  <div
-                    className="aspect-square relative overflow-hidden rounded-lg border-2 border-dashed border-muted-foreground/25 hover:border-primary hover:bg-primary/5 transition-colors flex items-center justify-center cursor-pointer"
+                  {/* Delete button - top right */}
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    size="sm"
+                    className="absolute top-2 right-2 h-7 w-7 p-0 opacity-0 group-hover:opacity-100 transition-opacity z-20 rounded-full"
                     onClick={(e) => {
                       e.stopPropagation()
-                      openFileDialog()
+                      e.preventDefault()
+                      removePhoto(index)
                     }}
                   >
-                    <div className="text-center space-y-2">
-                      <Plus className="h-6 w-6 text-muted-foreground mx-auto" />
-                      <p className="text-xs text-muted-foreground">Agregar más</p>
-                    </div>
-                  </div>
-                )}
-              </div>
+                    <X className="h-3 w-3" />
+                  </Button>
 
-              {/* Instructions */}
-              <div className="text-center space-y-2">
-                <p className="text-xs text-muted-foreground">
-                  {isMobile
-                    ? "Toca la estrella para marcar la foto principal"
-                    : "Arrastra las fotos para reordenar o usa la estrella para marcar como principal"}
-                </p>
-                <Badge variant="outline">
-                  {photos.length} de {maxPhotos} fotos
-                </Badge>
+                  {/* Primary badge - top left when selected */}
+                  {photo.isPrimary && (
+                    <div className="absolute top-2 left-2 z-10">
+                      <Badge className="text-xs bg-white/90 text-gray-800 border-0 rounded-full px-2 py-1">
+                        <Star className="h-3 w-3 mr-1 fill-current text-yellow-500" />
+                        Principal
+                      </Badge>
+                    </div>
+                  )}
+
+                  {/* Primary selection button - bottom center, minimalist with shorter text */}
+                  {!photo.isPrimary && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="absolute bottom-2 left-1/2 transform -translate-x-1/2 h-7 px-2 bg-white/90 hover:bg-white text-gray-700 hover:text-gray-900 opacity-0 group-hover:opacity-100 transition-opacity z-20 rounded-full text-xs font-medium"
+                      onClick={(e) => {
+                        e.preventDefault()
+                        e.stopPropagation()
+                        setPrimaryPhoto(index)
+                      }}
+                    >
+                      <Star className="h-3 w-3 mr-1" />
+                      Principal
+                    </Button>
+                  )}
+                </div>
               </div>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+            ))}
+          </div>
+
+          {/* Instructions */}
+          <div className="text-center">
+            
+          </div>
+        </div>
+      )}
 
       {/* Hidden File Input */}
       <input
@@ -451,7 +293,6 @@ export function PhotoUpload({
       {/* Error Message */}
       {uploadError && (
         <Alert variant="destructive">
-          <AlertCircle className="h-4 w-4" />
           <AlertDescription>{uploadError}</AlertDescription>
         </Alert>
       )}
