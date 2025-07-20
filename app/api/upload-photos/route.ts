@@ -90,7 +90,12 @@ export async function POST(request: NextRequest) {
         // Generar nombre único
         const timestamp = Date.now()
         const randomSuffix = Math.random().toString(36).substring(2, 8)
-        const fileExtension = file.name.split(".").pop()?.toLowerCase() || "jpg"
+        let fileExtension = "jpg"
+          if (file.name && file.name.includes(".")) {
+            fileExtension = file.name.split(".").pop()!.toLowerCase()
+          } else if (file.type && file.type.includes("/")) {
+            fileExtension = file.type.split("/").pop()!.toLowerCase()
+          }
         const fileName = `review-photos/${user.id}_${reviewId}_${timestamp}_${randomSuffix}.${fileExtension}`
 
         console.log(`Subiendo archivo como: ${fileName}`)
