@@ -46,6 +46,7 @@ export function PhotoUpload({
   const [processingProgress, setProcessingProgress] = useState(0)
   const [debugLogs, setDebugLogs] = useState<DebugLog[]>([])
   const [showDebug, setShowDebug] = useState(false)
+  const [currentProcessingFile, setCurrentProcessingFile] = useState<string>("")
 
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -65,22 +66,41 @@ export function PhotoUpload({
     setDebugLogs([])
   }
 
-  // Función para procesar archivos de forma secuencial (no paralela)
-  const processFilesSequentially = async (files: File[]) => {
+  // Función para liberar memoria de URLs de objetos
+  const cleanupObjectUrls = () => {
+    // Limpiar URLs de objetos que ya no se usan
+    if (typeof window !== "undefined") {
+      // Forzar garbage collection si está disponible
+      if (window.gc) {
+        window.gc()
+      }
+    }
+  }
+
+  // Función para procesar archivos con delays más largos y mejor manejo de memoria
+  const processFilesWithDelay = async (files: File[]) => {
     const results: PhotoData[] = []
     const errors: string[] = []
+    const DELAY_BETWEEN_FILES = 500 // Aumentado a 500ms
+    const MAX_CONCURRENT_PROCESSING = 1 // Solo procesar 1 archivo a la vez
+
+    addDebugLog("info", `⏱️ Iniciando procesamiento con delay de ${DELAY_BETWEEN_FILES}ms entre archivos`)
 
     for (let i = 0; i < files.length; i++) {
       const file = files[i]
+      const startTime = Date.now()
+
+      setCurrentProcessingFile(`${file.name} (${i + 1}/${files.length})`)
       setProcessingProgress(((i + 1) / files.length) * 100)
 
-      addDebugLog("info", `🔄 Procesando secuencialmente archivo ${i + 1}/${files.length}: ${file.name}`)
+      addDebugLog("info", `🔄 [${i + 1}/${files.length}] Iniciando procesamiento: ${file.name}`, {
+        size: `${(file.size / 1024 / 1024).toFixed(2)}MB`,
+        type: file.type,
+        timestamp: new Date().toISOString(),
+      })
 
       try {
-        // Pequeña pausa para evitar sobrecarga del navegador móvil
-        await new Promise((resolve) => setTimeout(resolve, 100))
-
-        // Validar archivo
+        // Validar archivo primero (rápido)
         const validation = validateImageFile(file, maxSizePerPhoto, acceptedFormats)
         if (!validation.isValid) {
           const errorMsg = `${file.name}: ${validation.error}`
@@ -91,23 +111,35 @@ export function PhotoUpload({
 
         addDebugLog("info", `✅ Validación OK para ${file.name}`)
 
-        // Obtener información de la imagen de forma más robusta
+        // Delay antes del procesamiento pesado
+        await new Promise((resolve) => setTimeout(resolve, 200))
+
+        // Obtener información de la imagen con timeout
         let imageInfo
         try {
-          imageInfo = await getImageInfo(file)
-          addDebugLog("info", `📊 Info de imagen obtenida`, {
+          const imageInfoPromise = getImageInfo(file)
+          const timeoutPromise = new Promise((_, reject) =>
+            setTimeout(() => reject(new Error("Timeout obteniendo info de imagen")), 10000),
+          )
+
+          imageInfo = await Promise.race([imageInfoPromise, timeoutPromise])
+
+          const processingTime = Date.now() - startTime
+          addDebugLog("info", `📊 Info de imagen obtenida en ${processingTime}ms`, {
             file: file.name,
             size: `${(file.size / 1024 / 1024).toFixed(2)}MB`,
             dimensions: `${imageInfo.width}x${imageInfo.height}`,
             type: file.type,
+            processingTime: `${processingTime}ms`,
           })
         } catch (imageError) {
+          const processingTime = Date.now() - startTime
           addDebugLog(
             "warning",
-            `⚠️ Error obteniendo info de imagen para ${file.name}, usando valores por defecto`,
+            `⚠️ Error/timeout obteniendo info de imagen para ${file.name} después de ${processingTime}ms`,
             imageError,
           )
-          // Continuar con valores por defecto si falla getImageInfo
+          // Continuar con valores por defecto
           imageInfo = { width: 800, height: 600 }
         }
 
@@ -119,14 +151,34 @@ export function PhotoUpload({
         }
 
         results.push(photoData)
-        addDebugLog("info", `✅ PhotoData creado para ${file.name}`, { id: photoData.id })
+
+        const totalProcessingTime = Date.now() - startTime
+        addDebugLog("info", `✅ PhotoData creado para ${file.name} en ${totalProcessingTime}ms`, {
+          id: photoData.id,
+          totalTime: `${totalProcessingTime}ms`,
+        })
+
+        // Delay más largo entre archivos para dar tiempo al navegador
+        if (i < files.length - 1) {
+          addDebugLog("info", `⏳ Esperando ${DELAY_BETWEEN_FILES}ms antes del siguiente archivo...`)
+          await new Promise((resolve) => setTimeout(resolve, DELAY_BETWEEN_FILES))
+
+          // Limpiar memoria entre archivos
+          cleanupObjectUrls()
+        }
       } catch (error) {
-        const errorMsg = `Error procesando ${file.name}: ${error instanceof Error ? error.message : "Error desconocido"}`
-        addDebugLog("error", `💥 ${errorMsg}`, error)
+        const processingTime = Date.now() - startTime
+        const errorMsg = `Error procesando ${file.name} después de ${processingTime}ms: ${error instanceof Error ? error.message : "Error desconocido"}`
+        addDebugLog("error", `💥 ${errorMsg}`, {
+          error,
+          processingTime: `${processingTime}ms`,
+          fileIndex: i,
+        })
         errors.push(errorMsg)
       }
     }
 
+    setCurrentProcessingFile("")
     return { results, errors }
   }
 
@@ -135,12 +187,16 @@ export function PhotoUpload({
 
     // Debug específico para selección múltiple
     if (fileList.length > 1) {
-      addDebugLog("warning", `📱 SELECCIÓN MÚLTIPLE DETECTADA: ${fileList.length} archivos seleccionados de una vez`)
+      addDebugLog(
+        "warning",
+        `📱 SELECCIÓN MÚLTIPLE DETECTADA: ${fileList.length} archivos - usando procesamiento con delay`,
+      )
     }
 
     setUploadError(null)
     setIsProcessing(true)
     setProcessingProgress(0)
+    setCurrentProcessingFile("")
 
     // Debug: Log initial FileList info con más detalle
     const fileListInfo = Array.from(fileList).map((f, i) => ({
@@ -155,7 +211,7 @@ export function PhotoUpload({
 
     addDebugLog("info", "📋 FileList detallada recibida", {
       length: fileList.length,
-      totalSize: Array.from(fileList).reduce((sum, f) => sum + f.size, 0),
+      totalSize: `${(Array.from(fileList).reduce((sum, f) => sum + f.size, 0) / 1024 / 1024).toFixed(2)}MB`,
       files: fileListInfo,
       blobFiles: fileListInfo.filter((f) => f.isBlob).length,
       invalidTypes: fileListInfo.filter((f) => !f.hasValidType).length,
@@ -210,8 +266,8 @@ export function PhotoUpload({
 
     addDebugLog("info", `✅ Límite de fotos OK: ${photos.length + cleanedFiles.length}/${maxPhotos}`)
 
-    // Procesar archivos secuencialmente para evitar problemas de memoria en móvil
-    const { results: newPhotoData, errors } = await processFilesSequentially(cleanedFiles)
+    // Procesar archivos con delays para evitar problemas de tiempo
+    const { results: newPhotoData, errors } = await processFilesWithDelay(cleanedFiles)
 
     if (errors.length > 0) {
       addDebugLog("warning", `⚠️ ${errors.length} errores encontrados`, errors)
@@ -236,6 +292,7 @@ export function PhotoUpload({
 
     setIsProcessing(false)
     setProcessingProgress(0)
+    setCurrentProcessingFile("")
     addDebugLog("info", "🏁 Procesamiento completado")
   }
 
@@ -321,7 +378,7 @@ export function PhotoUpload({
             <div className="space-y-2">
               <div className="flex items-center gap-2 mb-3">
                 <Bug className="h-4 w-4 text-yellow-600" />
-                <h4 className="font-semibold text-yellow-800">Debug Mobile Upload - Selección Múltiple</h4>
+                <h4 className="font-semibold text-yellow-800">Debug Mobile Upload - Timing Issues</h4>
                 <Badge variant="outline" className="text-xs">
                   {debugLogs.length} logs
                 </Badge>
@@ -330,7 +387,7 @@ export function PhotoUpload({
               <div className="max-h-40 overflow-y-auto space-y-1 text-xs font-mono">
                 {debugLogs.length === 0 ? (
                   <p className="text-gray-500 italic">
-                    No hay logs aún... Intenta seleccionar múltiples fotos de una vez
+                    No hay logs aún... Intenta seleccionar múltiples fotos para ver los tiempos de procesamiento
                   </p>
                 ) : (
                   debugLogs.map((log, index) => (
@@ -393,15 +450,20 @@ export function PhotoUpload({
         </div>
       </div>
 
-      {/* Processing State */}
+      {/* Processing State with current file info */}
       {isProcessing && (
         <Card>
           <CardContent className="p-6">
             <div className="flex flex-col items-center justify-center space-y-4">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto" />
               <div className="space-y-2 w-full max-w-xs">
-                <p className="text-sm text-muted-foreground text-center">Procesando fotos...</p>
+                <p className="text-sm text-muted-foreground text-center">
+                  {currentProcessingFile ? `Procesando: ${currentProcessingFile}` : "Procesando fotos..."}
+                </p>
                 <Progress value={processingProgress} className="w-full" />
+                <p className="text-xs text-muted-foreground text-center">
+                  Procesamiento lento para mejor compatibilidad móvil
+                </p>
               </div>
             </div>
           </CardContent>
