@@ -3,11 +3,30 @@ export async function uploadMultipleReviewPhotos(files: File[], userId: string, 
   console.log(`Iniciando upload de ${files.length} fotos para usuario ${userId}, reseña ${reviewId}`)
 
   try {
+    // Validar que todos los elementos sean File objects
+    const validFiles = files.filter((file) => file instanceof File && file.size > 0)
+
+    if (validFiles.length === 0) {
+      console.warn("No hay archivos válidos para subir")
+      return []
+    }
+
+    if (validFiles.length !== files.length) {
+      console.warn(`Se filtraron ${files.length - validFiles.length} archivos inválidos`)
+    }
+
     const formData = new FormData()
 
-    // Agregar archivos al FormData con el nombre correcto
-    files.forEach((file, index) => {
-      console.log(`Agregando archivo ${index + 1}: ${file.name} (${file.size} bytes)`)
+    // Agregar solo archivos válidos al FormData
+    validFiles.forEach((file, index) => {
+      console.log(`Agregando archivo ${index + 1}: ${file.name} (${file.size} bytes, tipo: ${file.type})`)
+
+      // Validar que el archivo tenga un tipo MIME válido
+      if (!file.type.startsWith("image/")) {
+        console.warn(`Archivo ${file.name} no es una imagen válida, tipo: ${file.type}`)
+        return
+      }
+
       formData.append("photos", file)
     })
 

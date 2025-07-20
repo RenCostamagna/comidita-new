@@ -155,14 +155,43 @@ export function DetailedReviewForm({
         setUploadStatus("Subiendo fotos...")
         setUploadProgress(25)
 
-        // Filtrar solo los archivos File (no strings que ya son URLs)
-        const filesToUpload = photos.map((photo) => photo.file).filter((file): file is File => file instanceof File)
+        // Filtrar solo los archivos File (no strings que ya son URLs) y validar que sean archivos válidos
+        const filesToUpload = photos
+          .map((photo) => photo.file)
+          .filter((file): file is File => {
+            // Verificar que sea un File object válido
+            if (!(file instanceof File)) {
+              console.log("Elemento no es File:", typeof file, file)
+              return false
+            }
+
+            // Verificar que tenga tamaño válido
+            if (file.size === 0) {
+              console.log("Archivo vacío:", file.name)
+              return false
+            }
+
+            // Verificar que sea una imagen
+            if (!file.type.startsWith("image/")) {
+              console.log("Archivo no es imagen:", file.name, file.type)
+              return false
+            }
+
+            return true
+          })
 
         console.log("=== DEBUG PHOTO UPLOAD ===")
         console.log("Total photos:", photos.length)
         console.log("Files to upload:", filesToUpload.length)
-        console.log("Photos array:", photos)
-        console.log("Files array:", filesToUpload)
+        console.log(
+          "Photos array:",
+          photos.map((p) => ({
+            type: typeof p.file,
+            isFile: p.file instanceof File,
+            name: p.file instanceof File ? p.file.name : "URL",
+            size: p.file instanceof File ? p.file.size : "N/A",
+          })),
+        )
 
         if (filesToUpload.length > 0) {
           try {
@@ -197,10 +226,22 @@ export function DetailedReviewForm({
           }
         }
 
-        // También incluir URLs que ya existen (strings)
+        // También incluir URLs que ya existen (strings) - pero solo si son URLs válidas
         const existingUrls = photos
           .map((photo) => photo.file)
-          .filter((file): file is string => typeof file === "string")
+          .filter((file): file is string => {
+            if (typeof file === "string") {
+              // Verificar que sea una URL válida
+              try {
+                new URL(file)
+                return true
+              } catch {
+                console.warn("URL inválida encontrada:", file)
+                return false
+              }
+            }
+            return false
+          })
 
         uploadedPhotoUrls = [...uploadedPhotoUrls, ...existingUrls]
       }
