@@ -7,14 +7,16 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
-import { X, Upload, Camera, Star, Bug, RefreshCw } from "lucide-react"
+import { X, Upload, Camera, Star, Bug, RefreshCw, CloudUpload } from "lucide-react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { validateImageFile, getImageInfo } from "@/lib/image-compression"
+import { uploadMultipleReviewPhotos } from "@/lib/storage"
 
 interface PhotoData {
   file: File | string
   isPrimary: boolean
   id?: string
+  uploadUrl?: string // Para trackear si ya fue subida
 }
 
 interface PhotoUploadProps {
@@ -24,6 +26,8 @@ interface PhotoUploadProps {
   maxSizePerPhoto?: number // in MB
   acceptedFormats?: string[]
   userId?: string
+  reviewId?: string
+  onUploadComplete?: (urls: string[]) => void
 }
 
 interface DebugLog {
@@ -47,10 +51,14 @@ export function PhotoUpload({
   maxSizePerPhoto = 10,
   acceptedFormats = ["image/jpeg", "image/jpg", "image/png", "image/webp"],
   userId = "temp-user",
+  reviewId,
+  onUploadComplete,
 }: PhotoUploadProps) {
   const [uploadError, setUploadError] = useState<string | null>(null)
   const [isProcessing, setIsProcessing] = useState(false)
+  const [isUploading, setIsUploading] = useState(false)
   const [processingProgress, setProcessingProgress] = useState(0)
+  const [uploadProgress, setUploadProgress] = useState(0)
   const [debugLogs, setDebugLogs] = useState<DebugLog[]>([])
   const [showDebug, setShowDebug] = useState(false)
   const [currentProcessingFile, setCurrentProcessingFile] = useState<string>("")
@@ -72,6 +80,75 @@ export function PhotoUpload({
 
   const clearDebugLogs = () => {
     setDebugLogs([])
+  }
+
+  // Función para subir fotos procesadas a la API
+  const uploadPhotosToAPI = async (photoFiles: File[]) => {
+    if (!reviewId) {
+      addDebugLog("error", "❌ No hay reviewId para subir fotos")
+      throw new Error("reviewId es requerido para subir fotos")
+    }
+
+    addDebugLog("info", "🚀 INICIANDO UPLOAD A API", {
+      fileCount: photoFiles.length,
+      reviewId,
+      userId,
+      files: photoFiles.map((f) => ({ name: f.name, size: f.size, type: f.type })),
+    })
+
+    setIsUploading(true)
+    setUploadProgress(0)
+
+    try {
+      // Simular progreso durante el upload
+      const progressInterval = setInterval(() => {
+        setUploadProgress((prev) => Math.min(prev + 10, 90))
+      }, 500)
+
+      const uploadedUrls = await uploadMultipleReviewPhotos(photoFiles, userId, reviewId)
+
+      clearInterval(progressInterval)
+      setUploadProgress(100)
+
+      addDebugLog("info", "✅ UPLOAD COMPLETADO EXITOSAMENTE", {
+        uploadedCount: uploadedUrls.length,
+        totalAttempted: photoFiles.length,
+        urls: uploadedUrls,
+        successRate: `${Math.round((uploadedUrls.length / photoFiles.length) * 100)}%`,
+      })
+
+      // Actualizar photos con las URLs
+      const updatedPhotos = photos.map((photo, index) => {
+        if (typeof photo.file !== "string" && uploadedUrls[index]) {
+          return {
+            ...photo,
+            uploadUrl: uploadedUrls[index],
+            file: uploadedUrls[index], // Cambiar a URL string
+          }
+        }
+        return photo
+      })
+
+      onPhotosChange(updatedPhotos)
+
+      if (onUploadComplete) {
+        onUploadComplete(uploadedUrls)
+      }
+
+      return uploadedUrls
+    } catch (error) {
+      addDebugLog("error", "💥 ERROR EN UPLOAD A API", {
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+        reviewId,
+        userId,
+        fileCount: photoFiles.length,
+      })
+      throw error
+    } finally {
+      setIsUploading(false)
+      setUploadProgress(0)
+    }
   }
 
   // Función más robusta para procesar un solo archivo con reintentos
@@ -392,6 +469,23 @@ export function PhotoUpload({
         nuevasPhotos: newPhotoData.map((p) => ({ id: p.id, isPrimary: p.isPrimary })),
         totalPhotosAhora: updatedPhotos.length,
       })
+
+      // Si tenemos reviewId, subir automáticamente
+      if (reviewId && newPhotoData.length > 0) {
+        addDebugLog("info", "🚀 Iniciando upload automático a API...")
+        try {
+          const photoFiles = newPhotoData.map((p) => p.file).filter((f): f is File => f instanceof File)
+
+          if (photoFiles.length > 0) {
+            await uploadPhotosToAPI(photoFiles)
+          }
+        } catch (uploadError) {
+          addDebugLog("error", "💥 Error en upload automático", uploadError)
+          setUploadError(
+            `Error subiendo fotos: ${uploadError instanceof Error ? uploadError.message : String(uploadError)}`,
+          )
+        }
+      }
     } else {
       addDebugLog("error", `❌ NINGÚN ARCHIVO FUE PROCESADO EXITOSAMENTE`, {
         totalAttempted: cleanedFiles.length,
@@ -492,6 +586,22 @@ export function PhotoUpload({
     }
   }
 
+  // Función manual para subir fotos ya procesadas
+  const handleManualUpload = async () => {
+    const photoFiles = photos.map((p) => p.file).filter((f): f is File => f instanceof File)
+
+    if (photoFiles.length === 0) {
+      addDebugLog("warning", "⚠️ No hay archivos File para subir")
+      return
+    }
+
+    try {
+      await uploadPhotosToAPI(photoFiles)
+    } catch (error) {
+      setUploadError(`Error subiendo fotos: ${error instanceof Error ? error.message : String(error)}`)
+    }
+  }
+
   return (
     <div className="space-y-6">
       {/* Debug Controls */}
@@ -513,6 +623,19 @@ export function PhotoUpload({
               Reintentar ({failedFiles.length})
             </Button>
           )}
+          {photos.length > 0 && reviewId && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={handleManualUpload}
+              disabled={isUploading}
+              className="text-xs bg-blue-50 hover:bg-blue-100"
+            >
+              <CloudUpload className="h-3 w-3 mr-1" />
+              {isUploading ? "Subiendo..." : "Subir a API"}
+            </Button>
+          )}
           {debugLogs.length > 0 && (
             <Button type="button" variant="ghost" size="sm" onClick={clearDebugLogs} className="text-xs">
               Limpiar
@@ -528,7 +651,7 @@ export function PhotoUpload({
             <div className="space-y-2">
               <div className="flex items-center gap-2 mb-3">
                 <Bug className="h-4 w-4 text-yellow-600" />
-                <h4 className="font-semibold text-yellow-800">Debug Mobile Upload - Logs Completos</h4>
+                <h4 className="font-semibold text-yellow-800">Debug Mobile Upload - Logs Completos + API</h4>
                 <Badge variant="outline" className="text-xs">
                   {debugLogs.length}/50 logs
                 </Badge>
@@ -538,7 +661,7 @@ export function PhotoUpload({
               <div className="max-h-96 overflow-y-auto space-y-1 text-xs font-mono">
                 {debugLogs.length === 0 ? (
                   <p className="text-gray-500 italic">
-                    Selecciona múltiples fotos para ver el debug completo del proceso...
+                    Selecciona múltiples fotos para ver el debug completo del proceso + upload API...
                   </p>
                 ) : (
                   debugLogs.map((log, index) => (
@@ -582,7 +705,7 @@ export function PhotoUpload({
           <Button
             type="button"
             onClick={openFileDialog}
-            disabled={photos.length >= maxPhotos || isProcessing}
+            disabled={photos.length >= maxPhotos || isProcessing || isUploading}
             className="max-w-md bg-red-500 hover:bg-red-600 text-white font-medium rounded-full h-11 w-full"
             size="lg"
           >
@@ -604,17 +727,30 @@ export function PhotoUpload({
       </div>
 
       {/* Processing State */}
-      {isProcessing && (
+      {(isProcessing || isUploading) && (
         <Card>
           <CardContent className="p-6">
             <div className="flex flex-col items-center justify-center space-y-4">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto" />
               <div className="space-y-2 w-full max-w-xs">
-                <p className="text-sm text-muted-foreground text-center">
-                  {currentProcessingFile ? `Procesando: ${currentProcessingFile}` : "Procesando fotos..."}
-                </p>
-                <Progress value={processingProgress} className="w-full" />
-                <p className="text-xs text-muted-foreground text-center">Sistema de reintentos automáticos activo</p>
+                {isProcessing && (
+                  <>
+                    <p className="text-sm text-muted-foreground text-center">
+                      {currentProcessingFile ? `Procesando: ${currentProcessingFile}` : "Procesando fotos..."}
+                    </p>
+                    <Progress value={processingProgress} className="w-full" />
+                    <p className="text-xs text-muted-foreground text-center">
+                      Sistema de reintentos automáticos activo
+                    </p>
+                  </>
+                )}
+                {isUploading && (
+                  <>
+                    <p className="text-sm text-muted-foreground text-center">Subiendo fotos a la API...</p>
+                    <Progress value={uploadProgress} className="w-full" />
+                    <p className="text-xs text-muted-foreground text-center">Enviando a Vercel Blob Storage</p>
+                  </>
+                )}
               </div>
             </div>
           </CardContent>
@@ -622,7 +758,7 @@ export function PhotoUpload({
       )}
 
       {/* Photos Preview Section */}
-      {photos.length > 0 && !isProcessing && (
+      {photos.length > 0 && !isProcessing && !isUploading && (
         <div className="space-y-4">
           <h3 className="text-lg font-semibold text-foreground">Fotos de la reseña</h3>
 
@@ -635,6 +771,15 @@ export function PhotoUpload({
                     alt={`Preview ${index + 1}`}
                     className="w-full h-full object-cover"
                   />
+
+                  {/* Upload status indicator */}
+                  {photo.uploadUrl && (
+                    <div className="absolute top-2 right-8 z-10">
+                      <Badge className="text-xs bg-green-100 text-green-800 border-green-200 rounded-full px-2 py-1">
+                        ✓ Subida
+                      </Badge>
+                    </div>
+                  )}
 
                   {/* Delete button - top right */}
                   <Button
