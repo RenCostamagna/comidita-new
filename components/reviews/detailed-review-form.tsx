@@ -156,7 +156,29 @@ export function DetailedReviewForm({
         setUploadProgress(25)
 
         // Filtrar solo los archivos File (no strings que ya son URLs)
-        const filesToUpload = photos.map((photo) => photo.file).filter((file): file is File => file instanceof File)
+        const filesToUpload = photos
+          .map((photo, index) => {
+            const file = photo.file
+
+            if (!(file instanceof File)) return null
+
+            const hasBadName = !file.name || file.name === "blob" || file.name === "image"
+            const hasNoType = !file.type
+            const extension = (file.type || "image/jpeg").split("/")[1] || "jpg"
+            const newName = `photo_${Date.now()}_${index}.${extension}`
+            const fixedType = file.type || "image/jpeg"
+
+            // Solo renombramos si hace falta
+            if (hasBadName || hasNoType) {
+              return new File([file], newName, {
+                type: fixedType,
+                lastModified: file.lastModified,
+              })
+            }
+
+            return file
+          })
+          .filter((file): file is File => !!file && file instanceof File)
 
         console.log("=== DEBUG PHOTO UPLOAD ===")
         console.log("Total photos:", photos.length)

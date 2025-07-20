@@ -157,9 +157,9 @@ export function PlaceSearch({
 
   const handlePlaceSelect = (place: Place | LocalPlaceData) => {
     if ("google_place_id" in place && place.google_place_id) {
-      // Local place data
+      // Local place data - usar el ID interno directamente
       const normalizedPlace = {
-        place_id: place.google_place_id,
+        place_id: place.id.toString(), // Usar el ID interno como string
         name: place.name,
         formatted_address: place.address,
         geometry: {
@@ -168,6 +168,7 @@ export function PlaceSearch({
         types: [],
         localRating: place.rating,
         localTotalReviews: place.total_reviews,
+        google_place_id: place.google_place_id, // Mantener referencia al google_place_id
       }
       onPlaceSelect(normalizedPlace)
     } else {

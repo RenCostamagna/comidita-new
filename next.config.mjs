@@ -28,6 +28,7 @@ const nextConfig = {
       allowedOrigins: ['localhost:3000', '*.vercel.app'],
     },
   },
+  // Remove the env section that was exposing server-side variables
 }
 
 export default nextConfig
