@@ -18,7 +18,7 @@ interface PlaceReviewsPageProps {
   onGoHome?: () => void
   onGoReview?: () => void
   onGoProfile?: () => void
-  onNotificationClick?: (notification: any) => void // Nueva prop
+  onNotificationClick?: (notification: any) => void
 }
 
 export function PlaceReviewsPage({
@@ -29,7 +29,7 @@ export function PlaceReviewsPage({
   onGoHome,
   onGoReview,
   onGoProfile,
-  onNotificationClick, // Nueva prop
+  onNotificationClick,
 }: PlaceReviewsPageProps) {
   const [reviews, setReviews] = useState<Review[]>([])
   const [detailedReviews, setDetailedReviews] = useState<DetailedReview[]>([])
@@ -39,42 +39,94 @@ export function PlaceReviewsPage({
 
   useEffect(() => {
     fetchReviews()
-  }, [place.id])
+  }, [place.id, place.place_id])
 
   const fetchReviews = async () => {
     setIsLoading(true)
     try {
-      // Obtener reseñas simples
+      console.log("Fetching reviews for place:", {
+        id: place.id,
+        place_id: place.place_id,
+        google_place_id: place.google_place_id,
+        name: place.name,
+      })
+
+      let internalPlaceId = null
+
+      // Si place.id existe y es un número, usarlo directamente
+      if (place.id && !isNaN(Number(place.id))) {
+        internalPlaceId = Number(place.id)
+        console.log("Using place.id as internal ID:", internalPlaceId)
+      }
+      // Si place.place_id es un número, es el ID interno directo
+      else if (place.place_id && !isNaN(Number(place.place_id))) {
+        internalPlaceId = Number(place.place_id)
+        console.log("Using place.place_id as internal ID:", internalPlaceId)
+      }
+      // Si no, buscar por google_place_id
+      else {
+        const googlePlaceId = place.google_place_id || place.place_id
+        console.log("Looking for google_place_id:", googlePlaceId)
+
+        if (!googlePlaceId) {
+          console.error("No google_place_id found")
+          setReviews([])
+          setDetailedReviews([])
+          setIsLoading(false)
+          return
+        }
+
+        const { data: placeData, error: placeError } = await supabase
+          .from("places")
+          .select("id")
+          .eq("google_place_id", googlePlaceId)
+          .single()
+
+        if (placeError || !placeData) {
+          console.error("Error fetching place:", placeError)
+          setReviews([])
+          setDetailedReviews([])
+          setIsLoading(false)
+          return
+        }
+
+        internalPlaceId = placeData.id
+        console.log("Found internal place ID via google_place_id:", internalPlaceId)
+      }
+
+      // Obtener reseñas simples usando el ID interno
       const { data: reviewsData, error } = await supabase
         .from("reviews")
         .select(`
           *,
           user:users(*)
         `)
-        .eq("place_id", place.id)
+        .eq("place_id", internalPlaceId)
         .order("created_at", { ascending: false })
 
       if (error) {
         console.error("Error fetching reviews:", error)
         setReviews([])
       } else {
+        console.log("Found reviews:", reviewsData?.length || 0)
         setReviews(reviewsData || [])
       }
 
-      // Obtener reseñas detalladas
+      // Obtener reseñas detalladas usando el ID interno
       const { data: detailedReviewsData, error: detailedError } = await supabase
         .from("detailed_reviews")
         .select(`
           *,
           user:users(*)
         `)
-        .eq("place_id", place.id)
+        .eq("place_id", internalPlaceId)
         .order("created_at", { ascending: false })
 
       if (detailedError) {
         console.error("Error fetching detailed reviews:", detailedError)
         setDetailedReviews([])
       } else {
+        console.log("Found detailed reviews:", detailedReviewsData?.length || 0)
         setDetailedReviews(detailedReviewsData || [])
       }
     } catch (error) {
@@ -86,11 +138,9 @@ export function PlaceReviewsPage({
     }
   }
 
-  // Nueva función para manejar selección desde el header
   const handleHeaderPlaceSelect = async (selectedPlace: any) => {
-    // Navegar a las reseñas del lugar seleccionado
     if (onGoHome) {
-      onGoHome() // Esto debería manejar la navegación en el componente padre
+      onGoHome()
     }
   }
 
@@ -114,7 +164,7 @@ export function PlaceReviewsPage({
         onBack={onBack}
         user={currentUser}
         onPlaceSelect={handleHeaderPlaceSelect}
-        onNotificationClick={onNotificationClick} // Pasar la prop
+        onNotificationClick={onNotificationClick}
       />
 
       <main className="container mx-auto px-4 py-6 pt-20 max-w-2xl pb-24">
@@ -152,7 +202,6 @@ export function PlaceReviewsPage({
         </div>
       </main>
 
-      {/* Bottom Navigation */}
       <BottomNavigation
         currentPage="home"
         onGoHome={onGoHome}

@@ -141,8 +141,57 @@ export function HomePage({ user: initialUser }: HomePageProps) {
   }
 
   const handleHeaderPlaceSelect = async (place: any) => {
-    await handlePlaceSelect(place)
-    setShowReviews(true)
+    console.log("Header place selected:", place)
+
+    // Si es un lugar que viene del header search (con ID interno)
+    if (place.place_id && !isNaN(Number(place.place_id))) {
+      // Es un ID interno, obtener los datos completos del lugar
+      try {
+        const { data: fullPlaceData, error } = await supabase
+          .from("places")
+          .select("*")
+          .eq("id", Number(place.place_id))
+          .single()
+
+        if (error || !fullPlaceData) {
+          console.error("Error fetching full place data:", error)
+          return
+        }
+
+        // Crear el objeto place con la estructura correcta
+        const normalizedPlace = {
+          id: fullPlaceData.id,
+          place_id: fullPlaceData.id.toString(), // Usar ID interno
+          google_place_id: fullPlaceData.google_place_id,
+          name: fullPlaceData.name,
+          formatted_address: fullPlaceData.address,
+          address: fullPlaceData.address,
+          latitude: fullPlaceData.latitude,
+          longitude: fullPlaceData.longitude,
+          phone: fullPlaceData.phone,
+          website: fullPlaceData.website,
+          rating: fullPlaceData.rating,
+          total_reviews: fullPlaceData.total_reviews,
+          created_at: fullPlaceData.created_at,
+          updated_at: fullPlaceData.updated_at,
+          geometry: {
+            location: {
+              lat: fullPlaceData.latitude,
+              lng: fullPlaceData.longitude,
+            },
+          },
+        }
+
+        setSelectedPlace(normalizedPlace)
+        setShowReviews(true)
+      } catch (error) {
+        console.error("Error processing header place selection:", error)
+      }
+    } else {
+      // Es un lugar de Google Maps, usar el flujo normal
+      await handlePlaceSelect(place)
+      setShowReviews(true)
+    }
   }
 
   const handlePlaceSelect = async (googlePlace: any) => {
