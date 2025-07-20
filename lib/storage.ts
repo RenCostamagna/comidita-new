@@ -1,17 +1,20 @@
-// Función para limpiar archivos antes de subir
 function cleanFiles(files: File[]): File[] {
   return files.map((file, index) => {
-    let name = file.name
-    const type = file.type || "image/jpeg"
+    const blob = file instanceof Blob ? file : new Blob([file], { type: "image/jpeg" })
 
-    if (!name || name === "blob" || name === "image") {
-      const extension = type.split("/")[1] || "jpg"
+    let name = file.name
+    const fallbackType = file.type || "image/jpeg"
+    const extension = fallbackType.split("/")[1] || "jpg"
+
+    const isBadName = !name || name === "blob" || name === "image"
+
+    if (isBadName) {
       name = `photo_${Date.now()}_${index}.${extension}`
     }
 
-    return new File([file], name, {
-      type,
-      lastModified: file.lastModified,
+    return new File([blob], name, {
+      type: fallbackType,
+      lastModified: file.lastModified || Date.now(),
     })
   })
 }

@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
-import { X, Upload, Camera, Star } from "lucide-react"
+import { X, Upload, Camera, Star, Bug } from "lucide-react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { validateImageFile, getImageInfo } from "@/lib/image-compression"
 
@@ -26,6 +26,13 @@ interface PhotoUploadProps {
   userId?: string
 }
 
+interface DebugLog {
+  timestamp: string
+  type: "info" | "error" | "warning"
+  message: string
+  data?: any
+}
+
 export function PhotoUpload({
   photos,
   onPhotosChange,
@@ -37,17 +44,50 @@ export function PhotoUpload({
   const [uploadError, setUploadError] = useState<string | null>(null)
   const [isProcessing, setIsProcessing] = useState(false)
   const [processingProgress, setProcessingProgress] = useState(0)
+  const [debugLogs, setDebugLogs] = useState<DebugLog[]>([])
+  const [showDebug, setShowDebug] = useState(false)
 
   const fileInputRef = useRef<HTMLInputElement>(null)
 
+  // Debug logging function
+  const addDebugLog = (type: "info" | "error" | "warning", message: string, data?: any) => {
+    const log: DebugLog = {
+      timestamp: new Date().toLocaleTimeString(),
+      type,
+      message,
+      data,
+    }
+    setDebugLogs((prev) => [...prev.slice(-9), log]) // Keep last 10 logs
+    console.log(`[DEBUG ${type.toUpperCase()}]`, message, data)
+  }
+
+  const clearDebugLogs = () => {
+    setDebugLogs([])
+  }
+
   const handleFiles = async (fileList: FileList) => {
+    addDebugLog("info", `🚀 Iniciando procesamiento de ${fileList.length} archivos`)
+
     setUploadError(null)
     setIsProcessing(true)
     setProcessingProgress(0)
 
+    // Debug: Log initial FileList info
+    addDebugLog("info", "FileList recibida", {
+      length: fileList.length,
+      files: Array.from(fileList).map((f, i) => ({
+        index: i,
+        name: f.name,
+        size: f.size,
+        type: f.type,
+        lastModified: f.lastModified,
+      })),
+    })
+
     // Validación dura de FileList en el cliente
     const cleanedFiles = Array.from(fileList).map((file, i) => {
       const extension = file.type?.split("/")[1] || "jpg"
+      const originalName = file.name
       const name =
         !file.name || file.name === "blob" || file.name === "image"
           ? `mobile_photo_${Date.now()}_${i}.${extension}`
@@ -55,10 +95,17 @@ export function PhotoUpload({
 
       const type = file.type || "image/jpeg"
 
-      return new File([file], name, {
+      const cleanedFile = new File([file], name, {
         type,
         lastModified: file.lastModified,
       })
+
+      addDebugLog("info", `📝 Archivo ${i + 1} limpiado`, {
+        original: { name: originalName, type: file.type, size: file.size },
+        cleaned: { name: cleanedFile.name, type: cleanedFile.type, size: cleanedFile.size },
+      })
+
+      return cleanedFile
     })
 
     const newPhotoData: PhotoData[] = []
@@ -66,58 +113,77 @@ export function PhotoUpload({
 
     // Verificar límite total de fotos
     if (photos.length + cleanedFiles.length > maxPhotos) {
-      setUploadError(`Máximo ${maxPhotos} fotos permitidas`)
+      const errorMsg = `Máximo ${maxPhotos} fotos permitidas`
+      addDebugLog("error", errorMsg, { current: photos.length, trying: cleanedFiles.length, max: maxPhotos })
+      setUploadError(errorMsg)
       setIsProcessing(false)
       return
     }
+
+    addDebugLog("info", `✅ Límite de fotos OK: ${photos.length + cleanedFiles.length}/${maxPhotos}`)
 
     for (let i = 0; i < cleanedFiles.length; i++) {
       const file = cleanedFiles[i]
       setProcessingProgress(((i + 1) / cleanedFiles.length) * 100)
 
+      addDebugLog("info", `🔍 Procesando archivo ${i + 1}/${cleanedFiles.length}: ${file.name}`)
+
       try {
         // Validar archivo
         const validation = validateImageFile(file, maxSizePerPhoto, acceptedFormats)
         if (!validation.isValid) {
-          errors.push(`${file.name}: ${validation.error}`)
+          const errorMsg = `${file.name}: ${validation.error}`
+          addDebugLog("error", `❌ Validación falló: ${errorMsg}`)
+          errors.push(errorMsg)
           continue
         }
 
+        addDebugLog("info", `✅ Validación OK para ${file.name}`)
+
         // Obtener información de la imagen
         const imageInfo = await getImageInfo(file)
-        console.log(`✅ Archivo procesado: ${file.name}`, {
+        addDebugLog("info", `📊 Info de imagen obtenida`, {
+          file: file.name,
           size: `${(file.size / 1024 / 1024).toFixed(2)}MB`,
           dimensions: `${imageInfo.width}x${imageInfo.height}`,
           type: file.type,
-          originalName: fileList[i].name, // Log del nombre original para debugging
         })
 
         // Crear PhotoData object
         const photoData: PhotoData = {
           file: file,
-          isPrimary: false, // Will be set based on user selection
+          isPrimary: false,
           id: `photo-${Date.now()}-${i}`,
         }
 
         newPhotoData.push(photoData)
+        addDebugLog("info", `✅ PhotoData creado para ${file.name}`, { id: photoData.id })
       } catch (error) {
-        console.error(`Error procesando ${file.name}:`, error)
-        errors.push(`${file.name}: Error al procesar`)
+        const errorMsg = `Error procesando ${file.name}: ${error instanceof Error ? error.message : "Error desconocido"}`
+        addDebugLog("error", `💥 ${errorMsg}`, error)
+        errors.push(errorMsg)
       }
     }
 
     if (errors.length > 0) {
+      addDebugLog("warning", `⚠️ ${errors.length} errores encontrados`, errors)
       setUploadError(errors.join(", "))
     }
 
     if (newPhotoData.length > 0) {
       const updatedPhotos = updatePrimaryPhoto([...photos, ...newPhotoData])
       onPhotosChange(updatedPhotos)
-      console.log(`✅ ${newPhotoData.length} fotos agregadas correctamente`)
+      addDebugLog("info", `🎉 ${newPhotoData.length} fotos agregadas correctamente`, {
+        totalPhotos: updatedPhotos.length,
+        newPhotos: newPhotoData.map((p) => ({ id: p.id, isPrimary: p.isPrimary })),
+      })
+    } else {
+      addDebugLog("warning", "⚠️ No se agregaron fotos nuevas")
     }
 
     setIsProcessing(false)
     setProcessingProgress(0)
+    addDebugLog("info", "🏁 Procesamiento completado")
   }
 
   // Update primary photo - if no photo is marked as primary, make the first one primary
@@ -137,12 +203,16 @@ export function PhotoUpload({
       isPrimary: index === targetIndex,
     }))
     onPhotosChange(updatedPhotos)
-    console.log(`⭐ Foto ${targetIndex + 1} marcada como principal`)
+    addDebugLog("info", `⭐ Foto ${targetIndex + 1} marcada como principal`)
   }
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    addDebugLog("info", "📁 Input change detectado")
     if (e.target.files && e.target.files.length > 0) {
+      addDebugLog("info", `📁 ${e.target.files.length} archivos seleccionados`)
       handleFiles(e.target.files)
+    } else {
+      addDebugLog("warning", "⚠️ No hay archivos en el input")
     }
   }
 
@@ -150,13 +220,14 @@ export function PhotoUpload({
     const newPhotos = photos.filter((_, i) => i !== index)
     const updatedPhotos = updatePrimaryPhoto(newPhotos)
     onPhotosChange(updatedPhotos)
-    console.log(`🗑️ Foto ${index + 1} eliminada`)
+    addDebugLog("info", `🗑️ Foto ${index + 1} eliminada`)
   }
 
   const openFileDialog = (e: React.MouseEvent) => {
     // Prevenir que el evento se propague al formulario padre
     e.preventDefault()
     e.stopPropagation()
+    addDebugLog("info", "🖱️ Abriendo selector de archivos")
     fileInputRef.current?.click()
   }
 
@@ -170,6 +241,69 @@ export function PhotoUpload({
 
   return (
     <div className="space-y-6">
+      {/* Debug Toggle Button */}
+      <div className="flex justify-between items-center">
+        <Button type="button" variant="outline" size="sm" onClick={() => setShowDebug(!showDebug)} className="text-xs">
+          <Bug className="h-3 w-3 mr-1" />
+          Debug {showDebug ? "OFF" : "ON"}
+        </Button>
+        {debugLogs.length > 0 && (
+          <Button type="button" variant="ghost" size="sm" onClick={clearDebugLogs} className="text-xs">
+            Limpiar logs
+          </Button>
+        )}
+      </div>
+
+      {/* Debug Panel */}
+      {showDebug && (
+        <Card className="border-yellow-200 bg-yellow-50">
+          <CardContent className="p-4">
+            <div className="space-y-2">
+              <div className="flex items-center gap-2 mb-3">
+                <Bug className="h-4 w-4 text-yellow-600" />
+                <h4 className="font-semibold text-yellow-800">Debug Mobile Upload</h4>
+                <Badge variant="outline" className="text-xs">
+                  {debugLogs.length} logs
+                </Badge>
+              </div>
+
+              <div className="max-h-40 overflow-y-auto space-y-1 text-xs font-mono">
+                {debugLogs.length === 0 ? (
+                  <p className="text-gray-500 italic">No hay logs aún...</p>
+                ) : (
+                  debugLogs.map((log, index) => (
+                    <div
+                      key={index}
+                      className={`p-2 rounded border-l-2 ${
+                        log.type === "error"
+                          ? "bg-red-50 border-red-400 text-red-800"
+                          : log.type === "warning"
+                            ? "bg-yellow-50 border-yellow-400 text-yellow-800"
+                            : "bg-blue-50 border-blue-400 text-blue-800"
+                      }`}
+                    >
+                      <div className="flex justify-between items-start gap-2">
+                        <span className="font-medium">[{log.timestamp}]</span>
+                        <span className="text-xs opacity-75">{log.type.toUpperCase()}</span>
+                      </div>
+                      <div className="mt-1">{log.message}</div>
+                      {log.data && (
+                        <details className="mt-1">
+                          <summary className="cursor-pointer text-xs opacity-75">Ver datos</summary>
+                          <pre className="mt-1 text-xs bg-white/50 p-1 rounded overflow-x-auto">
+                            {JSON.stringify(log.data, null, 2)}
+                          </pre>
+                        </details>
+                      )}
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Upload Button - More compact/narrow */}
       <div className="space-y-3">
         <div className="flex justify-center">
@@ -177,7 +311,7 @@ export function PhotoUpload({
             type="button"
             onClick={openFileDialog}
             disabled={photos.length >= maxPhotos || isProcessing}
-            className="max-w-md bg-red-500 hover:bg-red-600 text-white font-medium rounded-full h-8 w-full"
+            className="max-w-md bg-red-500 hover:bg-red-600 text-white font-medium rounded-full h-11 w-full"
             size="lg"
           >
             <Upload className="h-4 w-4 mr-2" />
@@ -187,9 +321,13 @@ export function PhotoUpload({
         </div>
 
         <div className="text-center space-y-1">
-          
-          
-          
+          <p className="text-sm text-muted-foreground">
+            Máximo {maxPhotos} fotos • {maxSizePerPhoto}MB por foto
+          </p>
+          <p className="text-xs text-muted-foreground">JPG, PNG, WebP</p>
+          <p className="text-sm font-medium text-foreground">
+            {photos.length} de {maxPhotos} fotos
+          </p>
         </div>
       </div>
 
@@ -275,7 +413,9 @@ export function PhotoUpload({
 
           {/* Instructions */}
           <div className="text-center">
-            
+            <p className="text-sm text-muted-foreground">
+              Selecciona la foto principal que mejor represente tu experiencia
+            </p>
           </div>
         </div>
       )}
