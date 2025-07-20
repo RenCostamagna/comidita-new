@@ -68,12 +68,6 @@ export function PhotoUpload({
       setProcessingProgress(((i + 1) / fileList.length) * 100)
 
       try {
-        // Verificar que el archivo sea válido antes de procesarlo
-        if (!file || file.size === 0) {
-          errors.push(`Archivo ${i + 1}: Archivo vacío o inválido`)
-          continue
-        }
-
         // Validar archivo
         const validation = validateImageFile(file, maxSizePerPhoto, acceptedFormats)
         if (!validation.isValid) {
@@ -89,11 +83,11 @@ export function PhotoUpload({
           type: file.type,
         })
 
-        // Crear PhotoData object - asegurar que el file sea el objeto File original
+        // Crear PhotoData object
         const photoData: PhotoData = {
-          file: file, // Mantener el File object original
+          file: file,
           isPrimary: false, // Will be set based on position
-          id: `photo-${Date.now()}-${i}-${Math.random().toString(36).substr(2, 9)}`,
+          id: `photo-${Date.now()}-${i}`,
         }
 
         newPhotoData.push(photoData)
@@ -163,20 +157,10 @@ export function PhotoUpload({
   }
 
   const getPhotoPreviewUrl = (photo: PhotoData): string => {
-    try {
-      if (typeof photo.file === "string") {
-        // Verificar que sea una URL válida
-        new URL(photo.file)
-        return photo.file
-      } else if (photo.file instanceof File) {
-        return URL.createObjectURL(photo.file)
-      } else {
-        console.warn("Tipo de archivo no reconocido:", typeof photo.file, photo.file)
-        return "/placeholder.svg?height=300&width=300&text=Error"
-      }
-    } catch (error) {
-      console.error("Error generando URL de preview:", error)
-      return "/placeholder.svg?height=300&width=300&text=Error"
+    if (typeof photo.file === "string") {
+      return photo.file // Already a URL
+    } else {
+      return URL.createObjectURL(photo.file) // File object
     }
   }
 

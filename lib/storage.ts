@@ -1,32 +1,44 @@
+// Función para limpiar archivos antes de subir
+function cleanFiles(files: File[]): File[] {
+  return files.map((file, index) => {
+    let name = file.name
+    const type = file.type || "image/jpeg"
+
+    if (!name || name === "blob" || name === "image") {
+      const extension = type.split("/")[1] || "jpg"
+      name = `photo_${Date.now()}_${index}.${extension}`
+    }
+
+    return new File([file], name, {
+      type,
+      lastModified: file.lastModified,
+    })
+  })
+}
+
 // Función para subir múltiples fotos de reseñas usando la API route
 export async function uploadMultipleReviewPhotos(files: File[], userId: string, reviewId: string): Promise<string[]> {
   console.log(`Iniciando upload de ${files.length} fotos para usuario ${userId}, reseña ${reviewId}`)
 
   try {
-    // Validar que todos los elementos sean File objects
-    const validFiles = files.filter((file) => file instanceof File && file.size > 0)
+    // Paso 1: Limpiar archivos antes de subir
+    const cleanedFiles = cleanFiles(files)
 
-    if (validFiles.length === 0) {
-      console.warn("No hay archivos válidos para subir")
-      return []
-    }
-
-    if (validFiles.length !== files.length) {
-      console.warn(`Se filtraron ${files.length - validFiles.length} archivos inválidos`)
-    }
+    // Paso 2: Agregar log por cada archivo
+    cleanedFiles.forEach((file, i) => {
+      console.log(`📁 Archivo ${i + 1}:`, {
+        name: file.name,
+        size: file.size,
+        type: file.type,
+        instanceof: file instanceof File,
+      })
+    })
 
     const formData = new FormData()
 
-    // Agregar solo archivos válidos al FormData
-    validFiles.forEach((file, index) => {
-      console.log(`Agregando archivo ${index + 1}: ${file.name} (${file.size} bytes, tipo: ${file.type})`)
-
-      // Validar que el archivo tenga un tipo MIME válido
-      if (!file.type.startsWith("image/")) {
-        console.warn(`Archivo ${file.name} no es una imagen válida, tipo: ${file.type}`)
-        return
-      }
-
+    // Agregar archivos limpiados al FormData
+    cleanedFiles.forEach((file, index) => {
+      console.log(`Agregando archivo ${index + 1}: ${file.name} (${file.size} bytes)`)
       formData.append("photos", file)
     })
 

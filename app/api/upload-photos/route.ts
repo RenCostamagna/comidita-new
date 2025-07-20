@@ -49,6 +49,14 @@ export async function POST(request: NextRequest) {
 
     console.log("Número de archivos encontrados:", files.length)
 
+    // Paso 3: Validación defensiva en el backend
+    files.forEach((file, i) => {
+      if (!(file instanceof Blob) || typeof file.arrayBuffer !== "function" || file.size === 0) {
+        console.warn(`⚠️ Archivo inválido recibido en posición ${i}:`, file)
+        errors.push(`Archivo ${i + 1} inválido`)
+      }
+    })
+
     if (files.length === 0) {
       console.log("No se encontraron archivos en FormData")
       return NextResponse.json({ error: "No se encontraron archivos" }, { status: 400 })
