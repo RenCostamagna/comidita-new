@@ -2,12 +2,12 @@
 
 import type React from "react"
 
-import { useState, useRef, useCallback } from "react"
+import { useState, useRef, useCallback, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
-import { X, Upload, Camera, AlertCircle, Plus, GripVertical } from "lucide-react"
+import { X, Upload, Camera, AlertCircle, Plus, GripVertical, Star } from "lucide-react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { validateImageFile, getImageInfo } from "@/lib/image-compression"
 
@@ -40,13 +40,27 @@ export function PhotoUpload({
   const [processingProgress, setProcessingProgress] = useState(0)
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null)
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null)
-
-  // Touch/mobile drag state
-  const [touchDragIndex, setTouchDragIndex] = useState<number | null>(null)
-  const [touchStartPos, setTouchStartPos] = useState<{ x: number; y: number } | null>(null)
-  const [isDragging, setIsDragging] = useState(false)
+  const [isMobile, setIsMobile] = useState(false)
 
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // Detect mobile device
+  useEffect(() => {
+    const checkMobile = () => {
+      const userAgent = navigator.userAgent || navigator.vendor || (window as any).opera
+      const isMobileDevice = /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/i.test(
+        userAgent.toLowerCase(),
+      )
+      const isTouchDevice = "ontouchstart" in window || navigator.maxTouchPoints > 0
+      const isSmallScreen = window.innerWidth <= 768
+
+      setIsMobile(isMobileDevice || (isTouchDevice && isSmallScreen))
+    }
+
+    checkMobile()
+    window.addEventListener("resize", checkMobile)
+    return () => window.removeEventListener("resize", checkMobile)
+  }, [])
 
   const handleFiles = async (fileList: FileList) => {
     setUploadError(null)
@@ -103,7 +117,7 @@ export function PhotoUpload({
         // Crear PhotoData object
         const photoData: PhotoData = {
           file: file,
-          isPrimary: false, // Will be set based on position
+          isPrimary: false, // Will be set based on position or user selection
           id: `photo-${Date.now()}-${i}`,
         }
 
@@ -128,15 +142,31 @@ export function PhotoUpload({
     setProcessingProgress(0)
   }
 
-  // Update primary photo based on position (first photo is always primary)
+  // Update primary photo based on position (first photo is always primary by default)
   const updatePrimaryPhoto = (photoList: PhotoData[]): PhotoData[] => {
+    // If no photo is marked as primary, make the first one primary
+    const hasPrimary = photoList.some((photo) => photo.isPrimary)
+
     return photoList.map((photo, index) => ({
       ...photo,
-      isPrimary: index === 0,
+      isPrimary: hasPrimary ? photo.isPrimary : index === 0,
     }))
   }
 
+  // Set a specific photo as primary
+  const setPrimaryPhoto = (targetIndex: number) => {
+    const updatedPhotos = photos.map((photo, index) => ({
+      ...photo,
+      isPrimary: index === targetIndex,
+    }))
+    onPhotosChange(updatedPhotos)
+    console.log(`⭐ Foto ${targetIndex + 1} marcada como principal`)
+  }
+
   const handleDrag = (e: React.DragEvent) => {
+    // Disable drag and drop on mobile
+    if (isMobile) return
+
     e.preventDefault()
     e.stopPropagation()
     if (e.type === "dragenter" || e.type === "dragover") {
@@ -147,6 +177,9 @@ export function PhotoUpload({
   }
 
   const handleDrop = (e: React.DragEvent) => {
+    // Disable drag and drop on mobile
+    if (isMobile) return
+
     e.preventDefault()
     e.stopPropagation()
     setDragActive(false)
@@ -181,10 +214,10 @@ export function PhotoUpload({
     }
   }
 
-  // Reorder photos function
+  // Reorder photos function (only for desktop)
   const reorderPhotos = useCallback(
     (fromIndex: number, toIndex: number) => {
-      if (fromIndex === toIndex) return
+      if (fromIndex === toIndex || isMobile) return
 
       const newPhotos = [...photos]
       const draggedPhoto = newPhotos[fromIndex]
@@ -195,23 +228,29 @@ export function PhotoUpload({
       // Insert at new position
       newPhotos.splice(toIndex, 0, draggedPhoto)
 
-      // Update primary photo based on new positions
-      const updatedPhotos = updatePrimaryPhoto(newPhotos)
-      onPhotosChange(updatedPhotos)
+      // Update photos without changing primary status
+      onPhotosChange(newPhotos)
 
       console.log(`📷 Foto movida de posición ${fromIndex + 1} a ${toIndex + 1}`)
     },
-    [photos, onPhotosChange],
+    [photos, onPhotosChange, isMobile],
   )
 
-  // Desktop drag handlers
+  // Desktop drag handlers (disabled on mobile)
   const handlePhotosDragStart = (e: React.DragEvent, index: number) => {
+    if (isMobile) {
+      e.preventDefault()
+      return
+    }
+
     setDraggedIndex(index)
     e.dataTransfer.effectAllowed = "move"
     e.dataTransfer.setData("text/html", "photo-reorder")
   }
 
   const handlePhotosDragOver = (e: React.DragEvent, index: number) => {
+    if (isMobile) return
+
     e.preventDefault()
     e.dataTransfer.dropEffect = "move"
 
@@ -222,10 +261,13 @@ export function PhotoUpload({
   }
 
   const handlePhotosDragLeave = () => {
+    if (isMobile) return
     setDragOverIndex(null)
   }
 
   const handlePhotosDrop = (e: React.DragEvent, dropIndex: number) => {
+    if (isMobile) return
+
     e.preventDefault()
     e.stopPropagation()
 
@@ -239,71 +281,8 @@ export function PhotoUpload({
   }
 
   const handlePhotosDragEnd = () => {
+    if (isMobile) return
     setDraggedIndex(null)
-    setDragOverIndex(null)
-  }
-
-  // Mobile touch handlers
-  const handleTouchStart = (e: React.TouchEvent, index: number) => {
-    const touch = e.touches[0]
-    setTouchStartPos({ x: touch.clientX, y: touch.clientY })
-    setTouchDragIndex(index)
-
-    // Add a small delay to distinguish between tap and drag
-    setTimeout(() => {
-      if (touchDragIndex === index && touchStartPos) {
-        setIsDragging(true)
-      }
-    }, 150)
-  }
-
-  const handleTouchMove = (e: React.TouchEvent) => {
-    if (!isDragging || touchDragIndex === null || !touchStartPos) return
-
-    e.preventDefault() // Prevent scrolling while dragging
-
-    const touch = e.touches[0]
-    const deltaX = Math.abs(touch.clientX - touchStartPos.x)
-    const deltaY = Math.abs(touch.clientY - touchStartPos.y)
-
-    // Only start dragging if moved significantly
-    if (deltaX > 10 || deltaY > 10) {
-      // Find which photo we're over
-      const element = document.elementFromPoint(touch.clientX, touch.clientY)
-      const photoElement = element?.closest("[data-photo-index]")
-
-      if (photoElement) {
-        const overIndex = Number.parseInt(photoElement.getAttribute("data-photo-index") || "0")
-        setDragOverIndex(overIndex)
-      }
-    }
-  }
-
-  const handleTouchEnd = (e: React.TouchEvent) => {
-    if (!isDragging || touchDragIndex === null) {
-      // Reset states for tap
-      setTouchDragIndex(null)
-      setTouchStartPos(null)
-      setIsDragging(false)
-      return
-    }
-
-    // Handle drop
-    if (dragOverIndex !== null && dragOverIndex !== touchDragIndex) {
-      reorderPhotos(touchDragIndex, dragOverIndex)
-    }
-
-    // Reset all touch states
-    setTouchDragIndex(null)
-    setTouchStartPos(null)
-    setIsDragging(false)
-    setDragOverIndex(null)
-  }
-
-  const handleTouchCancel = () => {
-    setTouchDragIndex(null)
-    setTouchStartPos(null)
-    setIsDragging(false)
     setDragOverIndex(null)
   }
 
@@ -312,16 +291,16 @@ export function PhotoUpload({
       {/* Upload Area */}
       <Card
         className={`border-2 border-dashed transition-colors cursor-pointer ${
-          dragActive
+          dragActive && !isMobile
             ? "border-primary bg-primary/5"
             : photos.length >= maxPhotos
               ? "border-muted bg-muted/20"
               : "border-muted-foreground/25 hover:border-primary hover:bg-primary/5"
         }`}
-        onDragEnter={handleDrag}
-        onDragLeave={handleDrag}
-        onDragOver={handleDrag}
-        onDrop={handleDrop}
+        onDragEnter={!isMobile ? handleDrag : undefined}
+        onDragLeave={!isMobile ? handleDrag : undefined}
+        onDragOver={!isMobile ? handleDrag : undefined}
+        onDrop={!isMobile ? handleDrop : undefined}
         onClick={photos.length < maxPhotos ? openFileDialog : undefined}
       >
         <CardContent className="p-6">
@@ -341,7 +320,9 @@ export function PhotoUpload({
                 <Camera className="h-8 w-8 text-muted-foreground" />
               </div>
               <div className="space-y-2">
-                <p className="text-sm font-medium">Arrastra fotos aquí o haz clic para seleccionar</p>
+                <p className="text-sm font-medium">
+                  {isMobile ? "Toca para seleccionar fotos" : "Arrastra fotos aquí o haz clic para seleccionar"}
+                </p>
                 <p className="text-xs text-muted-foreground">
                   Máximo {maxPhotos} fotos • {maxSizePerPhoto}MB por foto
                 </p>
@@ -356,21 +337,19 @@ export function PhotoUpload({
                   <div
                     key={photo.id || index}
                     data-photo-index={index}
-                    className={`relative group ${dragOverIndex === index ? "ring-2 ring-primary ring-offset-2" : ""} ${
-                      draggedIndex === index || touchDragIndex === index ? "opacity-50" : ""
-                    } ${isDragging && touchDragIndex === index ? "scale-105 z-10" : ""} transition-all duration-200`}
-                    draggable
-                    onDragStart={(e) => handlePhotosDragStart(e, index)}
-                    onDragOver={(e) => handlePhotosDragOver(e, index)}
-                    onDragLeave={handlePhotosDragLeave}
-                    onDrop={(e) => handlePhotosDrop(e, index)}
-                    onDragEnd={handlePhotosDragEnd}
-                    onTouchStart={(e) => handleTouchStart(e, index)}
-                    onTouchMove={handleTouchMove}
-                    onTouchEnd={handleTouchEnd}
-                    onTouchCancel={handleTouchCancel}
+                    className={`relative group ${
+                      !isMobile && dragOverIndex === index ? "ring-2 ring-primary ring-offset-2" : ""
+                    } ${!isMobile && draggedIndex === index ? "opacity-50" : ""} transition-all duration-200`}
+                    draggable={!isMobile}
+                    onDragStart={!isMobile ? (e) => handlePhotosDragStart(e, index) : undefined}
+                    onDragOver={!isMobile ? (e) => handlePhotosDragOver(e, index) : undefined}
+                    onDragLeave={!isMobile ? handlePhotosDragLeave : undefined}
+                    onDrop={!isMobile ? (e) => handlePhotosDrop(e, index) : undefined}
+                    onDragEnd={!isMobile ? handlePhotosDragEnd : undefined}
                   >
-                    <div className="aspect-square relative overflow-hidden rounded-lg border cursor-move touch-none">
+                    <div
+                      className={`aspect-square relative overflow-hidden rounded-lg border ${!isMobile ? "cursor-move" : ""}`}
+                    >
                       <img
                         src={getPhotoPreviewUrl(photo) || "/placeholder.svg"}
                         alt={`Preview ${index + 1}`}
@@ -378,24 +357,36 @@ export function PhotoUpload({
                       />
                       <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors" />
 
-                      {/* Drag handle */}
-                      <div className="absolute top-2 left-2 opacity-0 group-hover:opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
-                        <div className="bg-black/50 rounded p-1">
-                          <GripVertical className="h-3 w-3 text-white" />
+                      {/* Drag handle - only on desktop */}
+                      {!isMobile && (
+                        <div className="absolute top-2 left-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <div className="bg-black/50 rounded p-1">
+                            <GripVertical className="h-3 w-3 text-white" />
+                          </div>
                         </div>
-                      </div>
+                      )}
+
+                      {/* Primary button - always visible on mobile, hover on desktop */}
+                      <Button
+                        variant={photo.isPrimary ? "default" : "secondary"}
+                        size="sm"
+                        className={`absolute ${isMobile ? "top-2 left-2" : "top-2 left-2 opacity-0 group-hover:opacity-100"} h-8 w-8 p-0 transition-opacity z-20`}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          e.preventDefault()
+                          setPrimaryPhoto(index)
+                        }}
+                        title="Marcar como foto principal"
+                      >
+                        <Star className={`h-3 w-3 ${photo.isPrimary ? "fill-current" : ""}`} />
+                      </Button>
 
                       {/* Delete button */}
                       <Button
                         variant="destructive"
                         size="sm"
-                        className="absolute top-2 right-2 h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity z-20"
+                        className={`absolute top-2 right-2 h-8 w-8 p-0 ${isMobile ? "" : "opacity-0 group-hover:opacity-100"} transition-opacity z-20`}
                         onClick={(e) => {
-                          e.stopPropagation()
-                          e.preventDefault()
-                          removePhoto(index)
-                        }}
-                        onTouchEnd={(e) => {
                           e.stopPropagation()
                           e.preventDefault()
                           removePhoto(index)
@@ -407,13 +398,8 @@ export function PhotoUpload({
                       {/* Primary badge */}
                       {photo.isPrimary && (
                         <Badge className="absolute bottom-2 left-2 text-xs pointer-events-none" variant="secondary">
-                          Plato
+                          Principal
                         </Badge>
-                      )}
-
-                      {/* Mobile drag indicator */}
-                      {isDragging && touchDragIndex === index && (
-                        <div className="absolute inset-0 bg-primary/20 border-2 border-primary rounded-lg" />
                       )}
                     </div>
                   </div>
@@ -436,9 +422,13 @@ export function PhotoUpload({
                 )}
               </div>
 
-              {/* Instructions when photos are present */}
+              {/* Instructions */}
               <div className="text-center space-y-2">
-                <p className="text-xs text-muted-foreground">Mantén presionado y arrastra las fotos para reordenar</p>
+                <p className="text-xs text-muted-foreground">
+                  {isMobile
+                    ? "Toca la estrella para marcar la foto principal"
+                    : "Arrastra las fotos para reordenar o usa la estrella para marcar como principal"}
+                </p>
                 <Badge variant="outline">
                   {photos.length} de {maxPhotos} fotos
                 </Badge>
