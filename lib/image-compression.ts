@@ -1,3 +1,4 @@
+// Tipos para la información de imagen
 export interface ImageInfo {
   width: number
   height: number
@@ -6,6 +7,7 @@ export interface ImageInfo {
   name: string
 }
 
+// Opciones de compresión
 export interface CompressionOptions {
   maxWidth?: number
   maxHeight?: number
@@ -14,21 +16,22 @@ export interface CompressionOptions {
   outputFormat?: "jpeg" | "png" | "webp"
 }
 
+// Validación de archivos de imagen
 export interface ValidationResult {
   isValid: boolean
   error?: string
 }
 
+// Función para validar archivos de imagen
 export function validateImageFile(
   file: File,
-  maxSizePerPhoto = 10,
+  maxSizePerPhoto = 50, // Aumentado a 50MB ya que comprimimos
   acceptedFormats: string[] = ["image/jpeg", "image/jpg", "image/png", "image/webp"],
 ): ValidationResult {
   if (!file) {
     return { isValid: false, error: "No se proporcionó archivo" }
   }
 
-  // Verificar tipo de archivo - el problema puede estar aquí con archivos móviles
   if (!file.type) {
     const fileName = file.name?.toLowerCase() || ""
     const hasImageExtension = /\.(jpg|jpeg|png|webp)$/i.test(fileName)
@@ -48,7 +51,6 @@ export function validateImageFile(
     return { isValid: false, error: "El archivo es muy pequeño" }
   }
 
-  // Verificar tipos permitidos de manera más flexible
   if (
     file.type &&
     !acceptedFormats.some(
@@ -64,6 +66,7 @@ export function validateImageFile(
   return { isValid: true }
 }
 
+// Función para obtener información de la imagen
 export async function getImageInfo(file: File): Promise<ImageInfo> {
   return new Promise((resolve, reject) => {
     const img = new Image()
@@ -96,6 +99,7 @@ export async function getImageInfo(file: File): Promise<ImageInfo> {
   })
 }
 
+// Función para comprimir imagen usando Canvas (solo cliente)
 export async function compressImageAdvanced(file: File, options: CompressionOptions = {}): Promise<File> {
   const { maxWidth = 800, maxHeight = 600, quality = 0.8, outputFormat = "jpeg" } = options
 

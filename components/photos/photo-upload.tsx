@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
-import { X, Upload, Camera, AlertCircle, Plus, GripVertical } from "lucide-react"
+import { X, Upload, Camera, AlertCircle, Plus, GripVertical } from 'lucide-react'
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { validateImageFile, getImageInfo } from "@/lib/image-compression"
 
@@ -30,7 +30,7 @@ export function PhotoUpload({
   photos,
   onPhotosChange,
   maxPhotos = 6,
-  maxSizePerPhoto = 10,
+  maxSizePerPhoto = 50, // Aumentado a 50MB
   acceptedFormats = ["image/jpeg", "image/jpg", "image/png", "image/webp"],
   userId = "temp-user",
 }: PhotoUploadProps) {
@@ -56,7 +56,6 @@ export function PhotoUpload({
     const newPhotoData: PhotoData[] = []
     const errors: string[] = []
 
-    // Verificar límite total de fotos
     if (photos.length + fileList.length > maxPhotos) {
       setUploadError(`Máximo ${maxPhotos} fotos permitidas`)
       setIsProcessing(false)
@@ -65,7 +64,6 @@ export function PhotoUpload({
 
     console.log(`📱 Procesando ${fileList.length} archivos...`)
 
-    // Procesar archivos SECUENCIALMENTE para evitar problemas en móviles
     for (let i = 0; i < fileList.length; i++) {
       const file = fileList[i]
       setProcessingProgress(((i + 1) / fileList.length) * 100)
@@ -73,7 +71,6 @@ export function PhotoUpload({
       console.log(`📱 Procesando archivo ${i + 1}/${fileList.length}: ${file.name}`)
 
       try {
-        // Validar archivo
         const validation = validateImageFile(file, maxSizePerPhoto, acceptedFormats)
         if (!validation.isValid) {
           errors.push(`${file.name}: ${validation.error}`)
@@ -81,7 +78,6 @@ export function PhotoUpload({
           continue
         }
 
-        // Manejar archivos sin nombre (común en móviles) con índice único
         let processedFile = file
         if (!file.name || file.name === "blob" || file.name === "image") {
           const timestamp = Date.now()
@@ -93,7 +89,6 @@ export function PhotoUpload({
           })
           console.log(`📱 Archivo móvil renombrado: ${file.name} -> ${newName}`)
         } else {
-          // Asegurar nombre único incluso si ya tiene nombre
           const nameParts = file.name.split(".")
           const extension = nameParts.pop() || "jpg"
           const baseName = nameParts.join(".")
@@ -108,7 +103,6 @@ export function PhotoUpload({
           }
         }
 
-        // Obtener información de la imagen
         const imageInfo = await getImageInfo(processedFile)
         console.log(`✅ Archivo ${i + 1} procesado: ${processedFile.name}`, {
           size: `${(processedFile.size / 1024 / 1024).toFixed(2)}MB`,
@@ -116,7 +110,6 @@ export function PhotoUpload({
           type: processedFile.type,
         })
 
-        // Crear PhotoData object con el archivo procesado
         const photoData: PhotoData = {
           file: processedFile,
           isPrimary: false,
@@ -125,7 +118,6 @@ export function PhotoUpload({
 
         newPhotoData.push(photoData)
 
-        // Pequeña pausa entre procesamiento de archivos para móviles
         if (i < fileList.length - 1) {
           await new Promise((resolve) => setTimeout(resolve, 50))
         }
@@ -192,7 +184,6 @@ export function PhotoUpload({
       })
       handleFiles(e.target.files)
     }
-    // Limpiar el input para permitir seleccionar los mismos archivos de nuevo
     e.target.value = ""
   }
 

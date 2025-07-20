@@ -50,10 +50,11 @@ export async function POST(request: NextRequest) {
     const uploadedUrls: string[] = []
     const errors: string[] = []
 
-    // El problema está aquí - necesitamos validar mejor los nombres de archivo
+    const baseTimestamp = Date.now()
+
     for (let i = 0; i < files.length; i++) {
       const file = files[i]
-      console.log(`Procesando archivo ${i + 1}:`, {
+      console.log(`Procesando archivo ${i + 1}/${files.length}:`, {
         name: file.name,
         size: file.size,
         type: file.type,
@@ -65,39 +66,14 @@ export async function POST(request: NextRequest) {
           continue
         }
 
-        if (file.size > 10 * 1024 * 1024) {
-          errors.push(`Archivo ${file.name}: Muy grande (máximo 10MB)`)
-          continue
-        }
-
-        // AQUÍ ESTÁ EL PROBLEMA: La validación del nombre de archivo para Vercel Blob
-        // Vercel Blob tiene restricciones específicas en los nombres de archivo
-        let cleanFileName = file.name || `image_${i}`
-
-        // Vercel Blob requiere nombres que cumplan con ciertos patrones
-        // Solo permite: letras, números, guiones, puntos y barras
-        cleanFileName = cleanFileName
-          .replace(/[^a-zA-Z0-9.\-_/]/g, "") // Solo caracteres permitidos
-          .replace(/^[.\-_]+|[.\-_]+$/g, "") // No empezar/terminar con . - _
-          .toLowerCase()
-
-        // Si el nombre queda vacío, generar uno
-        if (!cleanFileName || cleanFileName.length === 0) {
-          cleanFileName = `image_${i}`
-        }
-
-        // Generar nombre único pero compatible con Vercel Blob
-        const timestamp = Date.now()
-        const randomSuffix = Math.random().toString(36).substring(2, 6) // Más corto
-        const fileExtension = cleanFileName.split(".").pop()?.toLowerCase() || "jpg"
-
+        const fileExtension = file.type.split("/")[1] || "jpg"
         const validExtensions = ["jpg", "jpeg", "png", "webp"]
         const finalExtension = validExtensions.includes(fileExtension) ? fileExtension : "jpg"
 
-        // Nombre más simple para evitar problemas de patrón
-        const fileName = `review-photos/${user.id}/${reviewId}/${timestamp}_${i}.${finalExtension}`
+        const uniqueTimestamp = baseTimestamp + i
+        const fileName = `review-photos/${user.id}/${reviewId}/${uniqueTimestamp}_${i}.${finalExtension}`
 
-        console.log(`Subiendo archivo como: ${fileName}`)
+        console.log(`Subiendo archivo ${i + 1} como: ${fileName}`)
 
         const arrayBuffer = await file.arrayBuffer()
         const uint8Array = new Uint8Array(arrayBuffer)
@@ -109,15 +85,19 @@ export async function POST(request: NextRequest) {
         })
 
         uploadedUrls.push(blob.url)
-        console.log(`Archivo subido exitosamente: ${blob.url}`)
+        console.log(`✅ Archivo ${i + 1} subido exitosamente: ${blob.url}`)
+
+        if (i < files.length - 1) {
+          await new Promise((resolve) => setTimeout(resolve, 100))
+        }
       } catch (uploadError) {
-        console.error(`Error subiendo archivo ${file.name}:`, uploadError)
+        console.error(`❌ Error subiendo archivo ${i + 1} (${file.name}):`, uploadError)
         const errorMessage = uploadError instanceof Error ? uploadError.message : "Error desconocido"
         errors.push(`Error subiendo ${file.name}: ${errorMessage}`)
       }
     }
 
-    console.log(`Resultado final: ${uploadedUrls.length} archivos subidos, ${errors.length} errores`)
+    console.log(`🏁 Resultado final: ${uploadedUrls.length} archivos subidos, ${errors.length} errores`)
 
     return NextResponse.json({
       success: uploadedUrls.length > 0,
@@ -126,7 +106,7 @@ export async function POST(request: NextRequest) {
       message: `${uploadedUrls.length} de ${files.length} fotos subidas correctamente`,
     })
   } catch (error) {
-    console.error("Error general en upload-photos:", error)
+    console.error("💥 Error general en upload-photos:", error)
     return NextResponse.json(
       {
         error: "Error interno del servidor",

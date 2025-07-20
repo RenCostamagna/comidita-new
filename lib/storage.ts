@@ -5,17 +5,14 @@ export async function uploadMultipleReviewPhotos(files: File[], userId: string, 
   try {
     const formData = new FormData()
 
-    // El problema puede estar en cómo agregamos los archivos al FormData
     files.forEach((file, index) => {
       console.log(`Agregando archivo ${index + 1}: ${file.name} (${file.size} bytes)`)
 
-      // Validar que el archivo sea válido antes de agregarlo
       if (!file.type.startsWith("image/")) {
         console.warn(`Archivo ${file.name} no es una imagen, saltando...`)
         return
       }
 
-      // Para móviles, crear un nuevo archivo con nombre limpio si es necesario
       let cleanFile = file
       if (!file.name || file.name === "blob" || file.name === "image" || file.name.includes("�")) {
         const timestamp = Date.now()
