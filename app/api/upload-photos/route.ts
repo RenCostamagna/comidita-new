@@ -78,27 +78,42 @@ export async function POST(request: NextRequest) {
           continue
         }
 
-        // Generar nombre único
+        // Limpiar nombre de archivo para móviles - remover caracteres especiales
+        const cleanFileName = file.name
+          .replace(/[^a-zA-Z0-9.-]/g, "_") // Reemplazar caracteres especiales con _
+          .replace(/_{2,}/g, "_") // Reemplazar múltiples _ con uno solo
+          .toLowerCase()
+
+        // Generar nombre único con mejor manejo para móviles
         const timestamp = Date.now()
         const randomSuffix = Math.random().toString(36).substring(2, 8)
-        const fileExtension = file.name.split(".").pop()?.toLowerCase() || "jpg"
-        const fileName = `review-photos/${user.id}_${reviewId}_${timestamp}_${randomSuffix}.${fileExtension}`
+        const fileExtension = cleanFileName.split(".").pop()?.toLowerCase() || "jpg"
+
+        // Asegurar que la extensión sea válida
+        const validExtensions = ["jpg", "jpeg", "png", "webp"]
+        const finalExtension = validExtensions.includes(fileExtension) ? fileExtension : "jpg"
+
+        const fileName = `review-photos/${user.id}_${reviewId}_${timestamp}_${randomSuffix}.${finalExtension}`
 
         console.log(`Subiendo archivo como: ${fileName}`)
 
-        // Subir a Vercel Blob
-        const blob = await put(fileName, file, {
+        // Convertir archivo a ArrayBuffer para mejor compatibilidad móvil
+        const arrayBuffer = await file.arrayBuffer()
+        const uint8Array = new Uint8Array(arrayBuffer)
+
+        // Subir a Vercel Blob usando ArrayBuffer
+        const blob = await put(fileName, uint8Array, {
           access: "public",
           addRandomSuffix: false,
+          contentType: file.type || `image/${finalExtension}`,
         })
 
         uploadedUrls.push(blob.url)
         console.log(`Archivo subido exitosamente: ${blob.url}`)
       } catch (uploadError) {
         console.error(`Error subiendo archivo ${file.name}:`, uploadError)
-        errors.push(
-          `Error subiendo ${file.name}: ${uploadError instanceof Error ? uploadError.message : "Error desconocido"}`,
-        )
+        const errorMessage = uploadError instanceof Error ? uploadError.message : "Error desconocido"
+        errors.push(`Error subiendo ${file.name}: ${errorMessage}`)
       }
     }
 

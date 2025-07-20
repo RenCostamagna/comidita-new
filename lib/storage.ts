@@ -5,11 +5,32 @@ export async function uploadMultipleReviewPhotos(files: File[], userId: string, 
   try {
     const formData = new FormData()
 
-    // Agregar archivos al FormData con el nombre correcto
-    files.forEach((file, index) => {
-      console.log(`Agregando archivo ${index + 1}: ${file.name} (${file.size} bytes)`)
-      formData.append("photos", file)
-    })
+    // Procesar archivos para móviles
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i]
+      console.log(`Procesando archivo ${i + 1}: ${file.name} (${file.size} bytes)`)
+
+      // Validar archivo antes de agregarlo
+      if (!file.type.startsWith("image/")) {
+        console.warn(`Archivo ${file.name} no es una imagen, saltando...`)
+        continue
+      }
+
+      // Para móviles, asegurar que el archivo tenga un nombre válido
+      let fileName = file.name
+      if (!fileName || fileName === "blob" || fileName === "image") {
+        // Generar nombre si no tiene uno válido (común en móviles)
+        const timestamp = Date.now()
+        const extension = file.type.split("/")[1] || "jpg"
+        fileName = `photo_${timestamp}.${extension}`
+      }
+
+      // Crear nuevo archivo con nombre limpio si es necesario
+      const cleanFile =
+        fileName !== file.name ? new File([file], fileName, { type: file.type, lastModified: file.lastModified }) : file
+
+      formData.append("photos", cleanFile)
+    }
 
     formData.append("reviewId", reviewId)
 
@@ -85,7 +106,14 @@ export async function deleteMultipleReviewPhotos(photoUrls: string[]): Promise<b
 export function generateUniqueFileName(originalName: string, userId: string, reviewId: string): string {
   const timestamp = Date.now()
   const randomString = Math.random().toString(36).substring(2, 15)
-  const fileExtension = originalName.split(".").pop() || "jpg"
+
+  // Limpiar nombre original
+  const cleanName = originalName
+    .replace(/[^a-zA-Z0-9.-]/g, "_")
+    .replace(/_{2,}/g, "_")
+    .toLowerCase()
+
+  const fileExtension = cleanName.split(".").pop() || "jpg"
   return `reviews/${userId}/${reviewId}/${timestamp}_${randomString}.${fileExtension}`
 }
 

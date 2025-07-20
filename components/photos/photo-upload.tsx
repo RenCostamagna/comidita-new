@@ -75,6 +75,19 @@ export function PhotoUpload({
           continue
         }
 
+        // Manejar archivos sin nombre (común en móviles)
+        let processedFile = file
+        if (!file.name || file.name === "blob" || file.name === "image") {
+          const timestamp = Date.now()
+          const extension = file.type.split("/")[1] || "jpg"
+          const newName = `photo_${timestamp}.${extension}`
+          processedFile = new File([file], newName, {
+            type: file.type,
+            lastModified: file.lastModified,
+          })
+          console.log(`📱 Archivo móvil renombrado: ${file.name} -> ${newName}`)
+        }
+
         // Obtener información de la imagen
         const imageInfo = await getImageInfo(file)
         console.log(`✅ Archivo procesado: ${file.name}`, {
@@ -83,10 +96,10 @@ export function PhotoUpload({
           type: file.type,
         })
 
-        // Crear PhotoData object
+        // Crear PhotoData object con el archivo procesado
         const photoData: PhotoData = {
-          file: file,
-          isPrimary: false, // Will be set based on position
+          file: processedFile,
+          isPrimary: false,
           id: `photo-${Date.now()}-${i}`,
         }
 
@@ -140,7 +153,16 @@ export function PhotoUpload({
   }
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    console.log("📱 Input change detectado en móvil/desktop")
     if (e.target.files && e.target.files.length > 0) {
+      console.log(`📱 ${e.target.files.length} archivos seleccionados`)
+      Array.from(e.target.files).forEach((file, index) => {
+        console.log(`📱 Archivo ${index + 1}:`, {
+          name: file.name,
+          type: file.type,
+          size: file.size,
+        })
+      })
       handleFiles(e.target.files)
     }
   }
