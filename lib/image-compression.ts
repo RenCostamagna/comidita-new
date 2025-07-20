@@ -1,4 +1,3 @@
-// Tipos para la información de imagen
 export interface ImageInfo {
   width: number
   height: number
@@ -7,7 +6,6 @@ export interface ImageInfo {
   name: string
 }
 
-// Opciones de compresión
 export interface CompressionOptions {
   maxWidth?: number
   maxHeight?: number
@@ -16,26 +14,22 @@ export interface CompressionOptions {
   outputFormat?: "jpeg" | "png" | "webp"
 }
 
-// Validación de archivos de imagen
 export interface ValidationResult {
   isValid: boolean
   error?: string
 }
 
-// Función para validar archivos de imagen con mejor soporte móvil
 export function validateImageFile(
   file: File,
   maxSizePerPhoto = 10,
   acceptedFormats: string[] = ["image/jpeg", "image/jpg", "image/png", "image/webp"],
 ): ValidationResult {
-  // Verificar que es un archivo
   if (!file) {
     return { isValid: false, error: "No se proporcionó archivo" }
   }
 
-  // Verificar tipo de archivo - más flexible para móviles
+  // Verificar tipo de archivo - el problema puede estar aquí con archivos móviles
   if (!file.type) {
-    // Si no hay tipo, intentar inferir del nombre
     const fileName = file.name?.toLowerCase() || ""
     const hasImageExtension = /\.(jpg|jpeg|png|webp)$/i.test(fileName)
     if (!hasImageExtension) {
@@ -45,18 +39,16 @@ export function validateImageFile(
     return { isValid: false, error: "El archivo no es una imagen" }
   }
 
-  // Verificar tamaño (convertir MB a bytes)
   const maxSize = maxSizePerPhoto * 1024 * 1024
   if (file.size > maxSize) {
     return { isValid: false, error: `El archivo es muy grande (máximo ${maxSizePerPhoto}MB)` }
   }
 
-  // Verificar tamaño mínimo (evitar archivos corruptos)
   if (file.size < 100) {
     return { isValid: false, error: "El archivo es muy pequeño" }
   }
 
-  // Verificar tipos permitidos - más flexible para móviles
+  // Verificar tipos permitidos de manera más flexible
   if (
     file.type &&
     !acceptedFormats.some(
@@ -72,13 +64,11 @@ export function validateImageFile(
   return { isValid: true }
 }
 
-// Función para obtener información de la imagen con mejor manejo de errores
 export async function getImageInfo(file: File): Promise<ImageInfo> {
   return new Promise((resolve, reject) => {
     const img = new Image()
     const url = URL.createObjectURL(file)
 
-    // Timeout para evitar cuelgues en móviles
     const timeout = setTimeout(() => {
       URL.revokeObjectURL(url)
       reject(new Error("Timeout cargando la imagen"))
@@ -106,7 +96,6 @@ export async function getImageInfo(file: File): Promise<ImageInfo> {
   })
 }
 
-// Función para comprimir imagen usando Canvas (solo cliente) con mejor soporte móvil
 export async function compressImageAdvanced(file: File, options: CompressionOptions = {}): Promise<File> {
   const { maxWidth = 800, maxHeight = 600, quality = 0.8, outputFormat = "jpeg" } = options
 
@@ -122,7 +111,6 @@ export async function compressImageAdvanced(file: File, options: CompressionOpti
 
     img.onload = () => {
       try {
-        // Calcular nuevas dimensiones manteniendo proporción
         let { width, height } = img
 
         if (width > maxWidth) {
@@ -135,18 +123,14 @@ export async function compressImageAdvanced(file: File, options: CompressionOpti
           height = maxHeight
         }
 
-        // Configurar canvas
         canvas.width = width
         canvas.height = height
 
-        // Limpiar canvas
         ctx.fillStyle = "#FFFFFF"
         ctx.fillRect(0, 0, width, height)
 
-        // Dibujar imagen redimensionada
         ctx.drawImage(img, 0, 0, width, height)
 
-        // Convertir a blob con mejor manejo de errores
         canvas.toBlob(
           (blob) => {
             if (!blob) {
@@ -154,7 +138,6 @@ export async function compressImageAdvanced(file: File, options: CompressionOpti
               return
             }
 
-            // Crear nuevo archivo con nombre limpio
             const fileName = file.name || `compressed_image.${outputFormat}`
             const compressedFile = new File([blob], fileName, {
               type: `image/${outputFormat}`,
@@ -175,7 +158,6 @@ export async function compressImageAdvanced(file: File, options: CompressionOpti
       reject(new Error("Error cargando imagen para comprimir"))
     }
 
-    // Configurar crossOrigin para evitar problemas CORS
     img.crossOrigin = "anonymous"
     img.src = URL.createObjectURL(file)
   })

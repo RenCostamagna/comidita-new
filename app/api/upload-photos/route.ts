@@ -6,16 +6,13 @@ export async function POST(request: NextRequest) {
   try {
     console.log("=== INICIO UPLOAD PHOTOS API ===")
 
-    // Verificar que tenemos el token de Blob
     if (!process.env.BLOB_READ_WRITE_TOKEN) {
       console.error("BLOB_READ_WRITE_TOKEN no está configurado")
       return NextResponse.json({ error: "Token de Vercel Blob no configurado" }, { status: 500 })
     }
 
-    // Crear cliente de Supabase
     const supabase = await createClient()
 
-    // Verificar autenticación
     const {
       data: { user },
       error: authError,
@@ -28,10 +25,7 @@ export async function POST(request: NextRequest) {
 
     console.log("Usuario autenticado:", user.id)
 
-    // Obtener datos del formulario
     const formData = await request.formData()
-
-    // Debug: mostrar todas las claves del FormData
     console.log("Claves en FormData:", Array.from(formData.keys()))
 
     const reviewId = formData.get("reviewId") as string
@@ -41,7 +35,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "ID de reseña requerido" }, { status: 400 })
     }
 
-    // Obtener archivos - probar diferentes nombres de campo
     let files = formData.getAll("photos") as File[]
     if (files.length === 0) {
       files = formData.getAll("files") as File[]
@@ -57,20 +50,16 @@ export async function POST(request: NextRequest) {
     const uploadedUrls: string[] = []
     const errors: string[] = []
 
-    // Generar timestamp base una sola vez para evitar conflictos
-    const baseTimestamp = Date.now()
-
-    // Procesar cada archivo SECUENCIALMENTE para evitar conflictos de nombres
+    // El problema está aquí - necesitamos validar mejor los nombres de archivo
     for (let i = 0; i < files.length; i++) {
       const file = files[i]
-      console.log(`Procesando archivo ${i + 1}/${files.length}:`, {
+      console.log(`Procesando archivo ${i + 1}:`, {
         name: file.name,
         size: file.size,
         type: file.type,
       })
 
       try {
-        // Validar archivo
         if (!file.type.startsWith("image/")) {
           errors.push(`Archivo ${file.name}: No es una imagen`)
           continue
@@ -81,53 +70,54 @@ export async function POST(request: NextRequest) {
           continue
         }
 
-        // Limpiar nombre de archivo para móviles - remover caracteres especiales
-        let cleanFileName = file.name || `image_${i + 1}`
+        // AQUÍ ESTÁ EL PROBLEMA: La validación del nombre de archivo para Vercel Blob
+        // Vercel Blob tiene restricciones específicas en los nombres de archivo
+        let cleanFileName = file.name || `image_${i}`
+
+        // Vercel Blob requiere nombres que cumplan con ciertos patrones
+        // Solo permite: letras, números, guiones, puntos y barras
         cleanFileName = cleanFileName
-          .replace(/[^a-zA-Z0-9.-]/g, "_") // Reemplazar caracteres especiales con _
-          .replace(/_{2,}/g, "_") // Reemplazar múltiples _ con uno solo
+          .replace(/[^a-zA-Z0-9.\-_/]/g, "") // Solo caracteres permitidos
+          .replace(/^[.\-_]+|[.\-_]+$/g, "") // No empezar/terminar con . - _
           .toLowerCase()
 
-        // Generar nombre único con índice para evitar duplicados
-        const uniqueTimestamp = baseTimestamp + i // Incrementar timestamp por índice
-        const randomSuffix = Math.random().toString(36).substring(2, 8)
+        // Si el nombre queda vacío, generar uno
+        if (!cleanFileName || cleanFileName.length === 0) {
+          cleanFileName = `image_${i}`
+        }
+
+        // Generar nombre único pero compatible con Vercel Blob
+        const timestamp = Date.now()
+        const randomSuffix = Math.random().toString(36).substring(2, 6) // Más corto
         const fileExtension = cleanFileName.split(".").pop()?.toLowerCase() || "jpg"
 
-        // Asegurar que la extensión sea válida
         const validExtensions = ["jpg", "jpeg", "png", "webp"]
         const finalExtension = validExtensions.includes(fileExtension) ? fileExtension : "jpg"
 
-        // Incluir índice en el nombre para garantizar unicidad
-        const fileName = `review-photos/${user.id}_${reviewId}_${uniqueTimestamp}_${i}_${randomSuffix}.${finalExtension}`
+        // Nombre más simple para evitar problemas de patrón
+        const fileName = `review-photos/${user.id}/${reviewId}/${timestamp}_${i}.${finalExtension}`
 
-        console.log(`Subiendo archivo ${i + 1} como: ${fileName}`)
+        console.log(`Subiendo archivo como: ${fileName}`)
 
-        // Convertir archivo a ArrayBuffer para mejor compatibilidad móvil
         const arrayBuffer = await file.arrayBuffer()
         const uint8Array = new Uint8Array(arrayBuffer)
 
-        // Subir a Vercel Blob usando ArrayBuffer
         const blob = await put(fileName, uint8Array, {
           access: "public",
-          addRandomSuffix: false, // No usar suffix automático ya que generamos nuestro propio nombre único
+          addRandomSuffix: false,
           contentType: file.type || `image/${finalExtension}`,
         })
 
         uploadedUrls.push(blob.url)
-        console.log(`✅ Archivo ${i + 1} subido exitosamente: ${blob.url}`)
-
-        // Pequeña pausa entre uploads para evitar problemas de concurrencia en móviles
-        if (i < files.length - 1) {
-          await new Promise((resolve) => setTimeout(resolve, 100))
-        }
+        console.log(`Archivo subido exitosamente: ${blob.url}`)
       } catch (uploadError) {
-        console.error(`❌ Error subiendo archivo ${i + 1} (${file.name}):`, uploadError)
+        console.error(`Error subiendo archivo ${file.name}:`, uploadError)
         const errorMessage = uploadError instanceof Error ? uploadError.message : "Error desconocido"
         errors.push(`Error subiendo ${file.name}: ${errorMessage}`)
       }
     }
 
-    console.log(`🏁 Resultado final: ${uploadedUrls.length} archivos subidos, ${errors.length} errores`)
+    console.log(`Resultado final: ${uploadedUrls.length} archivos subidos, ${errors.length} errores`)
 
     return NextResponse.json({
       success: uploadedUrls.length > 0,
@@ -136,7 +126,7 @@ export async function POST(request: NextRequest) {
       message: `${uploadedUrls.length} de ${files.length} fotos subidas correctamente`,
     })
   } catch (error) {
-    console.error("💥 Error general en upload-photos:", error)
+    console.error("Error general en upload-photos:", error)
     return NextResponse.json(
       {
         error: "Error interno del servidor",
