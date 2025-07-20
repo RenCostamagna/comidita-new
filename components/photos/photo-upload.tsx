@@ -63,55 +63,81 @@ export function PhotoUpload({
       return
     }
 
+    console.log(`📱 Procesando ${fileList.length} archivos...`)
+
+    // Procesar archivos SECUENCIALMENTE para evitar problemas en móviles
     for (let i = 0; i < fileList.length; i++) {
       const file = fileList[i]
       setProcessingProgress(((i + 1) / fileList.length) * 100)
+
+      console.log(`📱 Procesando archivo ${i + 1}/${fileList.length}: ${file.name}`)
 
       try {
         // Validar archivo
         const validation = validateImageFile(file, maxSizePerPhoto, acceptedFormats)
         if (!validation.isValid) {
           errors.push(`${file.name}: ${validation.error}`)
+          console.warn(`⚠️ Validación fallida para ${file.name}: ${validation.error}`)
           continue
         }
 
-        // Manejar archivos sin nombre (común en móviles)
+        // Manejar archivos sin nombre (común en móviles) con índice único
         let processedFile = file
         if (!file.name || file.name === "blob" || file.name === "image") {
           const timestamp = Date.now()
           const extension = file.type.split("/")[1] || "jpg"
-          const newName = `photo_${timestamp}.${extension}`
+          const newName = `mobile_photo_${timestamp}_${i}.${extension}`
           processedFile = new File([file], newName, {
             type: file.type,
             lastModified: file.lastModified,
           })
           console.log(`📱 Archivo móvil renombrado: ${file.name} -> ${newName}`)
+        } else {
+          // Asegurar nombre único incluso si ya tiene nombre
+          const nameParts = file.name.split(".")
+          const extension = nameParts.pop() || "jpg"
+          const baseName = nameParts.join(".")
+          const uniqueName = `${baseName}_${i}_${Date.now()}.${extension}`
+
+          if (uniqueName !== file.name) {
+            processedFile = new File([file], uniqueName, {
+              type: file.type,
+              lastModified: file.lastModified,
+            })
+            console.log(`📱 Archivo renombrado para unicidad: ${file.name} -> ${uniqueName}`)
+          }
         }
 
         // Obtener información de la imagen
-        const imageInfo = await getImageInfo(file)
-        console.log(`✅ Archivo procesado: ${file.name}`, {
-          size: `${(file.size / 1024 / 1024).toFixed(2)}MB`,
+        const imageInfo = await getImageInfo(processedFile)
+        console.log(`✅ Archivo ${i + 1} procesado: ${processedFile.name}`, {
+          size: `${(processedFile.size / 1024 / 1024).toFixed(2)}MB`,
           dimensions: `${imageInfo.width}x${imageInfo.height}`,
-          type: file.type,
+          type: processedFile.type,
         })
 
         // Crear PhotoData object con el archivo procesado
         const photoData: PhotoData = {
           file: processedFile,
           isPrimary: false,
-          id: `photo-${Date.now()}-${i}`,
+          id: `photo-${Date.now()}-${i}-${Math.random().toString(36).substring(2, 8)}`,
         }
 
         newPhotoData.push(photoData)
+
+        // Pequeña pausa entre procesamiento de archivos para móviles
+        if (i < fileList.length - 1) {
+          await new Promise((resolve) => setTimeout(resolve, 50))
+        }
       } catch (error) {
-        console.error(`Error procesando ${file.name}:`, error)
+        console.error(`💥 Error procesando archivo ${i + 1} (${file.name}):`, error)
         errors.push(`${file.name}: Error al procesar`)
       }
     }
 
     if (errors.length > 0) {
       setUploadError(errors.join(", "))
+      console.warn("⚠️ Errores durante el procesamiento:", errors)
     }
 
     if (newPhotoData.length > 0) {
@@ -148,12 +174,13 @@ export function PhotoUpload({
     setDragActive(false)
 
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      console.log(`📱 Drop detectado: ${e.dataTransfer.files.length} archivos`)
       handleFiles(e.dataTransfer.files)
     }
   }
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    console.log("📱 Input change detectado en móvil/desktop")
+    console.log("📱 Input change detectado")
     if (e.target.files && e.target.files.length > 0) {
       console.log(`📱 ${e.target.files.length} archivos seleccionados`)
       Array.from(e.target.files).forEach((file, index) => {
@@ -165,6 +192,8 @@ export function PhotoUpload({
       })
       handleFiles(e.target.files)
     }
+    // Limpiar el input para permitir seleccionar los mismos archivos de nuevo
+    e.target.value = ""
   }
 
   const removePhoto = (index: number) => {
@@ -175,6 +204,7 @@ export function PhotoUpload({
   }
 
   const openFileDialog = () => {
+    console.log("📱 Abriendo selector de archivos...")
     fileInputRef.current?.click()
   }
 
@@ -336,6 +366,9 @@ export function PhotoUpload({
               <div className="space-y-2 w-full max-w-xs">
                 <p className="text-sm text-muted-foreground text-center">Procesando fotos...</p>
                 <Progress value={processingProgress} className="w-full" />
+                <p className="text-xs text-muted-foreground text-center">
+                  {Math.round(processingProgress)}% completado
+                </p>
               </div>
             </div>
           ) : photos.length === 0 ? (
