@@ -58,7 +58,7 @@ export function PhotoUpload({
 
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  // Debug logging function
+  // Debug logging function - aumentado a 50 logs
   const addDebugLog = (type: "info" | "error" | "warning", message: string, data?: any) => {
     const log: DebugLog = {
       timestamp: new Date().toLocaleTimeString(),
@@ -66,7 +66,7 @@ export function PhotoUpload({
       message,
       data,
     }
-    setDebugLogs((prev) => [...prev.slice(-14), log]) // Keep last 15 logs
+    setDebugLogs((prev) => [...prev.slice(-49), log]) // Keep last 50 logs
     console.log(`[DEBUG ${type.toUpperCase()}]`, message, data)
   }
 
@@ -87,19 +87,26 @@ export function PhotoUpload({
           attempt: attempt + 1,
           maxRetries: maxRetries + 1,
           size: `${(file.size / 1024 / 1024).toFixed(2)}MB`,
+          type: file.type,
+          lastModified: new Date(file.lastModified).toISOString(),
         })
 
         // Validación básica
+        addDebugLog("info", `🔍 Iniciando validación para ${file.name}`)
         const validation = validateImageFile(file, maxSizePerPhoto, acceptedFormats)
         if (!validation.isValid) {
           const error = `Validación falló: ${validation.error}`
-          addDebugLog("error", `❌ ${error}`)
+          addDebugLog("error", `❌ ${error}`, { file: file.name, validation })
           return { success: false, error }
         }
 
-        addDebugLog("info", `✅ Validación OK para ${file.name}`)
+        addDebugLog("info", `✅ Validación OK para ${file.name}`, {
+          validatedSize: `${(file.size / 1024 / 1024).toFixed(2)}MB`,
+          validatedType: file.type,
+        })
 
         // Crear una promesa con timeout más corto para detectar problemas rápido
+        addDebugLog("info", `📊 Iniciando getImageInfo para ${file.name}`)
         const processImageInfo = () => {
           return new Promise<any>((resolve, reject) => {
             const timeout = setTimeout(() => {
@@ -109,10 +116,12 @@ export function PhotoUpload({
             getImageInfo(file)
               .then((info) => {
                 clearTimeout(timeout)
+                addDebugLog("info", `📊 getImageInfo completado exitosamente para ${file.name}`, info)
                 resolve(info)
               })
               .catch((error) => {
                 clearTimeout(timeout)
+                addDebugLog("error", `📊 getImageInfo falló para ${file.name}`, error)
                 reject(error)
               })
           })
@@ -127,18 +136,20 @@ export function PhotoUpload({
             dimensions: `${imageInfo.width}x${imageInfo.height}`,
             processingTime: `${processingTime}ms`,
             attempt: attempt + 1,
+            imageInfo: imageInfo,
           })
         } catch (imageError) {
           const processingTime = Date.now() - startTime
           addDebugLog("warning", `⚠️ getImageInfo falló en ${processingTime}ms, usando fallback`, {
-            error: imageError,
+            error: imageError instanceof Error ? imageError.message : String(imageError),
             attempt: attempt + 1,
+            processingTime: `${processingTime}ms`,
           })
 
           // Si es el último intento, usar valores por defecto
           if (attempt === maxRetries) {
             imageInfo = { width: 800, height: 600 }
-            addDebugLog("info", `🔧 Usando dimensiones por defecto para ${file.name}`)
+            addDebugLog("info", `🔧 Usando dimensiones por defecto para ${file.name}`, imageInfo)
           } else {
             // Si no es el último intento, fallar para reintentar
             throw imageError
@@ -146,6 +157,7 @@ export function PhotoUpload({
         }
 
         // Crear PhotoData
+        addDebugLog("info", `🏗️ Creando PhotoData para ${file.name}`)
         const photoData: PhotoData = {
           file: file,
           isPrimary: false,
@@ -157,6 +169,8 @@ export function PhotoUpload({
           totalTime: `${totalTime}ms`,
           attempt: attempt + 1,
           id: photoData.id,
+          fileSize: file.size,
+          fileName: file.name,
         })
 
         return { success: true, photoData, retries: attempt }
@@ -166,15 +180,18 @@ export function PhotoUpload({
 
         addDebugLog("error", `💥 Intento ${attempt + 1} falló para ${file.name}`, {
           error: error instanceof Error ? error.message : String(error),
+          stack: error instanceof Error ? error.stack : undefined,
           processingTime: `${processingTime}ms`,
           attempt: attempt + 1,
           willRetry: attempt < maxRetries,
+          fileName: file.name,
+          fileSize: file.size,
         })
 
         // Si no es el último intento, esperar antes de reintentar
         if (attempt < maxRetries) {
           const retryDelay = 1000 * (attempt + 1) // 1s, 2s, 3s...
-          addDebugLog("info", `⏳ Esperando ${retryDelay}ms antes del reintento...`)
+          addDebugLog("info", `⏳ Esperando ${retryDelay}ms antes del reintento para ${file.name}`)
           await new Promise((resolve) => setTimeout(resolve, retryDelay))
         }
       }
@@ -182,6 +199,10 @@ export function PhotoUpload({
 
     // Si llegamos aquí, todos los intentos fallaron
     const errorMsg = `Falló después de ${maxRetries + 1} intentos: ${lastError instanceof Error ? lastError.message : String(lastError)}`
+    addDebugLog("error", `❌ FALLO DEFINITIVO: ${file.name} - ${errorMsg}`, {
+      totalAttempts: maxRetries + 1,
+      finalError: lastError,
+    })
     return { success: false, error: errorMsg, retries: maxRetries }
   }
 
@@ -191,10 +212,21 @@ export function PhotoUpload({
     const errors: string[] = []
     const failed: File[] = []
 
-    addDebugLog("info", `🚀 Iniciando procesamiento robusto de ${files.length} archivos`)
+    addDebugLog("info", `🚀 Iniciando procesamiento robusto de ${files.length} archivos`, {
+      totalFiles: files.length,
+      fileNames: files.map((f) => f.name),
+      totalSize: `${(files.reduce((sum, f) => sum + f.size, 0) / 1024 / 1024).toFixed(2)}MB`,
+    })
 
     for (let i = 0; i < files.length; i++) {
       const file = files[i]
+      addDebugLog("info", `📂 Iniciando procesamiento del archivo ${i + 1}/${files.length}: ${file.name}`, {
+        index: i,
+        fileName: file.name,
+        fileSize: `${(file.size / 1024 / 1024).toFixed(2)}MB`,
+        fileType: file.type,
+      })
+
       setCurrentProcessingFile(`${file.name} (${i + 1}/${files.length})`)
       setProcessingProgress(((i + 1) / files.length) * 100)
 
@@ -204,26 +236,57 @@ export function PhotoUpload({
         results.push(result.photoData)
         addDebugLog(
           "info",
-          `🎉 Éxito: ${file.name}${result.retries ? ` (después de ${result.retries + 1} intentos)` : ""}`,
+          `🎉 ÉXITO: ${file.name}${result.retries ? ` (después de ${result.retries + 1} intentos)` : ""}`,
+          {
+            fileName: file.name,
+            photoId: result.photoData.id,
+            totalRetries: result.retries || 0,
+            successfulFiles: results.length,
+          },
         )
       } else {
         errors.push(`${file.name}: ${result.error}`)
         failed.push(file)
-        addDebugLog("error", `❌ Falló definitivamente: ${file.name} - ${result.error}`)
+        addDebugLog("error", `❌ FALLO DEFINITIVO: ${file.name} - ${result.error}`, {
+          fileName: file.name,
+          error: result.error,
+          failedFiles: failed.length,
+        })
       }
 
       // Pausa entre archivos para no sobrecargar
       if (i < files.length - 1) {
+        addDebugLog("info", `⏳ Pausa de 300ms antes del siguiente archivo`)
         await new Promise((resolve) => setTimeout(resolve, 300))
       }
     }
+
+    addDebugLog("info", `🏁 PROCESAMIENTO COMPLETADO`, {
+      totalFiles: files.length,
+      successful: results.length,
+      failed: failed.length,
+      successRate: `${Math.round((results.length / files.length) * 100)}%`,
+      errors: errors,
+    })
 
     setFailedFiles(failed)
     return { results, errors }
   }
 
   const handleFiles = async (fileList: FileList) => {
-    addDebugLog("info", `🚀 NUEVA SESIÓN: ${fileList.length} archivos seleccionados`)
+    addDebugLog("info", `🚀 NUEVA SESIÓN DE UPLOAD INICIADA`, {
+      timestamp: new Date().toISOString(),
+      totalFiles: fileList.length,
+      userAgent: navigator.userAgent,
+      platform: navigator.platform,
+    })
+
+    addDebugLog("info", `📱 Información del dispositivo`, {
+      isMobile: /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent),
+      touchSupport: "ontouchstart" in window,
+      screenSize: `${window.screen.width}x${window.screen.height}`,
+      viewportSize: `${window.innerWidth}x${window.innerHeight}`,
+    })
 
     setUploadError(null)
     setIsProcessing(true)
@@ -235,18 +298,23 @@ export function PhotoUpload({
     const fileDetails = Array.from(fileList).map((f, i) => ({
       index: i,
       name: f.name,
-      size: `${(f.size / 1024 / 1024).toFixed(2)}MB`,
+      size: f.size,
+      sizeFormatted: `${(f.size / 1024 / 1024).toFixed(2)}MB`,
       type: f.type,
+      lastModified: new Date(f.lastModified).toISOString(),
       isBlob: f.name === "blob" || f.name === "image",
     }))
 
-    addDebugLog("info", "📋 Archivos recibidos:", {
+    addDebugLog("info", "📋 ARCHIVOS RECIBIDOS DEL FILELIST:", {
       total: fileList.length,
       files: fileDetails,
       totalSize: `${(Array.from(fileList).reduce((sum, f) => sum + f.size, 0) / 1024 / 1024).toFixed(2)}MB`,
+      blobFiles: fileDetails.filter((f) => f.isBlob).length,
+      validTypes: fileDetails.filter((f) => f.type && f.type.startsWith("image/")).length,
     })
 
     // Limpiar nombres de archivos
+    addDebugLog("info", `🧹 Iniciando limpieza de nombres de archivos`)
     const cleanedFiles = Array.from(fileList).map((file, i) => {
       const extension = file.type?.split("/")[1] || "jpg"
       const originalName = file.name
@@ -257,27 +325,57 @@ export function PhotoUpload({
 
       const type = file.type || "image/jpeg"
 
-      return new File([file], name, {
+      const cleanedFile = new File([file], name, {
         type,
         lastModified: file.lastModified,
       })
+
+      addDebugLog("info", `📝 Archivo ${i + 1} limpiado`, {
+        index: i,
+        original: { name: originalName, type: file.type, size: file.size },
+        cleaned: { name: cleanedFile.name, type: cleanedFile.type, size: cleanedFile.size },
+        wasRenamed: originalName !== name,
+        wasTypeFixed: file.type !== type,
+      })
+
+      return cleanedFile
     })
 
     // Verificar límites
+    addDebugLog("info", `🔢 Verificando límites de fotos`, {
+      currentPhotos: photos.length,
+      newFiles: cleanedFiles.length,
+      total: photos.length + cleanedFiles.length,
+      maxAllowed: maxPhotos,
+      withinLimit: photos.length + cleanedFiles.length <= maxPhotos,
+    })
+
     if (photos.length + cleanedFiles.length > maxPhotos) {
       const errorMsg = `Máximo ${maxPhotos} fotos permitidas`
-      addDebugLog("error", errorMsg)
+      addDebugLog("error", `❌ LÍMITE EXCEDIDO: ${errorMsg}`, {
+        current: photos.length,
+        trying: cleanedFiles.length,
+        max: maxPhotos,
+        excess: photos.length + cleanedFiles.length - maxPhotos,
+      })
       setUploadError(errorMsg)
       setIsProcessing(false)
       return
     }
 
+    addDebugLog("info", `✅ Límites OK, iniciando procesamiento de archivos`)
+
     // Procesar archivos con sistema de reintentos
     const { results: newPhotoData, errors } = await processMultipleFiles(cleanedFiles)
 
-    // Mostrar resultados
+    // Mostrar resultados finales
     if (errors.length > 0) {
-      addDebugLog("warning", `⚠️ ${errors.length}/${cleanedFiles.length} archivos fallaron`, errors)
+      addDebugLog("warning", `⚠️ ERRORES ENCONTRADOS: ${errors.length}/${cleanedFiles.length} archivos fallaron`, {
+        totalErrors: errors.length,
+        totalFiles: cleanedFiles.length,
+        errors: errors,
+        failureRate: `${Math.round((errors.length / cleanedFiles.length) * 100)}%`,
+      })
       setUploadError(
         `${errors.length} archivos fallaron: ${errors.slice(0, 2).join(", ")}${errors.length > 2 ? "..." : ""}`,
       )
@@ -286,24 +384,45 @@ export function PhotoUpload({
     if (newPhotoData.length > 0) {
       const updatedPhotos = updatePrimaryPhoto([...photos, ...newPhotoData])
       onPhotosChange(updatedPhotos)
-      addDebugLog("info", `🎉 RESULTADO FINAL: ${newPhotoData.length}/${cleanedFiles.length} archivos exitosos`, {
+      addDebugLog("info", `🎉 RESULTADO FINAL EXITOSO`, {
         exitosos: newPhotoData.length,
         fallidos: errors.length,
         total: cleanedFiles.length,
         tasa_exito: `${Math.round((newPhotoData.length / cleanedFiles.length) * 100)}%`,
+        nuevasPhotos: newPhotoData.map((p) => ({ id: p.id, isPrimary: p.isPrimary })),
+        totalPhotosAhora: updatedPhotos.length,
+      })
+    } else {
+      addDebugLog("error", `❌ NINGÚN ARCHIVO FUE PROCESADO EXITOSAMENTE`, {
+        totalAttempted: cleanedFiles.length,
+        allFailed: true,
+        errors: errors,
       })
     }
 
     setIsProcessing(false)
     setProcessingProgress(0)
     setCurrentProcessingFile("")
+
+    addDebugLog("info", `🏁 SESIÓN DE UPLOAD FINALIZADA`, {
+      timestamp: new Date().toISOString(),
+      duration: "Calculado en el cliente",
+      finalState: {
+        totalPhotos: photos.length + newPhotoData.length,
+        newPhotosAdded: newPhotoData.length,
+        failedFiles: errors.length,
+      },
+    })
   }
 
   // Función para reintentar archivos fallidos
   const retryFailedFiles = async () => {
     if (failedFiles.length === 0) return
 
-    addDebugLog("info", `🔄 Reintentando ${failedFiles.length} archivos fallidos`)
+    addDebugLog("info", `🔄 INICIANDO REINTENTO DE ARCHIVOS FALLIDOS`, {
+      failedFilesCount: failedFiles.length,
+      failedFileNames: failedFiles.map((f) => f.name),
+    })
     await processMultipleFiles(failedFiles)
   }
 
@@ -328,8 +447,19 @@ export function PhotoUpload({
   }
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    addDebugLog("info", `📁 INPUT CHANGE DETECTADO`, {
+      hasFiles: !!(e.target.files && e.target.files.length > 0),
+      fileCount: e.target.files?.length || 0,
+      inputElement: {
+        multiple: e.target.multiple,
+        accept: e.target.accept,
+      },
+    })
+
     if (e.target.files && e.target.files.length > 0) {
       handleFiles(e.target.files)
+    } else {
+      addDebugLog("warning", `⚠️ No hay archivos en el input change`)
     }
     e.target.value = ""
   }
@@ -338,13 +468,19 @@ export function PhotoUpload({
     const newPhotos = photos.filter((_, i) => i !== index)
     const updatedPhotos = updatePrimaryPhoto(newPhotos)
     onPhotosChange(updatedPhotos)
-    addDebugLog("info", `🗑️ Foto ${index + 1} eliminada`)
+    addDebugLog("info", `🗑️ Foto ${index + 1} eliminada`, {
+      removedIndex: index,
+      remainingPhotos: newPhotos.length,
+    })
   }
 
   const openFileDialog = (e: React.MouseEvent) => {
     e.preventDefault()
     e.stopPropagation()
-    addDebugLog("info", "🖱️ Abriendo selector de archivos")
+    addDebugLog("info", "🖱️ ABRIENDO SELECTOR DE ARCHIVOS", {
+      timestamp: new Date().toISOString(),
+      eventType: e.type,
+    })
     fileInputRef.current?.click()
   }
 
@@ -385,22 +521,25 @@ export function PhotoUpload({
         </div>
       </div>
 
-      {/* Debug Panel */}
+      {/* Debug Panel - Aumentado el tamaño */}
       {showDebug && (
         <Card className="border-yellow-200 bg-yellow-50">
           <CardContent className="p-4">
             <div className="space-y-2">
               <div className="flex items-center gap-2 mb-3">
                 <Bug className="h-4 w-4 text-yellow-600" />
-                <h4 className="font-semibold text-yellow-800">Debug Mobile Upload - Sistema de Reintentos</h4>
+                <h4 className="font-semibold text-yellow-800">Debug Mobile Upload - Logs Completos</h4>
                 <Badge variant="outline" className="text-xs">
-                  {debugLogs.length} logs
+                  {debugLogs.length}/50 logs
                 </Badge>
               </div>
 
-              <div className="max-h-48 overflow-y-auto space-y-1 text-xs font-mono">
+              {/* Aumentado la altura máxima para ver más logs */}
+              <div className="max-h-96 overflow-y-auto space-y-1 text-xs font-mono">
                 {debugLogs.length === 0 ? (
-                  <p className="text-gray-500 italic">Selecciona múltiples fotos para ver el debug detallado...</p>
+                  <p className="text-gray-500 italic">
+                    Selecciona múltiples fotos para ver el debug completo del proceso...
+                  </p>
                 ) : (
                   debugLogs.map((log, index) => (
                     <div
@@ -417,11 +556,13 @@ export function PhotoUpload({
                         <span className="font-medium">[{log.timestamp}]</span>
                         <span className="text-xs opacity-75">{log.type.toUpperCase()}</span>
                       </div>
-                      <div className="mt-1">{log.message}</div>
+                      <div className="mt-1 font-medium">{log.message}</div>
                       {log.data && (
                         <details className="mt-1">
-                          <summary className="cursor-pointer text-xs opacity-75">Ver datos</summary>
-                          <pre className="mt-1 text-xs bg-white/50 p-1 rounded overflow-x-auto">
+                          <summary className="cursor-pointer text-xs opacity-75 hover:opacity-100">
+                            Ver datos técnicos
+                          </summary>
+                          <pre className="mt-1 text-xs bg-white/50 p-2 rounded overflow-x-auto border">
                             {JSON.stringify(log.data, null, 2)}
                           </pre>
                         </details>
