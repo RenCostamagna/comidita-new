@@ -73,10 +73,10 @@ export async function getPlaceDetails(placeId: string): Promise<PlaceDetails> {
 }
 
 export function getPhotoUrl(photoReference: string, maxWidth = 400): string {
-  if (!photoReference) {
+  const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
+  if (!apiKey || !photoReference) {
     return "/placeholder.svg?height=200&width=300"
   }
 
-  // Return a server-side endpoint that will handle the photo URL generation
-  return `/api/places/photo?photo_reference=${encodeURIComponent(photoReference)}&maxwidth=${maxWidth}`
+  return `https://maps.googleapis.com/maps/api/place/photo?maxwidth=${maxWidth}&photo_reference=${photoReference}&key=${apiKey}`
 }

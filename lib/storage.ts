@@ -1,43 +1,12 @@
-// Función para limpiar archivos antes de subir
-function cleanFiles(files: File[]): File[] {
-  return files.map((file, index) => {
-    let name = file.name
-    const type = file.type || "image/jpeg"
-
-    if (!name || name === "blob" || name === "image") {
-      const extension = type.split("/")[1] || "jpg"
-      name = `photo_${Date.now()}_${index}.${extension}`
-    }
-
-    return new File([file], name, {
-      type,
-      lastModified: file.lastModified,
-    })
-  })
-}
-
 // Función para subir múltiples fotos de reseñas usando la API route
 export async function uploadMultipleReviewPhotos(files: File[], userId: string, reviewId: string): Promise<string[]> {
   console.log(`Iniciando upload de ${files.length} fotos para usuario ${userId}, reseña ${reviewId}`)
 
   try {
-    // Paso 1: Limpiar archivos antes de subir
-    const cleanedFiles = cleanFiles(files)
-
-    // Paso 2: Agregar log por cada archivo
-    cleanedFiles.forEach((file, i) => {
-      console.log(`📁 Archivo ${i + 1}:`, {
-        name: file.name,
-        size: file.size,
-        type: file.type,
-        instanceof: file instanceof File,
-      })
-    })
-
     const formData = new FormData()
 
-    // Agregar archivos limpiados al FormData
-    cleanedFiles.forEach((file, index) => {
+    // Agregar archivos al FormData con el nombre correcto
+    files.forEach((file, index) => {
       console.log(`Agregando archivo ${index + 1}: ${file.name} (${file.size} bytes)`)
       formData.append("photos", file)
     })
