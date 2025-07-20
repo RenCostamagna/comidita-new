@@ -5,32 +5,65 @@ export async function uploadMultipleReviewPhotos(files: File[], userId: string, 
   try {
     const formData = new FormData()
 
-    files.forEach((file, index) => {
-      console.log(`Agregando archivo ${index + 1}: ${file.name} (${file.size} bytes)`)
+    // Filtrar y validar que todos los elementos sean archivos válidos
+    const validFiles: File[] = []
+
+    for (let index = 0; index < files.length; index++) {
+      const file = files[index]
+
+      // Verificar que sea un File válido y no un string
+      if (!(file instanceof File)) {
+        console.warn(`Elemento ${index + 1} no es un File válido:`, typeof file, file)
+        continue
+      }
+
+      console.log(`Validando archivo ${index + 1}: ${file.name} (${file.size} bytes)`)
 
       if (!file.type.startsWith("image/")) {
         console.warn(`Archivo ${file.name} no es una imagen, saltando...`)
-        return
+        continue
+      }
+
+      // Verificar que el archivo tenga contenido
+      if (file.size === 0) {
+        console.warn(`Archivo ${file.name} está vacío, saltando...`)
+        continue
       }
 
       let cleanFile = file
-      if (!file.name || file.name === "blob" || file.name === "image" || file.name.includes("�")) {
+      if (!file.name || file.name === "blob" || file.name === "image" || file.name.includes("")) {
         const timestamp = Date.now()
         const extension = file.type.split("/")[1] || "jpg"
         const newName = `photo_${timestamp}_${index}.${extension}`
-        cleanFile = new File([file], newName, {
-          type: file.type,
-          lastModified: file.lastModified,
-        })
-        console.log(`Archivo renombrado: ${file.name} -> ${newName}`)
+
+        try {
+          cleanFile = new File([file], newName, {
+            type: file.type,
+            lastModified: file.lastModified,
+          })
+          console.log(`Archivo renombrado: ${file.name} -> ${newName}`)
+        } catch (error) {
+          console.error(`Error renombrando archivo ${file.name}:`, error)
+          continue
+        }
       }
 
-      formData.append("photos", cleanFile)
+      validFiles.push(cleanFile)
+    }
+
+    if (validFiles.length === 0) {
+      throw new Error("No se encontraron archivos válidos para subir")
+    }
+
+    // Agregar solo archivos válidos al FormData
+    validFiles.forEach((file, index) => {
+      console.log(`Agregando al FormData: ${file.name} (${file.size} bytes, tipo: ${file.type})`)
+      formData.append("photos", file)
     })
 
     formData.append("reviewId", reviewId)
 
-    console.log("Enviando request a /api/upload-photos...")
+    console.log(`Enviando ${validFiles.length} archivos válidos a /api/upload-photos...`)
 
     const response = await fetch("/api/upload-photos", {
       method: "POST",

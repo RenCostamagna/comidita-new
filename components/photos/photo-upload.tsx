@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
-import { X, Upload, Camera, AlertCircle, Plus, GripVertical } from 'lucide-react'
+import { X, Upload, Camera, AlertCircle, Plus, GripVertical } from "lucide-react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { validateImageFile, getImageInfo } from "@/lib/image-compression"
 
@@ -30,7 +30,7 @@ export function PhotoUpload({
   photos,
   onPhotosChange,
   maxPhotos = 6,
-  maxSizePerPhoto = 50, // Aumentado a 50MB
+  maxSizePerPhoto = 50,
   acceptedFormats = ["image/jpeg", "image/jpg", "image/png", "image/webp"],
   userId = "temp-user",
 }: PhotoUploadProps) {
@@ -68,9 +68,29 @@ export function PhotoUpload({
       const file = fileList[i]
       setProcessingProgress(((i + 1) / fileList.length) * 100)
 
-      console.log(`📱 Procesando archivo ${i + 1}/${fileList.length}: ${file.name}`)
+      console.log(`📱 Procesando archivo ${i + 1}/${fileList.length}:`, {
+        name: file.name,
+        type: file.type,
+        size: file.size,
+        constructor: file.constructor.name,
+        isFile: file instanceof File,
+      })
 
       try {
+        // Verificar que sea un File válido
+        if (!(file instanceof File)) {
+          console.error(`❌ Elemento ${i + 1} no es un File válido:`, typeof file, file)
+          errors.push(`Elemento ${i + 1}: No es un archivo válido`)
+          continue
+        }
+
+        // Verificar que tenga contenido
+        if (file.size === 0) {
+          console.error(`❌ Archivo ${file.name} está vacío`)
+          errors.push(`${file.name}: Archivo vacío`)
+          continue
+        }
+
         const validation = validateImageFile(file, maxSizePerPhoto, acceptedFormats)
         if (!validation.isValid) {
           errors.push(`${file.name}: ${validation.error}`)
@@ -83,11 +103,18 @@ export function PhotoUpload({
           const timestamp = Date.now()
           const extension = file.type.split("/")[1] || "jpg"
           const newName = `mobile_photo_${timestamp}_${i}.${extension}`
-          processedFile = new File([file], newName, {
-            type: file.type,
-            lastModified: file.lastModified,
-          })
-          console.log(`📱 Archivo móvil renombrado: ${file.name} -> ${newName}`)
+
+          try {
+            processedFile = new File([file], newName, {
+              type: file.type,
+              lastModified: file.lastModified,
+            })
+            console.log(`📱 Archivo móvil renombrado: ${file.name} -> ${newName}`)
+          } catch (renameError) {
+            console.error(`❌ Error renombrando archivo ${file.name}:`, renameError)
+            errors.push(`${file.name}: Error al procesar`)
+            continue
+          }
         } else {
           const nameParts = file.name.split(".")
           const extension = nameParts.pop() || "jpg"
@@ -95,12 +122,34 @@ export function PhotoUpload({
           const uniqueName = `${baseName}_${i}_${Date.now()}.${extension}`
 
           if (uniqueName !== file.name) {
-            processedFile = new File([file], uniqueName, {
-              type: file.type,
-              lastModified: file.lastModified,
-            })
-            console.log(`📱 Archivo renombrado para unicidad: ${file.name} -> ${uniqueName}`)
+            try {
+              processedFile = new File([file], uniqueName, {
+                type: file.type,
+                lastModified: file.lastModified,
+              })
+              console.log(`📱 Archivo renombrado para unicidad: ${file.name} -> ${uniqueName}`)
+            } catch (renameError) {
+              console.error(`❌ Error renombrando archivo ${file.name}:`, renameError)
+              // Usar archivo original si falla el renombrado
+              processedFile = file
+            }
           }
+        }
+
+        // Verificar que el archivo procesado sigue siendo válido
+        if (!(processedFile instanceof File)) {
+          console.error(`❌ Archivo procesado no es válido:`, typeof processedFile)
+          errors.push(`${file.name}: Error al procesar`)
+          continue
+        }
+
+        // Verificar que podemos leer el archivo
+        try {
+          await processedFile.arrayBuffer()
+        } catch (readError) {
+          console.error(`❌ No se puede leer el archivo ${processedFile.name}:`, readError)
+          errors.push(`${processedFile.name}: No se puede leer el archivo`)
+          continue
         }
 
         const imageInfo = await getImageInfo(processedFile)
@@ -111,7 +160,7 @@ export function PhotoUpload({
         })
 
         const photoData: PhotoData = {
-          file: processedFile,
+          file: processedFile, // Asegurar que siempre sea un File
           isPrimary: false,
           id: `photo-${Date.now()}-${i}-${Math.random().toString(36).substring(2, 8)}`,
         }
@@ -180,6 +229,7 @@ export function PhotoUpload({
           name: file.name,
           type: file.type,
           size: file.size,
+          isFile: file instanceof File,
         })
       })
       handleFiles(e.target.files)
@@ -202,8 +252,11 @@ export function PhotoUpload({
   const getPhotoPreviewUrl = (photo: PhotoData): string => {
     if (typeof photo.file === "string") {
       return photo.file // Already a URL
-    } else {
+    } else if (photo.file instanceof File) {
       return URL.createObjectURL(photo.file) // File object
+    } else {
+      console.error("Tipo de archivo no válido:", typeof photo.file, photo.file)
+      return "/placeholder.svg?height=300&width=300&text=Error"
     }
   }
 

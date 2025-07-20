@@ -47,25 +47,53 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "No se encontraron archivos" }, { status: 400 })
     }
 
+    // Validar que todos los elementos sean Files válidos
+    const validFiles: File[] = []
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i]
+
+      // Verificar que sea un File válido
+      if (!(file instanceof File)) {
+        console.error(`Elemento ${i + 1} no es un File válido:`, typeof file, file)
+        continue
+      }
+
+      // Verificar que tenga contenido
+      if (file.size === 0) {
+        console.error(`Archivo ${i + 1} está vacío:`, file.name)
+        continue
+      }
+
+      // Verificar que sea una imagen
+      if (!file.type.startsWith("image/")) {
+        console.error(`Archivo ${i + 1} no es una imagen:`, file.name, file.type)
+        continue
+      }
+
+      validFiles.push(file)
+    }
+
+    if (validFiles.length === 0) {
+      return NextResponse.json({ error: "No se encontraron archivos válidos" }, { status: 400 })
+    }
+
+    console.log(`Procesando ${validFiles.length} archivos válidos...`)
+
     const uploadedUrls: string[] = []
     const errors: string[] = []
 
     const baseTimestamp = Date.now()
 
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i]
-      console.log(`Procesando archivo ${i + 1}/${files.length}:`, {
+    for (let i = 0; i < validFiles.length; i++) {
+      const file = validFiles[i]
+      console.log(`Procesando archivo ${i + 1}/${validFiles.length}:`, {
         name: file.name,
         size: file.size,
         type: file.type,
+        constructor: file.constructor.name,
       })
 
       try {
-        if (!file.type.startsWith("image/")) {
-          errors.push(`Archivo ${file.name}: No es una imagen`)
-          continue
-        }
-
         const fileExtension = file.type.split("/")[1] || "jpg"
         const validExtensions = ["jpg", "jpeg", "png", "webp"]
         const finalExtension = validExtensions.includes(fileExtension) ? fileExtension : "jpg"
@@ -75,8 +103,24 @@ export async function POST(request: NextRequest) {
 
         console.log(`Subiendo archivo ${i + 1} como: ${fileName}`)
 
-        const arrayBuffer = await file.arrayBuffer()
+        // Verificar que podemos leer el archivo antes de subirlo
+        let arrayBuffer: ArrayBuffer
+        try {
+          arrayBuffer = await file.arrayBuffer()
+        } catch (bufferError) {
+          console.error(`Error leyendo arrayBuffer del archivo ${file.name}:`, bufferError)
+          errors.push(`Error leyendo ${file.name}: No se pudo procesar el archivo`)
+          continue
+        }
+
+        if (arrayBuffer.byteLength === 0) {
+          console.error(`ArrayBuffer vacío para archivo ${file.name}`)
+          errors.push(`Error procesando ${file.name}: Archivo vacío`)
+          continue
+        }
+
         const uint8Array = new Uint8Array(arrayBuffer)
+        console.log(`ArrayBuffer creado: ${uint8Array.length} bytes`)
 
         const blob = await put(fileName, uint8Array, {
           access: "public",
@@ -87,7 +131,7 @@ export async function POST(request: NextRequest) {
         uploadedUrls.push(blob.url)
         console.log(`✅ Archivo ${i + 1} subido exitosamente: ${blob.url}`)
 
-        if (i < files.length - 1) {
+        if (i < validFiles.length - 1) {
           await new Promise((resolve) => setTimeout(resolve, 100))
         }
       } catch (uploadError) {
@@ -103,7 +147,7 @@ export async function POST(request: NextRequest) {
       success: uploadedUrls.length > 0,
       uploadedUrls,
       errors: errors.length > 0 ? errors : undefined,
-      message: `${uploadedUrls.length} de ${files.length} fotos subidas correctamente`,
+      message: `${uploadedUrls.length} de ${validFiles.length} fotos subidas correctamente`,
     })
   } catch (error) {
     console.error("💥 Error general en upload-photos:", error)
