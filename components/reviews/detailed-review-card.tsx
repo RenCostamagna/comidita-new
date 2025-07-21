@@ -50,22 +50,21 @@ export function DetailedReviewCard({ review }: DetailedReviewCardProps) {
         })
     }
 
-    // Fallback a campos legacy
+    // Fallback a campos legacy - CONSIDERAR TODOS LOS CAMPOS DE FOTO
     const legacyPhotos = []
-    if (review.photo_1_url && review.photo_1_url.trim()) {
-      legacyPhotos.push({
-        photo_url: review.photo_1_url.trim(),
-        is_primary: true,
-        photo_order: 1,
-      })
-    }
-    if (review.photo_2_url && review.photo_2_url.trim() && review.photo_2_url !== review.photo_1_url) {
-      legacyPhotos.push({
-        photo_url: review.photo_2_url.trim(),
-        is_primary: false,
-        photo_order: 2,
-      })
-    }
+    const legacyFields = ["photo_1_url", "photo_2_url", "photo_3_url", "photo_4_url", "photo_5_url", "photo_6_url"]
+
+    legacyFields.forEach((field, index) => {
+      const photoUrl = review[field as keyof typeof review] as string
+      if (photoUrl && photoUrl.trim() && !legacyPhotos.some((p) => p.photo_url === photoUrl.trim())) {
+        legacyPhotos.push({
+          photo_url: photoUrl.trim(),
+          is_primary: index === 0,
+          photo_order: index + 1,
+        })
+      }
+    })
+
     return legacyPhotos
   }
 
