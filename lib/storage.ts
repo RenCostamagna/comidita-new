@@ -1,21 +1,15 @@
-import { autoCompressImage } from "./image-compression"
-
-// Función para subir una sola foto inmediatamente (estilo Twitter)
-export async function uploadSingleReviewPhoto(file: File, tempReviewId: string): Promise<string> {
-  console.log(`Iniciando upload individual de foto: ${file.name}`)
+// Función para subir una sola foto usando la API route
+export async function uploadSingleReviewPhoto(file: File, userId: string, reviewId: string): Promise<string> {
+  console.log(`Iniciando upload de foto individual para usuario ${userId}, reseña ${reviewId}`)
 
   try {
-    // Comprimir imagen automáticamente
-    console.log("🗜️ Comprimiendo imagen...")
-    const compressedFile = await autoCompressImage(file)
-
     const formData = new FormData()
-    formData.append("photo", compressedFile)
-    formData.append("tempReviewId", tempReviewId)
+    formData.append("photo", file)
+    formData.append("reviewId", reviewId)
 
-    console.log("Enviando request a /api/upload-single-photo...")
+    console.log("Enviando request a /api/upload-photos...")
 
-    const response = await fetch("/api/upload-single-photo", {
+    const response = await fetch("/api/upload-photos", {
       method: "POST",
       body: formData,
     })
@@ -31,17 +25,11 @@ export async function uploadSingleReviewPhoto(file: File, tempReviewId: string):
     const data = await response.json()
     console.log("Upload response:", data)
 
-    if (!data.success || !data.url) {
-      throw new Error("No se recibió URL válida del servidor")
+    if (!data.url) {
+      throw new Error("No se recibió URL de la imagen")
     }
 
-    // Verificar que la URL sea de Vercel Blob
-    if (data.url.includes("blob.vercel-storage.com")) {
-      console.log("✅ URL de Vercel Blob correcta:", data.url)
-    } else {
-      console.warn("⚠️ URL no es de Vercel Blob:", data.url)
-    }
-
+    console.log("✅ URL de Vercel Blob:", data.url)
     return data.url
   } catch (error) {
     console.error("Error en uploadSingleReviewPhoto:", error)
@@ -49,7 +37,7 @@ export async function uploadSingleReviewPhoto(file: File, tempReviewId: string):
   }
 }
 
-// Función para subir múltiples fotos de reseñas usando la API route (LEGACY - mantener por compatibilidad)
+// Función para subir múltiples fotos de reseñas usando la API route (DEPRECATED - usar uploadSingleReviewPhoto)
 export async function uploadMultipleReviewPhotos(files: File[], userId: string, reviewId: string): Promise<string[]> {
   console.log(`Iniciando upload de ${files.length} fotos para usuario ${userId}, reseña ${reviewId}`)
 
@@ -146,9 +134,4 @@ export function createLocalPhotoUrl(file: File, photoIndex: number): string {
     return URL.createObjectURL(file)
   }
   return `/placeholder.svg?height=300&width=300&text=Foto+${photoIndex}`
-}
-
-// Función para generar ID temporal único
-export function generateTempReviewId(): string {
-  return `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
 }

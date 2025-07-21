@@ -25,16 +25,6 @@ export const getRatingSliderColor = (rating: number): string => {
   return "bg-green-500"
 }
 
-// Función para obtener etiquetas de rating (RESTAURADA)
-export const getRatingLabel = (rating: number): string => {
-  if (rating <= 2) return "Muy malo"
-  if (rating <= 4) return "Malo"
-  if (rating <= 6) return "Regular"
-  if (rating <= 8) return "Bueno"
-  if (rating <= 9) return "Muy bueno"
-  return "Excelente"
-}
-
 // Array de todas las clases de colores para asegurar que Tailwind las incluya
 export const ALL_RATING_COLORS = [
   // Text colors

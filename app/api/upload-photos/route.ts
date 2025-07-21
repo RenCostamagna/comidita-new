@@ -4,7 +4,7 @@ import { createClient } from "@/lib/supabase/server"
 
 export async function POST(request: NextRequest) {
   try {
-    console.log("=== INICIO UPLOAD PHOTOS API ===")
+    console.log("=== INICIO UPLOAD SINGLE PHOTO API ===")
 
     // Verificar que tenemos el token de Blob
     if (!process.env.BLOB_READ_WRITE_TOKEN) {
@@ -30,88 +30,55 @@ export async function POST(request: NextRequest) {
 
     // Obtener datos del formulario
     const formData = await request.formData()
-
-    // Debug: mostrar todas las claves del FormData
-    console.log("Claves en FormData:", Array.from(formData.keys()))
-
+    const file = formData.get("photo") as File
     const reviewId = formData.get("reviewId") as string
-    console.log("Review ID recibido:", reviewId)
+
+    console.log("Archivo recibido:", {
+      name: file?.name,
+      size: file?.size,
+      type: file?.type,
+    })
+
+    if (!file) {
+      return NextResponse.json({ error: "No se encontró archivo" }, { status: 400 })
+    }
 
     if (!reviewId) {
       return NextResponse.json({ error: "ID de reseña requerido" }, { status: 400 })
     }
 
-    // Obtener archivos - probar diferentes nombres de campo
-    let files = formData.getAll("photos") as File[]
-    if (files.length === 0) {
-      files = formData.getAll("files") as File[]
+    // Validar archivo
+    if (!file.type.startsWith("image/")) {
+      return NextResponse.json({ error: "El archivo no es una imagen" }, { status: 400 })
     }
 
-    console.log("Número de archivos encontrados:", files.length)
-
-    if (files.length === 0) {
-      console.log("No se encontraron archivos en FormData")
-      return NextResponse.json({ error: "No se encontraron archivos" }, { status: 400 })
+    if (file.size > 10 * 1024 * 1024) {
+      return NextResponse.json({ error: "Archivo muy grande (máximo 10MB)" }, { status: 400 })
     }
 
-    const uploadedUrls: string[] = []
-    const errors: string[] = []
+    // Generar nombre único
+    const timestamp = Date.now()
+    const randomSuffix = Math.random().toString(36).substring(2, 8)
+    const fileExtension = file.name.split(".").pop()?.toLowerCase() || "jpg"
+    const fileName = `review-photos/${user.id}_${reviewId}_${timestamp}_${randomSuffix}.${fileExtension}`
 
-    // Procesar cada archivo
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i]
-      console.log(`Procesando archivo ${i + 1}:`, {
-        name: file.name,
-        size: file.size,
-        type: file.type,
-      })
+    console.log(`Subiendo archivo como: ${fileName}`)
 
-      try {
-        // Validar archivo
-        if (!file.type.startsWith("image/")) {
-          errors.push(`Archivo ${file.name}: No es una imagen`)
-          continue
-        }
+    // Subir a Vercel Blob
+    const blob = await put(fileName, file, {
+      access: "public",
+      addRandomSuffix: false,
+    })
 
-        if (file.size > 10 * 1024 * 1024) {
-          errors.push(`Archivo ${file.name}: Muy grande (máximo 10MB)`)
-          continue
-        }
-
-        // Generar nombre único
-        const timestamp = Date.now()
-        const randomSuffix = Math.random().toString(36).substring(2, 8)
-        const fileExtension = file.name.split(".").pop()?.toLowerCase() || "jpg"
-        const fileName = `review-photos/${user.id}_${reviewId}_${timestamp}_${randomSuffix}.${fileExtension}`
-
-        console.log(`Subiendo archivo como: ${fileName}`)
-
-        // Subir a Vercel Blob
-        const blob = await put(fileName, file, {
-          access: "public",
-          addRandomSuffix: false,
-        })
-
-        uploadedUrls.push(blob.url)
-        console.log(`Archivo subido exitosamente: ${blob.url}`)
-      } catch (uploadError) {
-        console.error(`Error subiendo archivo ${file.name}:`, uploadError)
-        errors.push(
-          `Error subiendo ${file.name}: ${uploadError instanceof Error ? uploadError.message : "Error desconocido"}`,
-        )
-      }
-    }
-
-    console.log(`Resultado final: ${uploadedUrls.length} archivos subidos, ${errors.length} errores`)
+    console.log(`Archivo subido exitosamente: ${blob.url}`)
 
     return NextResponse.json({
-      success: uploadedUrls.length > 0,
-      uploadedUrls,
-      errors: errors.length > 0 ? errors : undefined,
-      message: `${uploadedUrls.length} de ${files.length} fotos subidas correctamente`,
+      success: true,
+      url: blob.url,
+      message: "Foto subida correctamente",
     })
   } catch (error) {
-    console.error("Error general en upload-photos:", error)
+    console.error("Error en upload-photos:", error)
     return NextResponse.json(
       {
         error: "Error interno del servidor",

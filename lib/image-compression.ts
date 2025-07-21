@@ -1,109 +1,178 @@
-export async function compressImage(file: File): Promise<File> {
+// Tipos para la información de imagen
+export interface ImageInfo {
+  width: number
+  height: number
+  size: number
+  type: string
+  name: string
+}
+
+// Opciones de compresión
+export interface CompressionOptions {
+  maxWidth?: number
+  maxHeight?: number
+  quality?: number
+  maxSizeKB?: number
+  outputFormat?: "jpeg" | "png" | "webp"
+}
+
+// Validación de archivos de imagen
+export interface ValidationResult {
+  isValid: boolean
+  error?: string
+}
+
+// Función para validar archivos de imagen
+export function validateImageFile(
+  file: File,
+  maxSizePerPhoto = 10,
+  acceptedFormats: string[] = ["image/jpeg", "image/jpg", "image/png", "image/webp"],
+): ValidationResult {
+  // Verificar que es un archivo
+  if (!file) {
+    return { isValid: false, error: "No se proporcionó archivo" }
+  }
+
+  // Verificar tipo de archivo
+  if (!file.type.startsWith("image/")) {
+    return { isValid: false, error: "El archivo no es una imagen" }
+  }
+
+  // Verificar tamaño (convertir MB a bytes)
+  const maxSize = maxSizePerPhoto * 1024 * 1024
+  if (file.size > maxSize) {
+    return { isValid: false, error: `El archivo es muy grande (máximo ${maxSizePerPhoto}MB)` }
+  }
+
+  // Verificar tipos permitidos
+  if (!acceptedFormats.includes(file.type)) {
+    return { isValid: false, error: "Tipo de archivo no permitido. Use JPG, PNG o WebP" }
+  }
+
+  return { isValid: true }
+}
+
+// Función para obtener información de la imagen
+export async function getImageInfo(file: File): Promise<ImageInfo> {
   return new Promise((resolve, reject) => {
-    const canvas = document.createElement("canvas")
-    const ctx = canvas.getContext("2d")
     const img = new Image()
+    const url = URL.createObjectURL(file)
 
     img.onload = () => {
-      try {
-        // Determinar configuración de compresión basada en el tamaño del archivo
-        let maxWidth = 1920
-        let maxHeight = 1080
-        let quality = 0.8
-
-        const fileSizeMB = file.size / (1024 * 1024)
-
-        if (fileSizeMB > 5) {
-          // Archivos muy grandes: compresión agresiva
-          maxWidth = 1280
-          maxHeight = 720
-          quality = 0.6
-        } else if (fileSizeMB > 2) {
-          // Archivos medianos: compresión moderada
-          maxWidth = 1600
-          maxHeight = 900
-          quality = 0.7
-        } else if (fileSizeMB > 1) {
-          // Archivos pequeños: compresión ligera
-          quality = 0.8
-        } else {
-          // Archivos muy pequeños: mínima compresión
-          quality = 0.9
-        }
-
-        // Calcular nuevas dimensiones manteniendo aspect ratio
-        let { width, height } = img
-
-        if (width > maxWidth || height > maxHeight) {
-          const aspectRatio = width / height
-
-          if (width > height) {
-            width = maxWidth
-            height = width / aspectRatio
-          } else {
-            height = maxHeight
-            width = height * aspectRatio
-          }
-        }
-
-        // Configurar canvas
-        canvas.width = width
-        canvas.height = height
-
-        if (!ctx) {
-          throw new Error("No se pudo obtener el contexto del canvas")
-        }
-
-        // Dibujar imagen redimensionada
-        ctx.drawImage(img, 0, 0, width, height)
-
-        // Convertir a blob con compresión
-        canvas.toBlob(
-          (blob) => {
-            if (!blob) {
-              reject(new Error("Error al comprimir la imagen"))
-              return
-            }
-
-            // Crear nuevo archivo con el blob comprimido
-            const compressedFile = new File([blob], file.name, {
-              type: "image/jpeg",
-              lastModified: Date.now(),
-            })
-
-            console.log(`🗜️ Compresión completada:`)
-            console.log(`   Original: ${(file.size / 1024 / 1024).toFixed(2)}MB`)
-            console.log(`   Comprimido: ${(compressedFile.size / 1024 / 1024).toFixed(2)}MB`)
-            console.log(`   Reducción: ${((1 - compressedFile.size / file.size) * 100).toFixed(1)}%`)
-            console.log(`   Dimensiones: ${width}x${height}`)
-            console.log(`   Calidad: ${(quality * 100).toFixed(0)}%`)
-
-            resolve(compressedFile)
-          },
-          "image/jpeg",
-          quality,
-        )
-      } catch (error) {
-        reject(error)
-      }
+      URL.revokeObjectURL(url)
+      resolve({
+        width: img.naturalWidth,
+        height: img.naturalHeight,
+        size: file.size,
+        type: file.type,
+        name: file.name,
+      })
     }
 
     img.onerror = () => {
-      reject(new Error("Error al cargar la imagen"))
+      URL.revokeObjectURL(url)
+      reject(new Error("Error cargando la imagen"))
     }
 
-    // Cargar imagen
+    img.src = url
+  })
+}
+
+// Función para comprimir imagen usando Canvas (solo cliente) - MEJORADA
+export async function compressImageAdvanced(file: File, options: CompressionOptions = {}): Promise<File> {
+  const { maxWidth = 1200, maxHeight = 1200, quality = 0.85, maxSizeKB = 800, outputFormat = "jpeg" } = options
+
+  return new Promise((resolve, reject) => {
+    const img = new Image()
+    const canvas = document.createElement("canvas")
+    const ctx = canvas.getContext("2d")
+
+    if (!ctx) {
+      reject(new Error("No se pudo crear contexto de canvas"))
+      return
+    }
+
+    img.onload = () => {
+      // Calcular nuevas dimensiones manteniendo proporción
+      let { width, height } = img
+
+      if (width > maxWidth) {
+        height = (height * maxWidth) / width
+        width = maxWidth
+      }
+
+      if (height > maxHeight) {
+        width = (width * maxHeight) / height
+        height = maxHeight
+      }
+
+      // Configurar canvas
+      canvas.width = width
+      canvas.height = height
+
+      // Mejorar calidad de renderizado
+      ctx.imageSmoothingEnabled = true
+      ctx.imageSmoothingQuality = "high"
+
+      // Dibujar imagen redimensionada
+      ctx.drawImage(img, 0, 0, width, height)
+
+      // Función para intentar diferentes calidades hasta conseguir el tamaño deseado
+      const tryCompress = (currentQuality: number): void => {
+        canvas.toBlob(
+          (blob) => {
+            if (!blob) {
+              reject(new Error("Error comprimiendo imagen"))
+              return
+            }
+
+            const sizeKB = blob.size / 1024
+
+            // Si el tamaño es aceptable o ya estamos en calidad muy baja, usar este resultado
+            if (sizeKB <= maxSizeKB || currentQuality <= 0.3) {
+              const compressedFile = new File([blob], file.name, {
+                type: `image/${outputFormat}`,
+                lastModified: Date.now(),
+              })
+
+              console.log(`✅ Imagen comprimida: ${file.name}`, {
+                originalSize: `${(file.size / 1024).toFixed(1)}KB`,
+                compressedSize: `${sizeKB.toFixed(1)}KB`,
+                reduction: `${(((file.size - blob.size) / file.size) * 100).toFixed(1)}%`,
+                quality: currentQuality,
+                dimensions: `${width}x${height}`,
+              })
+
+              resolve(compressedFile)
+            } else {
+              // Reducir calidad y volver a intentar
+              tryCompress(currentQuality - 0.1)
+            }
+          },
+          `image/${outputFormat}`,
+          currentQuality,
+        )
+      }
+
+      // Comenzar con la calidad especificada
+      tryCompress(quality)
+    }
+
+    img.onerror = () => {
+      reject(new Error("Error cargando imagen para comprimir"))
+    }
+
     img.src = URL.createObjectURL(file)
   })
 }
 
-export async function autoCompressImage(file: File): Promise<File> {
-  // Si el archivo es menor a 500KB, no comprimir
-  if (file.size < 500 * 1024) {
-    console.log(`📸 Archivo pequeño (${(file.size / 1024).toFixed(0)}KB), no se comprime`)
-    return file
-  }
-
-  // Comprimir archivos más grandes
-  return compressImage(file)
+// Función rápida para comprimir imagen para mobile
+export async function compressForMobile(file: File): Promise<File> {
+  return compressImageAdvanced(file, {
+    maxWidth: 800,
+    maxHeight: 800,
+    quality: 0.8,
+    maxSizeKB: 500,
+    outputFormat: "jpeg",
+  })
 }

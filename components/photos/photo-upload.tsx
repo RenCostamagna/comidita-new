@@ -1,374 +1,561 @@
 "use client"
 
 import type React from "react"
-import { useState, useRef } from "react"
+
+import { useState, useRef, useCallback } from "react"
 import { Button } from "@/components/ui/button"
-import { Card } from "@/components/ui/card"
-import { Camera, X, Loader2, AlertCircle, Check } from "lucide-react"
-import { autoCompressImage } from "@/lib/image-compression"
+import { Card, CardContent } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
+import { X, Upload, Camera, AlertCircle, Plus, GripVertical, CheckCircle } from "lucide-react"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { validateImageFile, compressForMobile } from "@/lib/image-compression"
+import { uploadSingleReviewPhoto, deleteReviewPhoto } from "@/lib/storage"
+
+interface PhotoData {
+  file: File | string
+  isPrimary: boolean
+  id?: string
+  url?: string // URL ya subida a Vercel Blob
+  isUploading?: boolean
+  uploadError?: string
+  previewUrl?: string // URL local para preview
+}
 
 interface PhotoUploadProps {
-  onPhotosChange: (photos: { url: string; isUploading: boolean; error?: string }[]) => void
+  photos: PhotoData[]
+  onPhotosChange: (photos: PhotoData[]) => void
   maxPhotos?: number
-  existingPhotos?: string[]
+  maxSizePerPhoto?: number // in MB
+  acceptedFormats?: string[]
+  userId?: string
 }
 
-interface PhotoState {
-  id: string
-  file?: File
-  previewUrl: string
-  uploadedUrl?: string
-  isUploading: boolean
-  error?: string
-  compressionStats?: {
-    originalSize: number
-    compressedSize: number
-    compressionRatio: string
-  }
-}
+export function PhotoUpload({
+  photos,
+  onPhotosChange,
+  maxPhotos = 6,
+  maxSizePerPhoto = 10,
+  acceptedFormats = ["image/jpeg", "image/jpg", "image/png", "image/webp"],
+  userId = "temp-user",
+}: PhotoUploadProps) {
+  const [dragActive, setDragActive] = useState(false)
+  const [uploadError, setUploadError] = useState<string | null>(null)
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null)
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null)
 
-export function PhotoUpload({ onPhotosChange, maxPhotos = 5, existingPhotos = [] }: PhotoUploadProps) {
-  const [photos, setPhotos] = useState<PhotoState[]>(() => {
-    // Inicializar con fotos existentes
-    return existingPhotos.map((url, index) => ({
-      id: `existing-${index}`,
-      previewUrl: url,
-      uploadedUrl: url,
-      isUploading: false,
-    }))
-  })
+  // Touch/mobile drag state
+  const [touchDragIndex, setTouchDragIndex] = useState<number | null>(null)
+  const [touchStartPos, setTouchStartPos] = useState<{ x: number; y: number } | null>(null)
+  const [isDragging, setIsDragging] = useState(false)
 
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  const updatePhotosCallback = (updatedPhotos: PhotoState[]) => {
-    const photosForParent = updatedPhotos.map((photo) => ({
-      url: photo.uploadedUrl || photo.previewUrl,
-      isUploading: photo.isUploading,
-      error: photo.error,
-    }))
-    onPhotosChange(photosForParent)
+  // Función para subir una imagen individual
+  const uploadSinglePhoto = async (file: File, photoId: string): Promise<string> => {
+    try {
+      console.log(`🔄 Iniciando upload de ${file.name}...`)
+
+      // Comprimir imagen antes de subir
+      const compressedFile = await compressForMobile(file)
+      console.log(`📦 Imagen comprimida: ${file.name}`, {
+        originalSize: `${(file.size / 1024).toFixed(1)}KB`,
+        compressedSize: `${(compressedFile.size / 1024).toFixed(1)}KB`,
+      })
+
+      // Generar ID temporal para la reseña
+      const tempReviewId = `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+
+      const url = await uploadSingleReviewPhoto(compressedFile, userId, tempReviewId)
+      console.log(`✅ Foto subida exitosamente: ${url}`)
+
+      return url
+    } catch (error) {
+      console.error(`❌ Error subiendo ${file.name}:`, error)
+      throw error
+    }
   }
 
-  const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(event.target.files || [])
+  const handleFiles = async (fileList: FileList) => {
+    setUploadError(null)
 
-    if (files.length === 0) return
-
-    // Verificar límite de fotos
-    if (photos.length + files.length > maxPhotos) {
-      alert(`Solo puedes subir un máximo de ${maxPhotos} fotos`)
+    // Verificar límite total de fotos
+    if (photos.length + fileList.length > maxPhotos) {
+      setUploadError(`Máximo ${maxPhotos} fotos permitidas`)
       return
     }
 
+    const newPhotoData: PhotoData[] = []
+
     // Procesar cada archivo
-    for (const file of files) {
-      // Validar tipo de archivo
-      if (!file.type.startsWith("image/")) {
-        alert(`${file.name} no es una imagen válida`)
-        continue
-      }
+    for (let i = 0; i < fileList.length; i++) {
+      const file = fileList[i]
 
-      // Validar tamaño (máximo 10MB)
-      if (file.size > 10 * 1024 * 1024) {
-        alert(`${file.name} es demasiado grande (máximo 10MB)`)
-        continue
-      }
-
-      const photoId = `${Date.now()}-${Math.random().toString(36).substring(2, 15)}`
-      const previewUrl = URL.createObjectURL(file)
-
-      // Agregar foto con estado de carga
-      const newPhoto: PhotoState = {
-        id: photoId,
-        file,
-        previewUrl,
-        isUploading: true,
-      }
-
-      setPhotos((prev) => {
-        const updated = [...prev, newPhoto]
-        updatePhotosCallback(updated)
-        return updated
-      })
-
-      // Comprimir y subir en background
       try {
-        console.log(`📸 Iniciando procesamiento de: ${file.name}`)
-
-        // Comprimir imagen
-        const compressedFile = await autoCompressImage(file)
-
-        const compressionStats = {
-          originalSize: file.size,
-          compressedSize: compressedFile.size,
-          compressionRatio: ((1 - compressedFile.size / file.size) * 100).toFixed(1),
+        // Validar archivo
+        const validation = validateImageFile(file, maxSizePerPhoto, acceptedFormats)
+        if (!validation.isValid) {
+          setUploadError(`${file.name}: ${validation.error}`)
+          continue
         }
 
-        // Subir imagen comprimida
-        const formData = new FormData()
-        formData.append("file", compressedFile)
+        // Crear preview URL local
+        const previewUrl = URL.createObjectURL(file)
 
-        const response = await fetch("/api/upload-single-photo", {
-          method: "POST",
-          body: formData,
-        })
-
-        const result = await response.json()
-
-        if (!response.ok) {
-          throw new Error(result.error || "Error al subir la imagen")
+        // Crear PhotoData object con estado de "subiendo"
+        const photoId = `photo-${Date.now()}-${i}`
+        const photoData: PhotoData = {
+          file: file,
+          isPrimary: false,
+          id: photoId,
+          isUploading: true,
+          previewUrl: previewUrl,
         }
 
-        console.log(`✅ Imagen subida exitosamente: ${result.url}`)
-
-        // Actualizar estado con URL de la imagen subida
-        setPhotos((prev) => {
-          const updated = prev.map((photo) =>
-            photo.id === photoId
-              ? {
-                  ...photo,
-                  uploadedUrl: result.url,
-                  isUploading: false,
-                  compressionStats,
-                }
-              : photo,
-          )
-          updatePhotosCallback(updated)
-          return updated
-        })
+        newPhotoData.push(photoData)
       } catch (error) {
-        console.error(`❌ Error subiendo ${file.name}:`, error)
-
-        // Actualizar estado con error
-        setPhotos((prev) => {
-          const updated = prev.map((photo) =>
-            photo.id === photoId
-              ? {
-                  ...photo,
-                  isUploading: false,
-                  error: error instanceof Error ? error.message : "Error desconocido",
-                }
-              : photo,
-          )
-          updatePhotosCallback(updated)
-          return updated
-        })
+        console.error(`Error procesando ${file.name}:`, error)
+        setUploadError(`${file.name}: Error al procesar`)
       }
     }
 
-    // Limpiar input
-    if (fileInputRef.current) {
-      fileInputRef.current.value = ""
+    if (newPhotoData.length > 0) {
+      // Agregar fotos con estado "subiendo" inmediatamente
+      const updatedPhotos = updatePrimaryPhoto([...photos, ...newPhotoData])
+      onPhotosChange(updatedPhotos)
+
+      // Subir cada foto individualmente
+      for (let i = 0; i < newPhotoData.length; i++) {
+        const photoData = newPhotoData[i]
+        const photoIndex = photos.length + i
+
+        try {
+          const uploadedUrl = await uploadSinglePhoto(photoData.file as File, photoData.id!)
+
+          // Actualizar el estado de la foto con la URL subida
+          onPhotosChange((prevPhotos) => {
+            const newPhotos = [...prevPhotos]
+            const targetPhoto = newPhotos.find((p) => p.id === photoData.id)
+            if (targetPhoto) {
+              targetPhoto.url = uploadedUrl
+              targetPhoto.isUploading = false
+              targetPhoto.uploadError = undefined
+            }
+            return newPhotos
+          })
+        } catch (error) {
+          console.error(`Error subiendo foto ${photoData.id}:`, error)
+
+          // Marcar foto con error
+          onPhotosChange((prevPhotos) => {
+            const newPhotos = [...prevPhotos]
+            const targetPhoto = newPhotos.find((p) => p.id === photoData.id)
+            if (targetPhoto) {
+              targetPhoto.isUploading = false
+              targetPhoto.uploadError = error instanceof Error ? error.message : "Error desconocido"
+            }
+            return newPhotos
+          })
+        }
+      }
     }
   }
 
-  const removePhoto = (photoId: string) => {
-    setPhotos((prev) => {
-      // Limpiar URL de preview si existe
-      const photoToRemove = prev.find((p) => p.id === photoId)
-      if (photoToRemove?.previewUrl && photoToRemove.previewUrl.startsWith("blob:")) {
-        URL.revokeObjectURL(photoToRemove.previewUrl)
-      }
-
-      const updated = prev.filter((photo) => photo.id !== photoId)
-      updatePhotosCallback(updated)
-      return updated
-    })
+  // Update primary photo based on position (first photo is always primary)
+  const updatePrimaryPhoto = (photoList: PhotoData[]): PhotoData[] => {
+    return photoList.map((photo, index) => ({
+      ...photo,
+      isPrimary: index === 0,
+    }))
   }
 
-  const retryUpload = async (photoId: string) => {
-    const photo = photos.find((p) => p.id === photoId)
-    if (!photo?.file) return
-
-    // Resetear estado de error y marcar como subiendo
-    setPhotos((prev) => {
-      const updated = prev.map((p) => (p.id === photoId ? { ...p, isUploading: true, error: undefined } : p))
-      updatePhotosCallback(updated)
-      return updated
-    })
-
-    // Intentar subir nuevamente
-    try {
-      const compressedFile = await autoCompressImage(photo.file)
-
-      const formData = new FormData()
-      formData.append("file", compressedFile)
-
-      const response = await fetch("/api/upload-single-photo", {
-        method: "POST",
-        body: formData,
-      })
-
-      const result = await response.json()
-
-      if (!response.ok) {
-        throw new Error(result.error || "Error al subir la imagen")
-      }
-
-      // Actualizar con éxito
-      setPhotos((prev) => {
-        const updated = prev.map((p) => (p.id === photoId ? { ...p, uploadedUrl: result.url, isUploading: false } : p))
-        updatePhotosCallback(updated)
-        return updated
-      })
-    } catch (error) {
-      // Actualizar con error
-      setPhotos((prev) => {
-        const updated = prev.map((p) =>
-          p.id === photoId
-            ? {
-                ...p,
-                isUploading: false,
-                error: error instanceof Error ? error.message : "Error desconocido",
-              }
-            : p,
-        )
-        updatePhotosCallback(updated)
-        return updated
-      })
+  const handleDrag = (e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    if (e.type === "dragenter" || e.type === "dragover") {
+      setDragActive(true)
+    } else if (e.type === "dragleave") {
+      setDragActive(false)
     }
   }
 
-  const hasUploadingPhotos = photos.some((photo) => photo.isUploading)
-  const hasErrorPhotos = photos.some((photo) => photo.error)
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setDragActive(false)
+
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      handleFiles(e.dataTransfer.files)
+    }
+  }
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      handleFiles(e.target.files)
+    }
+  }
+
+  const removePhoto = async (index: number) => {
+    const photoToRemove = photos[index]
+
+    // Si la foto ya fue subida, eliminarla del storage
+    if (photoToRemove.url) {
+      try {
+        await deleteReviewPhoto(photoToRemove.url)
+        console.log(`🗑️ Foto eliminada del storage: ${photoToRemove.url}`)
+      } catch (error) {
+        console.error("Error eliminando foto del storage:", error)
+      }
+    }
+
+    // Limpiar preview URL si existe
+    if (photoToRemove.previewUrl && photoToRemove.previewUrl.startsWith("blob:")) {
+      URL.revokeObjectURL(photoToRemove.previewUrl)
+    }
+
+    const newPhotos = photos.filter((_, i) => i !== index)
+    const updatedPhotos = updatePrimaryPhoto(newPhotos)
+    onPhotosChange(updatedPhotos)
+    console.log(`🗑️ Foto ${index + 1} eliminada`)
+  }
+
+  const openFileDialog = () => {
+    fileInputRef.current?.click()
+  }
+
+  const getPhotoPreviewUrl = (photo: PhotoData): string => {
+    // Usar preview URL local si está disponible
+    if (photo.previewUrl) {
+      return photo.previewUrl
+    }
+
+    // Usar URL subida si está disponible
+    if (photo.url) {
+      return photo.url
+    }
+
+    // Fallback para strings (URLs existentes)
+    if (typeof photo.file === "string") {
+      return photo.file
+    }
+
+    // Crear preview URL para File objects
+    if (photo.file instanceof File) {
+      return URL.createObjectURL(photo.file)
+    }
+
+    return "/placeholder.svg?height=300&width=300&text=Error"
+  }
+
+  // Reorder photos function
+  const reorderPhotos = useCallback(
+    (fromIndex: number, toIndex: number) => {
+      if (fromIndex === toIndex) return
+
+      const newPhotos = [...photos]
+      const draggedPhoto = newPhotos[fromIndex]
+
+      // Remove dragged photo from its original position
+      newPhotos.splice(fromIndex, 1)
+
+      // Insert at new position
+      newPhotos.splice(toIndex, 0, draggedPhoto)
+
+      // Update primary photo based on new positions
+      const updatedPhotos = updatePrimaryPhoto(newPhotos)
+      onPhotosChange(updatedPhotos)
+
+      console.log(`📷 Foto movida de posición ${fromIndex + 1} a ${toIndex + 1}`)
+    },
+    [photos, onPhotosChange],
+  )
+
+  // Desktop drag handlers
+  const handlePhotosDragStart = (e: React.DragEvent, index: number) => {
+    setDraggedIndex(index)
+    e.dataTransfer.effectAllowed = "move"
+    e.dataTransfer.setData("text/html", "photo-reorder")
+  }
+
+  const handlePhotosDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault()
+    e.dataTransfer.dropEffect = "move"
+
+    // Only handle photo reordering, not file uploads
+    if (e.dataTransfer.types.includes("text/html")) {
+      setDragOverIndex(index)
+    }
+  }
+
+  const handlePhotosDragLeave = () => {
+    setDragOverIndex(null)
+  }
+
+  const handlePhotosDrop = (e: React.DragEvent, dropIndex: number) => {
+    e.preventDefault()
+    e.stopPropagation()
+
+    // Only handle photo reordering
+    if (draggedIndex !== null && e.dataTransfer.getData("text/html") === "photo-reorder") {
+      reorderPhotos(draggedIndex, dropIndex)
+    }
+
+    setDraggedIndex(null)
+    setDragOverIndex(null)
+  }
+
+  const handlePhotosDragEnd = () => {
+    setDraggedIndex(null)
+    setDragOverIndex(null)
+  }
+
+  // Mobile touch handlers
+  const handleTouchStart = (e: React.TouchEvent, index: number) => {
+    const touch = e.touches[0]
+    setTouchStartPos({ x: touch.clientX, y: touch.clientY })
+    setTouchDragIndex(index)
+
+    // Add a small delay to distinguish between tap and drag
+    setTimeout(() => {
+      if (touchDragIndex === index && touchStartPos) {
+        setIsDragging(true)
+      }
+    }, 150)
+  }
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (!isDragging || touchDragIndex === null || !touchStartPos) return
+
+    e.preventDefault() // Prevent scrolling while dragging
+
+    const touch = e.touches[0]
+    const deltaX = Math.abs(touch.clientX - touchStartPos.x)
+    const deltaY = Math.abs(touch.clientY - touchStartPos.y)
+
+    // Only start dragging if moved significantly
+    if (deltaX > 10 || deltaY > 10) {
+      // Find which photo we're over
+      const element = document.elementFromPoint(touch.clientX, touch.clientY)
+      const photoElement = element?.closest("[data-photo-index]")
+
+      if (photoElement) {
+        const overIndex = Number.parseInt(photoElement.getAttribute("data-photo-index") || "0")
+        setDragOverIndex(overIndex)
+      }
+    }
+  }
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (!isDragging || touchDragIndex === null) {
+      // Reset states for tap
+      setTouchDragIndex(null)
+      setTouchStartPos(null)
+      setIsDragging(false)
+      return
+    }
+
+    // Handle drop
+    if (dragOverIndex !== null && dragOverIndex !== touchDragIndex) {
+      reorderPhotos(touchDragIndex, dragOverIndex)
+    }
+
+    // Reset all touch states
+    setTouchDragIndex(null)
+    setTouchStartPos(null)
+    setIsDragging(false)
+    setDragOverIndex(null)
+  }
+
+  const handleTouchCancel = () => {
+    setTouchDragIndex(null)
+    setTouchStartPos(null)
+    setIsDragging(false)
+    setDragOverIndex(null)
+  }
 
   return (
     <div className="space-y-4">
-      {/* Botón para agregar fotos */}
-      {photos.length < maxPhotos && (
-        <div className="flex gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => fileInputRef.current?.click()}
-            className="flex-1"
-            disabled={hasUploadingPhotos}
-          >
-            <Camera className="h-4 w-4 mr-2" />
-            {photos.length === 0 ? "Agregar fotos" : "Agregar más fotos"}
-          </Button>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/*"
-            multiple
-            onChange={handleFileSelect}
-            className="hidden"
-          />
-        </div>
-      )}
+      {/* Upload Area */}
+      <Card
+        className={`border-2 border-dashed transition-colors cursor-pointer ${
+          dragActive
+            ? "border-primary bg-primary/5"
+            : photos.length >= maxPhotos
+              ? "border-muted bg-muted/20"
+              : "border-muted-foreground/25 hover:border-primary hover:bg-primary/5"
+        }`}
+        onDragEnter={handleDrag}
+        onDragLeave={handleDrag}
+        onDragOver={handleDrag}
+        onDrop={handleDrop}
+        onClick={photos.length < maxPhotos ? openFileDialog : undefined}
+      >
+        <CardContent className="p-6">
+          {photos.length === 0 ? (
+            // Empty state - show upload instructions
+            <div className="flex flex-col items-center justify-center py-8 text-center space-y-4">
+              <div className="flex items-center justify-center space-x-2">
+                <Upload className="h-8 w-8 text-muted-foreground" />
+                <Camera className="h-8 w-8 text-muted-foreground" />
+              </div>
+              <div className="space-y-2">
+                <p className="text-sm font-medium">Arrastra fotos aquí o haz clic para seleccionar</p>
+                <p className="text-xs text-muted-foreground">
+                  Las fotos se suben automáticamente y se comprimen para mobile
+                </p>
+              </div>
+            </div>
+          ) : (
+            // Photos grid with add more option
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                {photos.map((photo, index) => (
+                  <div
+                    key={photo.id || index}
+                    data-photo-index={index}
+                    className={`relative group ${dragOverIndex === index ? "ring-2 ring-primary ring-offset-2" : ""} ${
+                      draggedIndex === index || touchDragIndex === index ? "opacity-50" : ""
+                    } ${isDragging && touchDragIndex === index ? "scale-105 z-10" : ""} transition-all duration-200`}
+                    draggable={!photo.isUploading}
+                    onDragStart={(e) => handlePhotosDragStart(e, index)}
+                    onDragOver={(e) => handlePhotosDragOver(e, index)}
+                    onDragLeave={handlePhotosDragLeave}
+                    onDrop={(e) => handlePhotosDrop(e, index)}
+                    onDragEnd={handlePhotosDragEnd}
+                    onTouchStart={(e) => handleTouchStart(e, index)}
+                    onTouchMove={handleTouchMove}
+                    onTouchEnd={handleTouchEnd}
+                    onTouchCancel={handleTouchCancel}
+                  >
+                    <div className="aspect-square relative overflow-hidden rounded-lg border cursor-move touch-none">
+                      <img
+                        src={getPhotoPreviewUrl(photo) || "/placeholder.svg"}
+                        alt={`Preview ${index + 1}`}
+                        className="w-full h-full object-cover pointer-events-none"
+                      />
 
-      {/* Grid de fotos */}
-      {photos.length > 0 && (
-        <div className="grid grid-cols-2 gap-3">
-          {photos.map((photo, index) => (
-            <Card key={photo.id} className="relative overflow-hidden">
-              <div className="aspect-square relative">
-                <img
-                  src={photo.previewUrl || "/placeholder.svg"}
-                  alt={`Foto ${index + 1}`}
-                  className="w-full h-full object-cover"
-                  crossOrigin="anonymous"
-                />
+                      {/* Upload overlay */}
+                      {photo.isUploading && (
+                        <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                          <div className="text-center text-white">
+                            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white mx-auto mb-2" />
+                            <p className="text-xs">Subiendo...</p>
+                          </div>
+                        </div>
+                      )}
 
-                {/* Overlay de estado */}
-                <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-                  {photo.isUploading && (
-                    <div className="text-white text-center">
-                      <Loader2 className="h-6 w-6 animate-spin mx-auto mb-1" />
-                      <span className="text-xs">Subiendo...</span>
-                    </div>
-                  )}
+                      {/* Success overlay */}
+                      {photo.url && !photo.isUploading && (
+                        <div className="absolute top-2 left-2">
+                          <div className="bg-green-500 rounded-full p-1">
+                            <CheckCircle className="h-3 w-3 text-white" />
+                          </div>
+                        </div>
+                      )}
 
-                  {photo.error && (
-                    <div className="text-white text-center">
-                      <AlertCircle className="h-6 w-6 mx-auto mb-1 text-red-400" />
-                      <span className="text-xs">Error</span>
+                      {/* Error overlay */}
+                      {photo.uploadError && (
+                        <div className="absolute inset-0 bg-red-500/20 border-2 border-red-500 rounded-lg flex items-center justify-center">
+                          <div className="text-center text-red-700">
+                            <AlertCircle className="h-6 w-6 mx-auto mb-1" />
+                            <p className="text-xs">Error</p>
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors" />
+
+                      {/* Drag handle */}
+                      {!photo.isUploading && (
+                        <div className="absolute top-2 left-2 opacity-0 group-hover:opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
+                          <div className="bg-black/50 rounded p-1">
+                            <GripVertical className="h-3 w-3 text-white" />
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Delete button */}
                       <Button
+                        variant="destructive"
                         size="sm"
-                        variant="secondary"
-                        onClick={() => retryUpload(photo.id)}
-                        className="mt-1 text-xs h-6"
+                        className="absolute top-2 right-2 h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity z-20"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          e.preventDefault()
+                          removePhoto(index)
+                        }}
+                        onTouchEnd={(e) => {
+                          e.stopPropagation()
+                          e.preventDefault()
+                          removePhoto(index)
+                        }}
+                        disabled={photo.isUploading}
                       >
-                        Reintentar
+                        <X className="h-3 w-3" />
                       </Button>
+
+                      {/* Primary badge */}
+                      {photo.isPrimary && (
+                        <Badge className="absolute bottom-2 left-2 text-xs pointer-events-none" variant="secondary">
+                          Plato
+                        </Badge>
+                      )}
+
+                      {/* Mobile drag indicator */}
+                      {isDragging && touchDragIndex === index && (
+                        <div className="absolute inset-0 bg-primary/20 border-2 border-primary rounded-lg" />
+                      )}
                     </div>
-                  )}
+                  </div>
+                ))}
 
-                  {photo.uploadedUrl && !photo.isUploading && !photo.error && (
-                    <div className="text-white text-center">
-                      <Check className="h-6 w-6 mx-auto mb-1 text-green-400" />
-                      <span className="text-xs">Subida</span>
+                {/* Add more photos button */}
+                {photos.length < maxPhotos && (
+                  <div
+                    className="aspect-square relative overflow-hidden rounded-lg border-2 border-dashed border-muted-foreground/25 hover:border-primary hover:bg-primary/5 transition-colors flex items-center justify-center cursor-pointer"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      openFileDialog()
+                    }}
+                  >
+                    <div className="text-center space-y-2">
+                      <Plus className="h-6 w-6 text-muted-foreground mx-auto" />
+                      <p className="text-xs text-muted-foreground">Agregar más</p>
                     </div>
-                  )}
-                </div>
-
-                {/* Botón eliminar */}
-                <Button
-                  type="button"
-                  variant="destructive"
-                  size="icon"
-                  className="absolute top-1 right-1 h-6 w-6"
-                  onClick={() => removePhoto(photo.id)}
-                >
-                  <X className="h-3 w-3" />
-                </Button>
-
-                {/* Indicador de foto principal */}
-                {index === 0 && photos.length > 1 && (
-                  <div className="absolute bottom-1 left-1 bg-blue-500 text-white text-xs px-2 py-1 rounded">
-                    Principal
                   </div>
                 )}
               </div>
 
-              {/* Estadísticas de compresión */}
-              {photo.compressionStats && (
-                <div className="p-2 text-xs text-muted-foreground">
-                  Reducido {photo.compressionStats.compressionRatio}%
-                </div>
-              )}
-            </Card>
-          ))}
-        </div>
+              {/* Instructions when photos are present */}
+              <div className="text-center space-y-2">
+                <p className="text-xs text-muted-foreground">
+                  Las fotos se suben automáticamente. Mantén presionado para reordenar
+                </p>
+                <Badge variant="outline">
+                  {photos.length} de {maxPhotos} fotos
+                </Badge>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Hidden File Input */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        multiple
+        accept={acceptedFormats.join(",")}
+        onChange={handleInputChange}
+        className="hidden"
+      />
+
+      {/* Error Message */}
+      {uploadError && (
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>{uploadError}</AlertDescription>
+        </Alert>
       )}
-
-      {/* Información de estado */}
-      <div className="text-sm text-muted-foreground space-y-1">
-        {photos.length > 0 && (
-          <p>
-            {photos.length} de {maxPhotos} fotos
-          </p>
-        )}
-
-        {hasUploadingPhotos && (
-          <p className="text-blue-600 flex items-center gap-1">
-            <Loader2 className="h-3 w-3 animate-spin" />
-            Subiendo fotos...
-          </p>
-        )}
-
-        {hasErrorPhotos && (
-          <p className="text-red-600 flex items-center gap-1">
-            <AlertCircle className="h-3 w-3" />
-            Algunas fotos tuvieron errores. Puedes reintentarlas o continuar sin ellas.
-          </p>
-        )}
-
-        {photos.length > 0 && !hasUploadingPhotos && !hasErrorPhotos && (
-          <p className="text-green-600 flex items-center gap-1">
-            <Check className="h-3 w-3" />
-            Todas las fotos subidas correctamente
-          </p>
-        )}
-      </div>
-
-      {/* Ayuda */}
-      <div className="text-xs text-muted-foreground">
-        <p>• Las imágenes se comprimen automáticamente para ahorrar espacio</p>
-        <p>• La primera foto será la imagen principal</p>
-        <p>• Formatos soportados: JPG, PNG, GIF (máx. 10MB cada una)</p>
-      </div>
     </div>
   )
 }
