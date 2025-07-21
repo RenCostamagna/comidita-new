@@ -1,10 +1,16 @@
+import { autoCompressImage } from "./image-compression"
+
 // Función para subir una sola foto inmediatamente (estilo Twitter)
 export async function uploadSingleReviewPhoto(file: File, tempReviewId: string): Promise<string> {
   console.log(`Iniciando upload individual de foto: ${file.name}`)
 
   try {
+    // Comprimir imagen automáticamente
+    console.log("🗜️ Comprimiendo imagen...")
+    const compressedFile = await autoCompressImage(file)
+
     const formData = new FormData()
-    formData.append("photo", file)
+    formData.append("photo", compressedFile)
     formData.append("tempReviewId", tempReviewId)
 
     console.log("Enviando request a /api/upload-single-photo...")

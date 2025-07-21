@@ -1,92 +1,69 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { put } from "@vercel/blob"
 import { createClient } from "@/lib/supabase/server"
+import { compressImage } from "@/lib/image-compression"
 
 export async function POST(request: NextRequest) {
   try {
-    console.log("=== INICIO UPLOAD SINGLE PHOTO API ===")
-
-    // Verificar que tenemos el token de Blob
-    if (!process.env.BLOB_READ_WRITE_TOKEN) {
-      console.error("BLOB_READ_WRITE_TOKEN no está configurado")
-      return NextResponse.json({ error: "Token de Vercel Blob no configurado" }, { status: 500 })
-    }
-
-    // Crear cliente de Supabase
-    const supabase = await createClient()
+    const supabase = createClient()
 
     // Verificar autenticación
     const {
       data: { user },
       error: authError,
     } = await supabase.auth.getUser()
-
     if (authError || !user) {
-      console.error("Error de autenticación:", authError)
       return NextResponse.json({ error: "No autorizado" }, { status: 401 })
     }
 
-    console.log("Usuario autenticado:", user.id)
-
-    // Obtener datos del formulario
     const formData = await request.formData()
-    const file = formData.get("photo") as File
-    const tempReviewId = formData.get("tempReviewId") as string
+    const file = formData.get("file") as File
 
     if (!file) {
-      return NextResponse.json({ error: "No se encontró archivo" }, { status: 400 })
+      return NextResponse.json({ error: "No se proporcionó archivo" }, { status: 400 })
     }
 
-    if (!tempReviewId) {
-      return NextResponse.json({ error: "ID temporal requerido" }, { status: 400 })
-    }
-
-    console.log("Procesando archivo:", {
-      name: file.name,
-      size: file.size,
-      type: file.type,
-    })
-
-    // Validar archivo
+    // Validar tipo de archivo
     if (!file.type.startsWith("image/")) {
-      return NextResponse.json({ error: "El archivo no es una imagen" }, { status: 400 })
+      return NextResponse.json({ error: "El archivo debe ser una imagen" }, { status: 400 })
     }
 
+    // Validar tamaño (máximo 10MB antes de compresión)
     if (file.size > 10 * 1024 * 1024) {
-      return NextResponse.json({ error: "Archivo muy grande (máximo 10MB)" }, { status: 400 })
+      return NextResponse.json({ error: "La imagen es demasiado grande (máximo 10MB)" }, { status: 400 })
     }
+
+    console.log(`📸 Procesando imagen: ${file.name} (${(file.size / 1024 / 1024).toFixed(2)}MB)`)
+
+    // Comprimir imagen
+    const compressedFile = await compressImage(file)
+    console.log(
+      `🗜️ Imagen comprimida: ${(compressedFile.size / 1024 / 1024).toFixed(2)}MB (${((1 - compressedFile.size / file.size) * 100).toFixed(1)}% reducción)`,
+    )
 
     // Generar nombre único
     const timestamp = Date.now()
-    const randomSuffix = Math.random().toString(36).substring(2, 8)
-    const fileExtension = file.name.split(".").pop()?.toLowerCase() || "jpg"
-    const fileName = `review-photos/${user.id}_${tempReviewId}_${timestamp}_${randomSuffix}.${fileExtension}`
-
-    console.log(`Subiendo archivo como: ${fileName}`)
+    const randomString = Math.random().toString(36).substring(2, 15)
+    const extension = file.name.split(".").pop() || "jpg"
+    const fileName = `review-photos/${user.id}/${timestamp}-${randomString}.${extension}`
 
     // Subir a Vercel Blob
-    const blob = await put(fileName, file, {
+    const blob = await put(fileName, compressedFile, {
       access: "public",
-      addRandomSuffix: false,
+      contentType: compressedFile.type,
     })
 
-    console.log(`Archivo subido exitosamente: ${blob.url}`)
+    console.log(`✅ Imagen subida exitosamente: ${blob.url}`)
 
     return NextResponse.json({
       success: true,
       url: blob.url,
-      fileName: fileName,
-      originalName: file.name,
-      size: file.size,
+      originalSize: file.size,
+      compressedSize: compressedFile.size,
+      compressionRatio: ((1 - compressedFile.size / file.size) * 100).toFixed(1),
     })
   } catch (error) {
-    console.error("Error en upload-single-photo:", error)
-    return NextResponse.json(
-      {
-        error: "Error interno del servidor",
-        details: error instanceof Error ? error.message : "Error desconocido",
-      },
-      { status: 500 },
-    )
+    console.error("❌ Error subiendo imagen:", error)
+    return NextResponse.json({ error: "Error interno del servidor" }, { status: 500 })
   }
 }
