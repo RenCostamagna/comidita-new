@@ -192,7 +192,9 @@ export function DetailedReviewForm({
       // Crear el objeto de datos de la reseña con las URLs ya subidas
       const reviewData = {
         place: placeData,
-        dish_name: dishName.trim() || null,
+        dish_name: dishName.trim()
+          ? dishName.trim().toLowerCase().charAt(0).toUpperCase() + dishName.trim().toLowerCase().slice(1)
+          : null,
         ...ratings,
         celiac_friendly: dietaryOptions.celiac_friendly,
         vegetarian_friendly: dietaryOptions.vegetarian_friendly,
@@ -319,61 +321,49 @@ export function DetailedReviewForm({
             </div>
 
             {/* Opciones dietéticas - NUEVAS CHECKBOXES */}
-<div className="space-y-4">
-  <div className="space-y-1">
-    <Label className="text-base font-semibold">Opciones dietéticas</Label>
-  </div>
+            <div className="space-y-4">
+              <div className="space-y-1">
+                <Label className="text-base font-semibold">Opciones dietéticas</Label>
+              </div>
 
-  <div className="grid grid-cols-1 gap-4">
-    {/* Celíaco friendly */}
-    <label
-      htmlFor="celiac-friendly"
-      className={`flex items-center space-x-3 p-3 border rounded-lg cursor-pointer transition-colors ${
-        dietaryOptions.celiac_friendly
-          ? "bg-red-100 border-red-400"
-          : "bg-muted/30"
-      }`}
-    >
-      <Checkbox
-        id="celiac-friendly"
-        checked={dietaryOptions.celiac_friendly}
-        onCheckedChange={(checked) =>
-          handleDietaryOptionChange("celiac_friendly", !!checked)
-        }
-      />
-      <div className="flex-1">
-        <span className="text-sm font-medium">🌾 Celíaco friendly</span>
-        <p className="text-xs text-muted-foreground">
-          Tiene opciones sin gluten/TACC
-        </p>
-      </div>
-    </label>
+              <div className="grid grid-cols-1 gap-4">
+                {/* Celíaco friendly */}
+                <label
+                  htmlFor="celiac-friendly"
+                  className={`flex items-center space-x-3 p-3 border rounded-lg cursor-pointer transition-colors ${
+                    dietaryOptions.celiac_friendly ? "bg-red-100 border-red-400" : "bg-muted/30"
+                  }`}
+                >
+                  <Checkbox
+                    id="celiac-friendly"
+                    checked={dietaryOptions.celiac_friendly}
+                    onCheckedChange={(checked) => handleDietaryOptionChange("celiac_friendly", !!checked)}
+                  />
+                  <div className="flex-1">
+                    <span className="text-sm font-medium">🌾 Celíaco friendly</span>
+                    <p className="text-xs text-muted-foreground">Tiene opciones sin gluten/TACC</p>
+                  </div>
+                </label>
 
-    {/* Vegetariano friendly */}
-    <label
-      htmlFor="vegetarian-friendly"
-      className={`flex items-center space-x-3 p-3 border rounded-lg cursor-pointer transition-colors ${
-        dietaryOptions.vegetarian_friendly
-          ? "bg-red-100 border-red-400"
-          : "bg-muted/30"
-      }`}
-    >
-      <Checkbox
-        id="vegetarian-friendly"
-        checked={dietaryOptions.vegetarian_friendly}
-        onCheckedChange={(checked) =>
-          handleDietaryOptionChange("vegetarian_friendly", !!checked)
-        }
-      />
-      <div className="flex-1">
-        <span className="text-sm font-medium">🥬 Vegetariano friendly</span>
-        <p className="text-xs text-muted-foreground">
-          Tiene buenas opciones vegetarianas/veganas
-        </p>
-      </div>
-    </label>
-  </div>
-</div>
+                {/* Vegetariano friendly */}
+                <label
+                  htmlFor="vegetarian-friendly"
+                  className={`flex items-center space-x-3 p-3 border rounded-lg cursor-pointer transition-colors ${
+                    dietaryOptions.vegetarian_friendly ? "bg-red-100 border-red-400" : "bg-muted/30"
+                  }`}
+                >
+                  <Checkbox
+                    id="vegetarian-friendly"
+                    checked={dietaryOptions.vegetarian_friendly}
+                    onCheckedChange={(checked) => handleDietaryOptionChange("vegetarian_friendly", !!checked)}
+                  />
+                  <div className="flex-1">
+                    <span className="text-sm font-medium">🥬 Vegetariano friendly</span>
+                    <p className="text-xs text-muted-foreground">Tiene buenas opciones vegetarianas/veganas</p>
+                  </div>
+                </label>
+              </div>
+            </div>
 
             {/* Checkbox para recomendar plato */}
             <div className="space-y-3">
