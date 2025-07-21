@@ -41,6 +41,9 @@ function sendLogToServer(level: "debug" | "error", module: string, message: stri
   // Only run on the client
   if (typeof window === "undefined" || !IS_DEBUG_MODE) return
 
+  // Self-debug: Confirm this function is being called
+  console.log(`[Logger] Attempting to send log to server: ${message}`)
+
   const payload = {
     level,
     module,

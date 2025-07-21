@@ -50,6 +50,7 @@ export function PhotoUpload({
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
+    logDebug("PhotoUpload", "Component mounted")
     logDeviceInfo("PhotoUpload")
   }, [])
 
@@ -59,7 +60,7 @@ export function PhotoUpload({
     setProcessingProgress(0)
 
     logDebug(
-      "PhotoUpload",
+      "PhotoUpload:handleFiles",
       `Handling ${fileList.length} files. Current photo count: ${photos.length}. Max photos: ${maxPhotos}.`,
     )
 
@@ -68,7 +69,9 @@ export function PhotoUpload({
 
     // Verificar límite total de fotos
     if (photos.length + fileList.length > maxPhotos) {
-      setUploadError(`Máximo ${maxPhotos} fotos permitidas`)
+      const errorMsg = `Máximo ${maxPhotos} fotos permitidas. Intento de agregar ${fileList.length} a las ${photos.length} existentes.`
+      logError("PhotoUpload:handleFiles", errorMsg, null)
+      setUploadError(errorMsg)
       setIsProcessing(false)
       return
     }
@@ -77,7 +80,7 @@ export function PhotoUpload({
       const file = fileList[i]
       setProcessingProgress(((i + 1) / fileList.length) * 100)
 
-      logDebug("PhotoUpload", `Processing file ${i + 1}/${fileList.length}`, {
+      logDebug("PhotoUpload:handleFiles", `Processing file ${i + 1}/${fileList.length}`, {
         name: file.name,
         size: file.size,
         type: file.type,
@@ -87,7 +90,7 @@ export function PhotoUpload({
         // Validar archivo
         const validation = validateImageFile(file, maxSizePerPhoto, acceptedFormats)
         if (!validation.isValid) {
-          logError("PhotoUpload", `File validation failed for ${file.name}`, validation.error)
+          logError("PhotoUpload:handleFiles", `File validation failed for ${file.name}`, validation.error)
           errors.push(`${file.name}: ${validation.error}`)
           continue
         }
@@ -95,7 +98,7 @@ export function PhotoUpload({
         // Obtener información de la imagen
         const imageInfo = await getImageInfo(file)
 
-        logDebug("PhotoUpload", `✅ File processed successfully: ${file.name}`, {
+        logDebug("PhotoUpload:handleFiles", `✅ File processed successfully: ${file.name}`, {
           size: `${(file.size / 1024 / 1024).toFixed(2)}MB`,
           dimensions: `${imageInfo.width}x${imageInfo.height}`,
           type: file.type,
@@ -110,13 +113,13 @@ export function PhotoUpload({
 
         newPhotoData.push(photoData)
       } catch (error) {
-        logError("PhotoUpload", `Error processing ${file.name}`, error)
+        logError("PhotoUpload:handleFiles", `Error processing ${file.name}`, error)
         errors.push(`${file.name}: Error al procesar`)
       }
     }
 
     if (errors.length > 0) {
-      logError("PhotoUpload", "Errors occurred during file processing", errors)
+      logError("PhotoUpload:handleFiles", "Errors occurred during file processing", errors)
       setUploadError(errors.join(", "))
     }
 
@@ -124,10 +127,15 @@ export function PhotoUpload({
       const updatedPhotos = updatePrimaryPhoto([...photos, ...newPhotoData])
       onPhotosChange(updatedPhotos)
       logDebug(
-        "PhotoUpload",
-        `✅ ${newPhotoData.length} photos added successfully. Total photos now: ${updatedPhotos.length}`,
-        updatedPhotos,
+        "PhotoUpload:handleFiles",
+        `✅ ${newPhotoData.length} photos added. Calling onPhotosChange. Total photos now: ${updatedPhotos.length}`,
+        {
+          newPhotoNames: newPhotoData.map((p) => (p.file as File).name),
+          totalPhotoCount: updatedPhotos.length,
+        },
       )
+    } else {
+      logDebug("PhotoUpload:handleFiles", "No new photos were added after processing.")
     }
 
     setIsProcessing(false)
@@ -158,24 +166,30 @@ export function PhotoUpload({
     setDragActive(false)
 
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      logDebug("PhotoUpload:handleDrop", `Dropped ${e.dataTransfer.files.length} files.`)
       handleFiles(e.dataTransfer.files)
     }
   }
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
+      logDebug("PhotoUpload:handleInputChange", `Selected ${e.target.files.length} files via input.`)
       handleFiles(e.target.files)
+      // Reset file input to allow selecting the same file again
+      e.target.value = ""
     }
   }
 
   const removePhoto = (index: number) => {
+    logDebug("PhotoUpload:removePhoto", `Attempting to remove photo at index ${index}.`)
     const newPhotos = photos.filter((_, i) => i !== index)
     const updatedPhotos = updatePrimaryPhoto(newPhotos)
     onPhotosChange(updatedPhotos)
-    logDebug("PhotoUpload", `🗑️ Photo ${index + 1} removed. Total photos now: ${updatedPhotos.length}`)
+    logDebug("PhotoUpload:removePhoto", `🗑️ Photo ${index + 1} removed. Total photos now: ${updatedPhotos.length}`)
   }
 
   const openFileDialog = () => {
+    logDebug("PhotoUpload:openFileDialog", "File dialog opened by user.")
     fileInputRef.current?.click()
   }
 
@@ -192,6 +206,7 @@ export function PhotoUpload({
     (fromIndex: number, toIndex: number) => {
       if (fromIndex === toIndex) return
 
+      logDebug("PhotoUpload:reorderPhotos", `Reordering photo from index ${fromIndex} to ${toIndex}.`)
       const newPhotos = [...photos]
       const draggedPhoto = newPhotos[fromIndex]
 
@@ -205,7 +220,7 @@ export function PhotoUpload({
       const updatedPhotos = updatePrimaryPhoto(newPhotos)
       onPhotosChange(updatedPhotos)
 
-      logDebug("PhotoUpload", `📷 Photo moved from position ${fromIndex + 1} to ${toIndex + 1}`)
+      logDebug("PhotoUpload:reorderPhotos", `📷 Photo moved. Calling onPhotosChange.`)
     },
     [photos, onPhotosChange],
   )

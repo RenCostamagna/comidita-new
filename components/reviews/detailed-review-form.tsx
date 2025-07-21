@@ -22,7 +22,7 @@ import { Progress } from "@/components/ui/progress"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { AlertCircle } from "lucide-react"
 import { cleanAddress, formatPlaceForStorage } from "@/lib/address-utils"
-import { logDebug, logError } from "@/lib/debug-logger"
+import { logDebug, logError, logDeviceInfo } from "@/lib/debug-logger"
 
 interface PhotoData {
   file: File | string
@@ -76,7 +76,10 @@ export function DetailedReviewForm({
   const supabase = createClient()
 
   useEffect(() => {
+    logDebug("DetailedReviewForm", "Component mounted.")
+    logDeviceInfo("DetailedReviewForm")
     if (preSelectedPlace) {
+      logDebug("DetailedReviewForm", "Pre-selected place provided.", preSelectedPlace)
       if (preSelectedPlace.name) {
         setSelectedPlace(preSelectedPlace)
       }
@@ -95,37 +98,53 @@ export function DetailedReviewForm({
   }
 
   const handleRatingChange = (key: string, value: number[]) => {
+    logDebug("DetailedReviewForm:handleRatingChange", `Rating changed for ${key}`, { newValue: value[0] })
     setRatings((prev) => ({ ...prev, [key]: value[0] }))
   }
 
   const handlePlaceSelect = (place: any) => {
+    logDebug("DetailedReviewForm:handlePlaceSelect", "Place selected by user.", place)
     // Format the place with cleaned address before setting it
     const formattedPlace = formatPlaceForStorage(place)
     setSelectedPlace(formattedPlace)
   }
 
   const handleDietaryOptionChange = (option: string, checked: boolean) => {
+    logDebug("DetailedReviewForm:handleDietaryOptionChange", `Dietary option toggled: ${option}`, {
+      isChecked: checked,
+    })
     setDietaryOptions((prev) => ({ ...prev, [option]: checked }))
+  }
+
+  const handlePhotosChange = (newPhotos: PhotoData[]) => {
+    logDebug("DetailedReviewForm:handlePhotosChange", `Photo list updated. New count: ${newPhotos.length}`)
+    setPhotos(newPhotos)
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setUploadError(null)
 
-    logDebug("DetailedReviewForm", "handleSubmit triggered")
+    logDebug("DetailedReviewForm:handleSubmit", "SUBMIT BUTTON CLICKED. Starting submission process.")
 
     if (!selectedPlace || !priceRange || !category) {
+      logError("DetailedReviewForm:handleSubmit", "Validation failed: Required fields missing.", {
+        hasSelectedPlace: !!selectedPlace,
+        priceRange,
+        category,
+      })
       alert("Por favor completa todos los campos obligatorios")
       return
     }
 
     // Enhanced place validation
     if (!selectedPlace.place_id && !selectedPlace.google_place_id) {
+      logError("DetailedReviewForm:handleSubmit", "Validation failed: Place ID missing.", selectedPlace)
       alert("Error: Información del lugar incompleta. Por favor selecciona el lugar nuevamente.")
       return
     }
 
-    logDebug("DetailedReviewForm", "Form validation passed (basic)")
+    logDebug("DetailedReviewForm:handleSubmit", "Form validation passed (basic).")
 
     // Ensure we have the required place fields
     const placeId = selectedPlace.google_place_id || selectedPlace.place_id
@@ -133,7 +152,11 @@ export function DetailedReviewForm({
     const placeAddress = selectedPlace.formatted_address || selectedPlace.address
 
     if (!placeId || !placeName || !placeAddress) {
-      logError("DetailedReviewForm", "Place ID, name, or address missing", { placeId, placeName, placeAddress })
+      logError("DetailedReviewForm:handleSubmit", "Place ID, name, or address missing after check.", {
+        placeId,
+        placeName,
+        placeAddress,
+      })
       alert("Error: Información del lugar incompleta. Por favor selecciona el lugar nuevamente.")
       return
     }
@@ -143,7 +166,7 @@ export function DetailedReviewForm({
     setUploadStatus("Preparando...")
 
     try {
-      logDebug("DetailedReviewForm", "Starting submission process")
+      logDebug("DetailedReviewForm:handleSubmit", "Submission state set to true. Starting async operations.")
 
       // Generar un ID temporal para la reseña
       const tempReviewId = `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
@@ -153,11 +176,13 @@ export function DetailedReviewForm({
         data: { user },
       } = await supabase.auth.getUser()
       if (!user) {
+        logError("DetailedReviewForm:handleSubmit", "Authentication check failed. User is null.", null)
         alert("Debes estar autenticado para enviar una reseña")
+        setIsSubmitting(false)
         return
       }
 
-      logDebug("DetailedReviewForm", "User authenticated", { userId: user.id })
+      logDebug("DetailedReviewForm:handleSubmit", "User authenticated.", { userId: user.id })
 
       // Subir fotos a Vercel Blob si hay fotos
       let uploadedPhotoUrls: string[] = []
@@ -168,34 +193,31 @@ export function DetailedReviewForm({
         // Filtrar solo los archivos File (no strings que ya son URLs)
         const filesToUpload = photos.map((photo) => photo.file).filter((file): file is File => file instanceof File)
 
-        logDebug("DetailedReviewForm", "Preparing to upload photos", {
-          totalPhotos: photos.length,
-          filesToUpload: filesToUpload.length,
-          photoState: photos,
+        logDebug("DetailedReviewForm:handleSubmit", "Preparing to upload photos.", {
+          totalPhotosInState: photos.length,
+          filesToUploadCount: filesToUpload.length,
+          photoState: photos.map((p) => ({
+            isPrimary: p.isPrimary,
+            type: typeof p.file,
+            name: typeof p.file === "string" ? "url" : p.file.name,
+          })),
         })
 
         if (filesToUpload.length > 0) {
           try {
-            console.log("Iniciando upload de fotos...")
+            logDebug("DetailedReviewForm:handleSubmit", "Calling uploadMultipleReviewPhotos...")
             uploadedPhotoUrls = await uploadMultipleReviewPhotos(filesToUpload, user.id, tempReviewId)
-            console.log("Fotos subidas exitosamente:", uploadedPhotoUrls)
-
-            // DEBUG: Verificar que las URLs sean de Vercel Blob
-            uploadedPhotoUrls.forEach((url, index) => {
-              console.log(`[DEBUG VERCEL BLOB URL ${index}]`, {
-                url,
-                isVercelBlob: url.includes("blob.vercel-storage.com"),
-                isSupabase: url.includes("supabase.co"),
-                urlLength: url.length,
-              })
+            logDebug("DetailedReviewForm:handleSubmit", "uploadMultipleReviewPhotos finished successfully.", {
+              returnedUrls: uploadedPhotoUrls,
             })
-
-            logDebug("DetailedReviewForm", "Photos uploaded successfully", { urls: uploadedPhotoUrls })
 
             setUploadProgress(75)
           } catch (uploadError) {
-            logError("DetailedReviewForm", "Error during photo upload", uploadError)
-            console.error("Error subiendo fotos:", uploadError)
+            logError(
+              "DetailedReviewForm:handleSubmit",
+              "CRITICAL: uploadMultipleReviewPhotos threw an error.",
+              uploadError,
+            )
             const errorMessage = uploadError instanceof Error ? uploadError.message : "Error desconocido"
             setUploadError(`Error subiendo fotos: ${errorMessage}`)
 
@@ -205,10 +227,15 @@ export function DetailedReviewForm({
             )
 
             if (!continueWithoutPhotos) {
+              logDebug("DetailedReviewForm:handleSubmit", "User chose to CANCEL submission after upload error.")
+              setIsSubmitting(false)
               return
             }
 
-            logDebug("DetailedReviewForm", "User chose to continue without photos after upload error.")
+            logDebug(
+              "DetailedReviewForm:handleSubmit",
+              "User chose to CONTINUE submission without photos after upload error.",
+            )
           }
         }
 
@@ -218,7 +245,9 @@ export function DetailedReviewForm({
           .filter((file): file is string => typeof file === "string")
 
         uploadedPhotoUrls = [...uploadedPhotoUrls, ...existingUrls]
-        logDebug("DetailedReviewForm", "Final list of photo URLs", { uploadedPhotoUrls })
+        logDebug("DetailedReviewForm:handleSubmit", "Final list of photo URLs constructed.", { uploadedPhotoUrls })
+      } else {
+        logDebug("DetailedReviewForm:handleSubmit", "No photos to upload.")
       }
 
       setUploadStatus("Guardando reseña...")
@@ -254,17 +283,17 @@ export function DetailedReviewForm({
         vercel_blob_urls: uploadedPhotoUrls.filter((url) => url.includes("blob.vercel-storage.com")),
       }
 
-      logDebug("DetailedReviewForm", "Final review data prepared for submission", reviewData)
+      logDebug("DetailedReviewForm:handleSubmit", "Final review data prepared. Calling parent onSubmit.", reviewData)
 
       setUploadProgress(100)
       await onSubmit(reviewData)
-      logDebug("DetailedReviewForm", "onSubmit completed successfully")
+      logDebug("DetailedReviewForm:handleSubmit", "SUCCESS: Parent onSubmit completed.")
     } catch (error) {
-      logError("DetailedReviewForm", "Error in handleSubmit", error)
-      console.error("Error submitting review:", error)
+      logError("DetailedReviewForm:handleSubmit", "CRITICAL: Unhandled error in submission process.", error)
       const errorMessage = error instanceof Error ? error.message : "Error desconocido"
       setUploadError(`Error al enviar la reseña: ${errorMessage}`)
     } finally {
+      logDebug("DetailedReviewForm:handleSubmit", "Submission process finished. Resetting state.")
       setIsSubmitting(false)
       setUploadProgress(0)
       setUploadStatus("")
@@ -443,7 +472,7 @@ export function DetailedReviewForm({
             </div>
 
             {/* Fotos - Componente mejorado */}
-            <PhotoUpload photos={photos} onPhotosChange={setPhotos} maxPhotos={6} userId="temp-user" />
+            <PhotoUpload photos={photos} onPhotosChange={handlePhotosChange} maxPhotos={6} userId="temp-user" />
 
             {/* Comentario */}
             <div className="space-y-2">

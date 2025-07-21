@@ -1,15 +1,31 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { put } from "@vercel/blob"
 import { createClient } from "@/lib/supabase/server"
-import { logDebug, logError } from "@/lib/debug-logger"
+
+// Helper to log messages on the server
+function logOnServer(level: "info" | "error", message: string, data?: any) {
+  const timestamp = new Date().toISOString()
+  const logMessage = `[API:upload-photos] ${timestamp} - ${message}`
+  if (level === "error") {
+    console.error(logMessage, data ? JSON.stringify(data, null, 2) : "")
+  } else {
+    console.log(logMessage, data ? JSON.stringify(data, null, 2) : "")
+  }
+}
 
 export async function POST(request: NextRequest) {
   try {
-    logDebug("API:upload-photos", "POST request received", { headers: request.headers })
+    logOnServer("info", "POST request received.", {
+      headers: {
+        "content-type": request.headers.get("content-type"),
+        "content-length": request.headers.get("content-length"),
+        "user-agent": request.headers.get("user-agent"),
+      },
+    })
 
     // Verificar que tenemos el token de Blob
     if (!process.env.BLOB_READ_WRITE_TOKEN) {
-      logError("API:upload-photos", "BLOB_READ_WRITE_TOKEN is not configured", null)
+      logOnServer("error", "BLOB_READ_WRITE_TOKEN is not configured.")
       return NextResponse.json({ error: "Token de Vercel Blob no configurado" }, { status: 500 })
     }
 
@@ -23,23 +39,24 @@ export async function POST(request: NextRequest) {
     } = await supabase.auth.getUser()
 
     if (authError || !user) {
-      logError("API:upload-photos", "Authentication failed", authError)
+      logOnServer("error", "Authentication failed.", { authError })
       return NextResponse.json({ error: "No autorizado" }, { status: 401 })
     }
 
-    logDebug("API:upload-photos", "User authenticated", { userId: user.id })
+    logOnServer("info", "User authenticated.", { userId: user.id })
 
     // Obtener datos del formulario
     const formData = await request.formData()
 
     // Debug: mostrar todas las claves del FormData
     const formDataKeys = Array.from(formData.keys())
-    logDebug("API:upload-photos", "FormData keys received", { keys: formDataKeys })
+    logOnServer("info", "FormData keys received.", { keys: formDataKeys })
 
     const reviewId = formData.get("reviewId") as string
-    logDebug("API:upload-photos", "Review ID received", { reviewId })
+    logOnServer("info", "Review ID received.", { reviewId })
 
     if (!reviewId) {
+      logOnServer("error", "Review ID is required but was not found.")
       return NextResponse.json({ error: "ID de reseña requerido" }, { status: 400 })
     }
 
@@ -49,10 +66,10 @@ export async function POST(request: NextRequest) {
       files = formData.getAll("files") as File[]
     }
 
-    logDebug("API:upload-photos", `Found ${files.length} files in FormData`)
+    logOnServer("info", `Found ${files.length} files in FormData.`)
 
     if (files.length === 0) {
-      logError("API:upload-photos", "No files found in FormData", null)
+      logOnServer("error", "No files found in FormData with keys 'photos' or 'files'.")
       return NextResponse.json({ error: "No se encontraron archivos" }, { status: 400 })
     }
 
@@ -62,7 +79,7 @@ export async function POST(request: NextRequest) {
     // Procesar cada archivo
     for (let i = 0; i < files.length; i++) {
       const file = files[i]
-      logDebug("API:upload-photos", `Processing file ${i + 1}/${files.length}`, {
+      logOnServer("info", `Processing file ${i + 1}/${files.length}`, {
         name: file.name,
         size: file.size,
         type: file.type,
@@ -71,13 +88,13 @@ export async function POST(request: NextRequest) {
       try {
         // Validar archivo
         if (!file.type.startsWith("image/")) {
-          logError("API:upload-photos", `File ${file.name} is not an image`, { type: file.type })
+          logOnServer("error", `File ${file.name} is not an image.`, { type: file.type })
           errors.push(`Archivo ${file.name}: No es una imagen`)
           continue
         }
 
         if (file.size > 10 * 1024 * 1024) {
-          logError("API:upload-photos", `File ${file.name} is too large`, { size: file.size })
+          logOnServer("error", `File ${file.name} is too large.`, { size: file.size })
           errors.push(`Archivo ${file.name}: Muy grande (máximo 10MB)`)
           continue
         }
@@ -88,7 +105,7 @@ export async function POST(request: NextRequest) {
         const fileExtension = file.name.split(".").pop()?.toLowerCase() || "jpg"
         const fileName = `review-photos/${user.id}_${reviewId}_${timestamp}_${randomSuffix}.${fileExtension}`
 
-        logDebug("API:upload-photos", `Uploading file to Vercel Blob as: ${fileName}`)
+        logOnServer("info", `Uploading file to Vercel Blob as: ${fileName}`)
 
         // Subir a Vercel Blob
         const blob = await put(fileName, file, {
@@ -97,16 +114,16 @@ export async function POST(request: NextRequest) {
         })
 
         uploadedUrls.push(blob.url)
-        logDebug("API:upload-photos", `File uploaded successfully`, { url: blob.url })
+        logOnServer("info", `File uploaded successfully.`, { url: blob.url })
       } catch (uploadError) {
-        logError("API:upload-photos", `Error uploading file ${file.name}`, uploadError)
+        logOnServer("error", `Error uploading file ${file.name}`, { uploadError })
         errors.push(
           `Error subiendo ${file.name}: ${uploadError instanceof Error ? uploadError.message : "Error desconocido"}`,
         )
       }
     }
 
-    logDebug("API:upload-photos", "Finished processing all files", {
+    logOnServer("info", "Finished processing all files.", {
       uploadedCount: uploadedUrls.length,
       errorCount: errors.length,
     })
@@ -118,7 +135,7 @@ export async function POST(request: NextRequest) {
       message: `${uploadedUrls.length} de ${files.length} fotos subidas correctamente`,
     })
   } catch (error) {
-    logError("API:upload-photos", "A general error occurred in the API route", error)
+    logOnServer("error", "A general error occurred in the API route.", { error })
     return NextResponse.json(
       {
         error: "Error interno del servidor",
