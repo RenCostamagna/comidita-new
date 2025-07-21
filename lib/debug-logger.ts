@@ -36,11 +36,47 @@ function getDeviceInfo() {
   }
 }
 
+// Function to send logs to the server
+function sendLogToServer(level: "debug" | "error", module: string, message: string, data?: any) {
+  // Only run on the client
+  if (typeof window === "undefined" || !IS_DEBUG_MODE) return
+
+  const payload = {
+    level,
+    module,
+    message,
+    data: data || null,
+    deviceInfo: getDeviceInfo(),
+  }
+
+  // Use sendBeacon if available for reliability, otherwise fallback to fetch
+  try {
+    if (navigator.sendBeacon) {
+      const blob = new Blob([JSON.stringify(payload)], { type: "application/json" })
+      navigator.sendBeacon("/api/log", blob)
+    } else {
+      fetch("/api/log", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+        keepalive: true,
+      })
+    }
+  } catch (e) {
+    // Fallback to console if sending fails
+    console.error("Failed to send log to server:", e)
+  }
+}
+
 export function logDebug(module: string, message: string, data?: any) {
   if (!IS_DEBUG_MODE) return
 
   const timestamp = new Date().toISOString()
+  // Log to browser console for immediate feedback during development
   console.log(`[DEBUG] ${timestamp} [${module}] - ${message}`, data !== undefined ? data : "")
+
+  // Send log to server to appear in Vercel logs
+  sendLogToServer("debug", module, message, data)
 }
 
 export function logError(module: string, message: string, error: any) {
@@ -48,10 +84,15 @@ export function logError(module: string, message: string, error: any) {
   if (process.env.NODE_ENV === "production" && !IS_DEBUG_MODE) return
 
   const timestamp = new Date().toISOString()
+  // Log to browser console
   console.error(`[ERROR] ${timestamp} [${module}] - ${message}`, error)
+
+  // Send log to server
+  sendLogToServer("error", module, message, error)
 }
 
 export function logDeviceInfo(module: string) {
   if (!IS_DEBUG_MODE) return
-  logDebug(module, "Device Information", getDeviceInfo())
+  const deviceInfo = getDeviceInfo()
+  logDebug(module, "Device Information", deviceInfo)
 }
