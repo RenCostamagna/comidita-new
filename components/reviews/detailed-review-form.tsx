@@ -17,6 +17,7 @@ import { RESTAURANT_CATEGORIES } from "@/lib/types"
 import { PhotoUpload } from "@/components/photos/photo-upload"
 import { getRatingColor } from "@/lib/rating-labels"
 import { createClient } from "@/lib/supabase/client"
+import { uploadMultipleReviewPhotos } from "@/lib/storage"
 import { Progress } from "@/components/ui/progress"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { AlertCircle } from "lucide-react"
@@ -50,7 +51,6 @@ export function DetailedReviewForm({
   const [uploadStatus, setUploadStatus] = useState("")
   const [uploadError, setUploadError] = useState<string | null>(null)
   const [wantsToRecommendDish, setWantsToRecommendDish] = useState(false)
-  const [user, setUser] = useState<any>(null)
 
   // Puntuaciones (1-10) - valores iniciales en 5
   const [ratings, setRatings] = useState({
@@ -73,16 +73,6 @@ export function DetailedReviewForm({
   const [category, setCategory] = useState("")
 
   const supabase = createClient()
-
-  useEffect(() => {
-    const getUser = async () => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
-      setUser(user)
-    }
-    getUser()
-  }, [])
 
   useEffect(() => {
     if (preSelectedPlace) {
@@ -143,10 +133,13 @@ export function DetailedReviewForm({
     }
 
     setIsSubmitting(true)
-    setUploadProgress(50)
-    setUploadStatus("Guardando reseña...")
+    setUploadProgress(0)
+    setUploadStatus("Preparando...")
 
     try {
+      // Generar un ID temporal para la reseña
+      const tempReviewId = `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+
       // Obtener el usuario actual
       const {
         data: { user },
@@ -156,13 +149,63 @@ export function DetailedReviewForm({
         return
       }
 
-      // Las fotos ya están subidas, solo extraer las URLs
-      const uploadedPhotoUrls = photos
-        .map((photo) => photo.file)
-        .filter((file): file is string => typeof file === "string")
+      // Subir fotos a Vercel Blob si hay fotos
+      let uploadedPhotoUrls: string[] = []
+      if (photos.length > 0) {
+        setUploadStatus("Subiendo fotos...")
+        setUploadProgress(25)
 
-      console.log("[DEBUG] Fotos ya subidas:", uploadedPhotoUrls)
+        // Filtrar solo los archivos File (no strings que ya son URLs)
+        const filesToUpload = photos.map((photo) => photo.file).filter((file): file is File => file instanceof File)
 
+        console.log("=== DEBUG PHOTO UPLOAD ===")
+        console.log("Total photos:", photos.length)
+        console.log("Files to upload:", filesToUpload.length)
+        console.log("Photos array:", photos)
+        console.log("Files array:", filesToUpload)
+
+        if (filesToUpload.length > 0) {
+          try {
+            console.log("Iniciando upload de fotos...")
+            uploadedPhotoUrls = await uploadMultipleReviewPhotos(filesToUpload, user.id, tempReviewId)
+            console.log("Fotos subidas exitosamente:", uploadedPhotoUrls)
+
+            // DEBUG: Verificar que las URLs sean de Vercel Blob
+            uploadedPhotoUrls.forEach((url, index) => {
+              console.log(`[DEBUG VERCEL BLOB URL ${index}]`, {
+                url,
+                isVercelBlob: url.includes("blob.vercel-storage.com"),
+                isSupabase: url.includes("supabase.co"),
+                urlLength: url.length,
+              })
+            })
+
+            setUploadProgress(75)
+          } catch (uploadError) {
+            console.error("Error subiendo fotos:", uploadError)
+            const errorMessage = uploadError instanceof Error ? uploadError.message : "Error desconocido"
+            setUploadError(`Error subiendo fotos: ${errorMessage}`)
+
+            // Preguntar al usuario si quiere continuar sin fotos
+            const continueWithoutPhotos = confirm(
+              "Hubo un problema subiendo las fotos. ¿Quieres enviar la reseña sin fotos?",
+            )
+
+            if (!continueWithoutPhotos) {
+              return
+            }
+          }
+        }
+
+        // También incluir URLs que ya existen (strings)
+        const existingUrls = photos
+          .map((photo) => photo.file)
+          .filter((file): file is string => typeof file === "string")
+
+        uploadedPhotoUrls = [...uploadedPhotoUrls, ...existingUrls]
+      }
+
+      setUploadStatus("Guardando reseña...")
       setUploadProgress(90)
 
       // Clean the address before saving to database
@@ -171,7 +214,7 @@ export function DetailedReviewForm({
       const placeData = {
         google_place_id: placeId,
         name: placeName,
-        address: cleanedAddress,
+        address: cleanedAddress, // Use cleaned address
         latitude: selectedPlace.geometry?.location?.lat || selectedPlace.latitude || -32.9442426,
         longitude: selectedPlace.geometry?.location?.lng || selectedPlace.longitude || -60.6505388,
         phone: selectedPlace.formatted_phone_number || selectedPlace.phone || null,
@@ -179,7 +222,7 @@ export function DetailedReviewForm({
         id: selectedPlace.id || null,
       }
 
-      // Crear el objeto de datos de la reseña con las URLs ya subidas
+      // Crear el objeto de datos de la reseña con las URLs de las fotos subidas
       const reviewData = {
         place: placeData,
         dish_name: dishName.trim() || null,
@@ -191,10 +234,13 @@ export function DetailedReviewForm({
         comment: comment.trim() || null,
         photo_urls: uploadedPhotoUrls,
         primary_photo_url: uploadedPhotoUrls.length > 0 ? uploadedPhotoUrls[0] : null,
+        // DEBUG: Campo adicional para verificar las URLs
+        vercel_blob_urls: uploadedPhotoUrls.filter((url) => url.includes("blob.vercel-storage.com")),
       }
 
       console.log("[DEBUG REVIEW DATA]", {
         photo_urls: reviewData.photo_urls,
+        vercel_blob_urls: reviewData.vercel_blob_urls,
         primary_photo_url: reviewData.primary_photo_url,
         total_photos: uploadedPhotoUrls.length,
         cleaned_address: cleanedAddress,
@@ -386,7 +432,7 @@ export function DetailedReviewForm({
             </div>
 
             {/* Fotos - Componente mejorado */}
-            <PhotoUpload photos={photos} onPhotosChange={setPhotos} maxPhotos={6} userId={user?.id || "temp-user"} />
+            <PhotoUpload photos={photos} onPhotosChange={setPhotos} maxPhotos={6} userId="temp-user" />
 
             {/* Comentario */}
             <div className="space-y-2">

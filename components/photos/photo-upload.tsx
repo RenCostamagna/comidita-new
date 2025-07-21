@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState, useRef, useCallback, useEffect } from "react"
+import { useState, useRef, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -10,8 +10,6 @@ import { Progress } from "@/components/ui/progress"
 import { X, Upload, Camera, AlertCircle, Plus, GripVertical } from "lucide-react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { validateImageFile, getImageInfo } from "@/lib/image-compression"
-import { uploadMultipleReviewPhotos } from "@/lib/storage"
-import { createClient } from "@/lib/supabase/client"
 
 interface PhotoData {
   file: File | string
@@ -48,31 +46,12 @@ export function PhotoUpload({
   const [touchStartPos, setTouchStartPos] = useState<{ x: number; y: number } | null>(null)
   const [isDragging, setIsDragging] = useState(false)
 
-  const [user, setUser] = useState<any>(null)
-  const supabase = createClient()
-
   const fileInputRef = useRef<HTMLInputElement>(null)
-
-  useEffect(() => {
-    const getUser = async () => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
-      setUser(user)
-    }
-    getUser()
-  }, [])
 
   const handleFiles = async (fileList: FileList) => {
     setUploadError(null)
     setIsProcessing(true)
     setProcessingProgress(0)
-
-    if (!user) {
-      setUploadError("Debes estar autenticado para subir fotos")
-      setIsProcessing(false)
-      return
-    }
 
     const newPhotoData: PhotoData[] = []
     const errors: string[] = []
@@ -84,11 +63,9 @@ export function PhotoUpload({
       return
     }
 
-    // Procesar y subir cada archivo individualmente
     for (let i = 0; i < fileList.length; i++) {
       const file = fileList[i]
-      const currentProgress = ((i + 1) / fileList.length) * 100
-      setProcessingProgress(currentProgress)
+      setProcessingProgress(((i + 1) / fileList.length) * 100)
 
       try {
         // Validar archivo
@@ -100,37 +77,23 @@ export function PhotoUpload({
 
         // Obtener información de la imagen
         const imageInfo = await getImageInfo(file)
-        console.log(`✅ Archivo validado: ${file.name}`, {
+        console.log(`✅ Archivo procesado: ${file.name}`, {
           size: `${(file.size / 1024 / 1024).toFixed(2)}MB`,
           dimensions: `${imageInfo.width}x${imageInfo.height}`,
           type: file.type,
         })
 
-        // Subir archivo inmediatamente a Vercel Blob
-        console.log(`📤 Subiendo foto ${i + 1}/${fileList.length}: ${file.name}`)
-
-        const tempReviewId = `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
-        const uploadedUrls = await uploadMultipleReviewPhotos([file], user.id, tempReviewId)
-
-        if (uploadedUrls.length === 0) {
-          errors.push(`${file.name}: Error al subir`)
-          continue
-        }
-
-        const uploadedUrl = uploadedUrls[0]
-        console.log(`✅ Foto subida exitosamente: ${uploadedUrl}`)
-
-        // Crear PhotoData object con la URL ya subida
+        // Crear PhotoData object
         const photoData: PhotoData = {
-          file: uploadedUrl, // Usar la URL subida en lugar del File
-          isPrimary: false,
+          file: file,
+          isPrimary: false, // Will be set based on position
           id: `photo-${Date.now()}-${i}`,
         }
 
         newPhotoData.push(photoData)
       } catch (error) {
-        console.error(`Error procesando/subiendo ${file.name}:`, error)
-        errors.push(`${file.name}: ${error instanceof Error ? error.message : "Error al subir"}`)
+        console.error(`Error procesando ${file.name}:`, error)
+        errors.push(`${file.name}: Error al procesar`)
       }
     }
 
@@ -141,7 +104,7 @@ export function PhotoUpload({
     if (newPhotoData.length > 0) {
       const updatedPhotos = updatePrimaryPhoto([...photos, ...newPhotoData])
       onPhotosChange(updatedPhotos)
-      console.log(`✅ ${newPhotoData.length} fotos subidas y agregadas correctamente`)
+      console.log(`✅ ${newPhotoData.length} fotos agregadas correctamente`)
     }
 
     setIsProcessing(false)
@@ -349,7 +312,7 @@ export function PhotoUpload({
             <div className="flex flex-col items-center justify-center py-8 space-y-4">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto" />
               <div className="space-y-2 w-full max-w-xs">
-                <p className="text-sm text-muted-foreground text-center">Subiendo fotos...</p>
+                <p className="text-sm text-muted-foreground text-center">Procesando fotos...</p>
                 <Progress value={processingProgress} className="w-full" />
               </div>
             </div>
@@ -362,6 +325,8 @@ export function PhotoUpload({
               </div>
               <div className="space-y-2">
                 <p className="text-sm font-medium">Arrastra fotos aquí o haz clic para seleccionar</p>
+                
+                
               </div>
             </div>
           ) : (
