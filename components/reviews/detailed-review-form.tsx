@@ -17,7 +17,7 @@ import { RESTAURANT_CATEGORIES } from "@/lib/types"
 import { PhotoUpload } from "@/components/photos/photo-upload"
 import { getRatingColor } from "@/lib/rating-labels"
 import { createClient } from "@/lib/supabase/client"
-import { uploadMultipleReviewPhotos } from "@/lib/storage"
+import { generateTempReviewId } from "@/lib/storage"
 import { Progress } from "@/components/ui/progress"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { AlertCircle } from "lucide-react"
@@ -27,6 +27,8 @@ interface PhotoData {
   file: File | string
   isPrimary: boolean
   id?: string
+  isUploading?: boolean
+  uploadError?: string
 }
 
 interface DetailedReviewFormProps {
@@ -51,6 +53,7 @@ export function DetailedReviewForm({
   const [uploadStatus, setUploadStatus] = useState("")
   const [uploadError, setUploadError] = useState<string | null>(null)
   const [wantsToRecommendDish, setWantsToRecommendDish] = useState(false)
+  const [tempReviewId] = useState(() => generateTempReviewId())
 
   // Puntuaciones (1-10) - valores iniciales en 5
   const [ratings, setRatings] = useState({
@@ -122,6 +125,24 @@ export function DetailedReviewForm({
       return
     }
 
+    // Verificar que no hay fotos subiendo
+    const uploadingPhotos = photos.filter((photo) => photo.isUploading)
+    if (uploadingPhotos.length > 0) {
+      alert(`Espera a que terminen de subir ${uploadingPhotos.length} foto${uploadingPhotos.length > 1 ? "s" : ""}`)
+      return
+    }
+
+    // Verificar que no hay errores en las fotos
+    const photosWithErrors = photos.filter((photo) => photo.uploadError)
+    if (photosWithErrors.length > 0) {
+      const continueWithErrors = confirm(
+        `${photosWithErrors.length} foto${photosWithErrors.length > 1 ? "s tienen" : " tiene"} errores. ¿Quieres continuar sin ${photosWithErrors.length > 1 ? "esas fotos" : "esa foto"}?`,
+      )
+      if (!continueWithErrors) {
+        return
+      }
+    }
+
     // Ensure we have the required place fields
     const placeId = selectedPlace.google_place_id || selectedPlace.place_id
     const placeName = selectedPlace.name
@@ -133,13 +154,10 @@ export function DetailedReviewForm({
     }
 
     setIsSubmitting(true)
-    setUploadProgress(0)
-    setUploadStatus("Preparando...")
+    setUploadStatus("Guardando reseña...")
+    setUploadProgress(50)
 
     try {
-      // Generar un ID temporal para la reseña
-      const tempReviewId = `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
-
       // Obtener el usuario actual
       const {
         data: { user },
@@ -148,65 +166,6 @@ export function DetailedReviewForm({
         alert("Debes estar autenticado para enviar una reseña")
         return
       }
-
-      // Subir fotos a Vercel Blob si hay fotos
-      let uploadedPhotoUrls: string[] = []
-      if (photos.length > 0) {
-        setUploadStatus("Subiendo fotos...")
-        setUploadProgress(25)
-
-        // Filtrar solo los archivos File (no strings que ya son URLs)
-        const filesToUpload = photos.map((photo) => photo.file).filter((file): file is File => file instanceof File)
-
-        console.log("=== DEBUG PHOTO UPLOAD ===")
-        console.log("Total photos:", photos.length)
-        console.log("Files to upload:", filesToUpload.length)
-        console.log("Photos array:", photos)
-        console.log("Files array:", filesToUpload)
-
-        if (filesToUpload.length > 0) {
-          try {
-            console.log("Iniciando upload de fotos...")
-            uploadedPhotoUrls = await uploadMultipleReviewPhotos(filesToUpload, user.id, tempReviewId)
-            console.log("Fotos subidas exitosamente:", uploadedPhotoUrls)
-
-            // DEBUG: Verificar que las URLs sean de Vercel Blob
-            uploadedPhotoUrls.forEach((url, index) => {
-              console.log(`[DEBUG VERCEL BLOB URL ${index}]`, {
-                url,
-                isVercelBlob: url.includes("blob.vercel-storage.com"),
-                isSupabase: url.includes("supabase.co"),
-                urlLength: url.length,
-              })
-            })
-
-            setUploadProgress(75)
-          } catch (uploadError) {
-            console.error("Error subiendo fotos:", uploadError)
-            const errorMessage = uploadError instanceof Error ? uploadError.message : "Error desconocido"
-            setUploadError(`Error subiendo fotos: ${errorMessage}`)
-
-            // Preguntar al usuario si quiere continuar sin fotos
-            const continueWithoutPhotos = confirm(
-              "Hubo un problema subiendo las fotos. ¿Quieres enviar la reseña sin fotos?",
-            )
-
-            if (!continueWithoutPhotos) {
-              return
-            }
-          }
-        }
-
-        // También incluir URLs que ya existen (strings)
-        const existingUrls = photos
-          .map((photo) => photo.file)
-          .filter((file): file is string => typeof file === "string")
-
-        uploadedPhotoUrls = [...uploadedPhotoUrls, ...existingUrls]
-      }
-
-      setUploadStatus("Guardando reseña...")
-      setUploadProgress(90)
 
       // Clean the address before saving to database
       const cleanedAddress = cleanAddress(placeAddress)
@@ -222,7 +181,20 @@ export function DetailedReviewForm({
         id: selectedPlace.id || null,
       }
 
-      // Crear el objeto de datos de la reseña con las URLs de las fotos subidas
+      // Obtener solo las URLs de las fotos que se subieron exitosamente
+      const successfulPhotoUrls = photos
+        .filter((photo) => typeof photo.file === "string" && !photo.uploadError && !photo.isUploading)
+        .map((photo) => photo.file as string)
+
+      console.log("[DEBUG NEW SYSTEM]", {
+        total_photos: photos.length,
+        successful_uploads: successfulPhotoUrls.length,
+        uploading: photos.filter((p) => p.isUploading).length,
+        errors: photos.filter((p) => p.uploadError).length,
+        urls: successfulPhotoUrls,
+      })
+
+      // Crear el objeto de datos de la reseña con las URLs ya subidas
       const reviewData = {
         place: placeData,
         dish_name: dishName.trim() || null,
@@ -232,20 +204,10 @@ export function DetailedReviewForm({
         price_range: priceRange,
         restaurant_category: category,
         comment: comment.trim() || null,
-        photo_urls: uploadedPhotoUrls,
-        primary_photo_url: uploadedPhotoUrls.length > 0 ? uploadedPhotoUrls[0] : null,
-        // DEBUG: Campo adicional para verificar las URLs
-        vercel_blob_urls: uploadedPhotoUrls.filter((url) => url.includes("blob.vercel-storage.com")),
+        photo_urls: successfulPhotoUrls,
+        primary_photo_url: successfulPhotoUrls.length > 0 ? successfulPhotoUrls[0] : null,
+        temp_review_id: tempReviewId, // Para tracking
       }
-
-      console.log("[DEBUG REVIEW DATA]", {
-        photo_urls: reviewData.photo_urls,
-        vercel_blob_urls: reviewData.vercel_blob_urls,
-        primary_photo_url: reviewData.primary_photo_url,
-        total_photos: uploadedPhotoUrls.length,
-        cleaned_address: cleanedAddress,
-        original_address: placeAddress,
-      })
 
       setUploadProgress(100)
       await onSubmit(reviewData)
@@ -432,7 +394,13 @@ export function DetailedReviewForm({
             </div>
 
             {/* Fotos - Componente mejorado */}
-            <PhotoUpload photos={photos} onPhotosChange={setPhotos} maxPhotos={6} userId="temp-user" />
+            <PhotoUpload
+              photos={photos}
+              onPhotosChange={setPhotos}
+              maxPhotos={6}
+              userId="temp-user"
+              tempReviewId={tempReviewId}
+            />
 
             {/* Comentario */}
             <div className="space-y-2">

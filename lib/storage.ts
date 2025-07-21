@@ -1,4 +1,49 @@
-// Función para subir múltiples fotos de reseñas usando la API route
+// Función para subir una sola foto inmediatamente (estilo Twitter)
+export async function uploadSingleReviewPhoto(file: File, tempReviewId: string): Promise<string> {
+  console.log(`Iniciando upload individual de foto: ${file.name}`)
+
+  try {
+    const formData = new FormData()
+    formData.append("photo", file)
+    formData.append("tempReviewId", tempReviewId)
+
+    console.log("Enviando request a /api/upload-single-photo...")
+
+    const response = await fetch("/api/upload-single-photo", {
+      method: "POST",
+      body: formData,
+    })
+
+    console.log("Response status:", response.status)
+
+    if (!response.ok) {
+      const errorData = await response.json()
+      console.error("Error response:", errorData)
+      throw new Error(errorData.error || `Error HTTP ${response.status}`)
+    }
+
+    const data = await response.json()
+    console.log("Upload response:", data)
+
+    if (!data.success || !data.url) {
+      throw new Error("No se recibió URL válida del servidor")
+    }
+
+    // Verificar que la URL sea de Vercel Blob
+    if (data.url.includes("blob.vercel-storage.com")) {
+      console.log("✅ URL de Vercel Blob correcta:", data.url)
+    } else {
+      console.warn("⚠️ URL no es de Vercel Blob:", data.url)
+    }
+
+    return data.url
+  } catch (error) {
+    console.error("Error en uploadSingleReviewPhoto:", error)
+    throw error
+  }
+}
+
+// Función para subir múltiples fotos de reseñas usando la API route (LEGACY - mantener por compatibilidad)
 export async function uploadMultipleReviewPhotos(files: File[], userId: string, reviewId: string): Promise<string[]> {
   console.log(`Iniciando upload de ${files.length} fotos para usuario ${userId}, reseña ${reviewId}`)
 
@@ -95,4 +140,9 @@ export function createLocalPhotoUrl(file: File, photoIndex: number): string {
     return URL.createObjectURL(file)
   }
   return `/placeholder.svg?height=300&width=300&text=Foto+${photoIndex}`
+}
+
+// Función para generar ID temporal único
+export function generateTempReviewId(): string {
+  return `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
 }

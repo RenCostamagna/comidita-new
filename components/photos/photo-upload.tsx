@@ -6,15 +6,18 @@ import { useState, useRef, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Progress } from "@/components/ui/progress"
-import { X, Upload, Camera, AlertCircle, Plus, GripVertical } from "lucide-react"
+import { X, Upload, Camera, AlertCircle, Plus, GripVertical, Loader2 } from "lucide-react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { validateImageFile, getImageInfo } from "@/lib/image-compression"
+import { uploadSingleReviewPhoto, generateTempReviewId } from "@/lib/storage"
 
 interface PhotoData {
   file: File | string
   isPrimary: boolean
   id?: string
+  isUploading?: boolean
+  uploadProgress?: number
+  uploadError?: string
 }
 
 interface PhotoUploadProps {
@@ -24,6 +27,7 @@ interface PhotoUploadProps {
   maxSizePerPhoto?: number // in MB
   acceptedFormats?: string[]
   userId?: string
+  tempReviewId?: string
 }
 
 export function PhotoUpload({
@@ -33,11 +37,10 @@ export function PhotoUpload({
   maxSizePerPhoto = 10,
   acceptedFormats = ["image/jpeg", "image/jpg", "image/png", "image/webp"],
   userId = "temp-user",
+  tempReviewId,
 }: PhotoUploadProps) {
   const [dragActive, setDragActive] = useState(false)
   const [uploadError, setUploadError] = useState<string | null>(null)
-  const [isProcessing, setIsProcessing] = useState(false)
-  const [processingProgress, setProcessingProgress] = useState(0)
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null)
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null)
 
@@ -47,68 +50,110 @@ export function PhotoUpload({
   const [isDragging, setIsDragging] = useState(false)
 
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const currentTempReviewId = useRef(tempReviewId || generateTempReviewId())
+
+  // Función para subir una sola imagen inmediatamente
+  const uploadSinglePhoto = async (file: File): Promise<string> => {
+    console.log(`🚀 Iniciando upload inmediato de: ${file.name}`)
+
+    try {
+      const url = await uploadSingleReviewPhoto(file, currentTempReviewId.current)
+      console.log(`✅ Foto subida exitosamente: ${url}`)
+      return url
+    } catch (error) {
+      console.error(`❌ Error subiendo ${file.name}:`, error)
+      throw error
+    }
+  }
 
   const handleFiles = async (fileList: FileList) => {
     setUploadError(null)
-    setIsProcessing(true)
-    setProcessingProgress(0)
-
-    const newPhotoData: PhotoData[] = []
-    const errors: string[] = []
 
     // Verificar límite total de fotos
     if (photos.length + fileList.length > maxPhotos) {
       setUploadError(`Máximo ${maxPhotos} fotos permitidas`)
-      setIsProcessing(false)
       return
     }
 
+    // Procesar cada archivo individualmente
     for (let i = 0; i < fileList.length; i++) {
       const file = fileList[i]
-      setProcessingProgress(((i + 1) / fileList.length) * 100)
 
       try {
         // Validar archivo
         const validation = validateImageFile(file, maxSizePerPhoto, acceptedFormats)
         if (!validation.isValid) {
-          errors.push(`${file.name}: ${validation.error}`)
+          setUploadError(`${file.name}: ${validation.error}`)
           continue
         }
 
         // Obtener información de la imagen
         const imageInfo = await getImageInfo(file)
-        console.log(`✅ Archivo procesado: ${file.name}`, {
+        console.log(`📷 Archivo validado: ${file.name}`, {
           size: `${(file.size / 1024 / 1024).toFixed(2)}MB`,
           dimensions: `${imageInfo.width}x${imageInfo.height}`,
           type: file.type,
         })
 
-        // Crear PhotoData object
-        const photoData: PhotoData = {
-          file: file,
-          isPrimary: false, // Will be set based on position
-          id: `photo-${Date.now()}-${i}`,
+        // Crear PhotoData object con estado de carga
+        const photoId = `photo-${Date.now()}-${i}`
+        const newPhotoData: PhotoData = {
+          file: file, // Temporalmente guardamos el File
+          isPrimary: false,
+          id: photoId,
+          isUploading: true,
+          uploadProgress: 0,
         }
 
-        newPhotoData.push(photoData)
+        // Agregar la foto inmediatamente al estado (mostrando loading)
+        const updatedPhotos = updatePrimaryPhoto([...photos, newPhotoData])
+        onPhotosChange(updatedPhotos)
+
+        // Subir la imagen en background
+        uploadSinglePhoto(file)
+          .then((uploadedUrl) => {
+            // Actualizar el estado con la URL subida
+            onPhotosChange((prevPhotos) => {
+              const photoIndex = prevPhotos.findIndex((p) => p.id === photoId)
+              if (photoIndex === -1) return prevPhotos
+
+              const newPhotos = [...prevPhotos]
+              newPhotos[photoIndex] = {
+                ...newPhotos[photoIndex],
+                file: uploadedUrl, // Reemplazar File con URL
+                isUploading: false,
+                uploadProgress: 100,
+                uploadError: undefined,
+              }
+
+              return updatePrimaryPhoto(newPhotos)
+            })
+
+            console.log(`✅ Foto ${file.name} procesada y guardada como URL`)
+          })
+          .catch((error) => {
+            // Marcar error en el estado
+            onPhotosChange((prevPhotos) => {
+              const photoIndex = prevPhotos.findIndex((p) => p.id === photoId)
+              if (photoIndex === -1) return prevPhotos
+
+              const newPhotos = [...prevPhotos]
+              newPhotos[photoIndex] = {
+                ...newPhotos[photoIndex],
+                isUploading: false,
+                uploadError: error.message || "Error subiendo foto",
+              }
+
+              return newPhotos
+            })
+
+            console.error(`❌ Error procesando ${file.name}:`, error)
+          })
       } catch (error) {
         console.error(`Error procesando ${file.name}:`, error)
-        errors.push(`${file.name}: Error al procesar`)
+        setUploadError(`${file.name}: Error al procesar`)
       }
     }
-
-    if (errors.length > 0) {
-      setUploadError(errors.join(", "))
-    }
-
-    if (newPhotoData.length > 0) {
-      const updatedPhotos = updatePrimaryPhoto([...photos, ...newPhotoData])
-      onPhotosChange(updatedPhotos)
-      console.log(`✅ ${newPhotoData.length} fotos agregadas correctamente`)
-    }
-
-    setIsProcessing(false)
-    setProcessingProgress(0)
   }
 
   // Update primary photo based on position (first photo is always primary)
@@ -146,6 +191,14 @@ export function PhotoUpload({
   }
 
   const removePhoto = (index: number) => {
+    const photoToRemove = photos[index]
+
+    // Si la foto ya está subida (es una URL), intentar eliminarla del storage
+    if (typeof photoToRemove.file === "string" && photoToRemove.file.includes("blob.vercel-storage.com")) {
+      // TODO: Implementar eliminación del blob si es necesario
+      console.log(`🗑️ Foto eliminada del estado: ${photoToRemove.file}`)
+    }
+
     const newPhotos = photos.filter((_, i) => i !== index)
     const updatedPhotos = updatePrimaryPhoto(newPhotos)
     onPhotosChange(updatedPhotos)
@@ -290,6 +343,10 @@ export function PhotoUpload({
     setDragOverIndex(null)
   }
 
+  // Contar fotos que están subiendo
+  const uploadingCount = photos.filter((photo) => photo.isUploading).length
+  const hasUploadErrors = photos.some((photo) => photo.uploadError)
+
   return (
     <div className="space-y-4">
       {/* Upload Area */}
@@ -308,15 +365,7 @@ export function PhotoUpload({
         onClick={photos.length < maxPhotos ? openFileDialog : undefined}
       >
         <CardContent className="p-6">
-          {isProcessing ? (
-            <div className="flex flex-col items-center justify-center py-8 space-y-4">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto" />
-              <div className="space-y-2 w-full max-w-xs">
-                <p className="text-sm text-muted-foreground text-center">Procesando fotos...</p>
-                <Progress value={processingProgress} className="w-full" />
-              </div>
-            </div>
-          ) : photos.length === 0 ? (
+          {photos.length === 0 ? (
             // Empty state - show upload instructions
             <div className="flex flex-col items-center justify-center py-8 text-center space-y-4">
               <div className="flex items-center justify-center space-x-2">
@@ -325,8 +374,9 @@ export function PhotoUpload({
               </div>
               <div className="space-y-2">
                 <p className="text-sm font-medium">Arrastra fotos aquí o haz clic para seleccionar</p>
-                
-                
+                <p className="text-xs text-muted-foreground">
+                  Las fotos se suben automáticamente • Máximo {maxPhotos} fotos • {maxSizePerPhoto}MB por foto
+                </p>
               </div>
             </div>
           ) : (
@@ -340,13 +390,13 @@ export function PhotoUpload({
                     className={`relative group ${dragOverIndex === index ? "ring-2 ring-primary ring-offset-2" : ""} ${
                       draggedIndex === index || touchDragIndex === index ? "opacity-50" : ""
                     } ${isDragging && touchDragIndex === index ? "scale-105 z-10" : ""} transition-all duration-200`}
-                    draggable
-                    onDragStart={(e) => handlePhotosDragStart(e, index)}
+                    draggable={!photo.isUploading}
+                    onDragStart={(e) => !photo.isUploading && handlePhotosDragStart(e, index)}
                     onDragOver={(e) => handlePhotosDragOver(e, index)}
                     onDragLeave={handlePhotosDragLeave}
                     onDrop={(e) => handlePhotosDrop(e, index)}
                     onDragEnd={handlePhotosDragEnd}
-                    onTouchStart={(e) => handleTouchStart(e, index)}
+                    onTouchStart={(e) => !photo.isUploading && handleTouchStart(e, index)}
                     onTouchMove={handleTouchMove}
                     onTouchEnd={handleTouchEnd}
                     onTouchCancel={handleTouchCancel}
@@ -357,14 +407,37 @@ export function PhotoUpload({
                         alt={`Preview ${index + 1}`}
                         className="w-full h-full object-cover pointer-events-none"
                       />
+
+                      {/* Loading overlay */}
+                      {photo.isUploading && (
+                        <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                          <div className="text-center text-white">
+                            <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2" />
+                            <p className="text-xs">Subiendo...</p>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Error overlay */}
+                      {photo.uploadError && (
+                        <div className="absolute inset-0 bg-red-500/80 flex items-center justify-center">
+                          <div className="text-center text-white p-2">
+                            <AlertCircle className="h-4 w-4 mx-auto mb-1" />
+                            <p className="text-xs">Error</p>
+                          </div>
+                        </div>
+                      )}
+
                       <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors" />
 
-                      {/* Drag handle */}
-                      <div className="absolute top-2 left-2 opacity-0 group-hover:opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
-                        <div className="bg-black/50 rounded p-1">
-                          <GripVertical className="h-3 w-3 text-white" />
+                      {/* Drag handle - solo si no está subiendo */}
+                      {!photo.isUploading && (
+                        <div className="absolute top-2 left-2 opacity-0 group-hover:opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
+                          <div className="bg-black/50 rounded p-1">
+                            <GripVertical className="h-3 w-3 text-white" />
+                          </div>
                         </div>
-                      </div>
+                      )}
 
                       {/* Delete button */}
                       <Button
@@ -381,14 +454,15 @@ export function PhotoUpload({
                           e.preventDefault()
                           removePhoto(index)
                         }}
+                        disabled={photo.isUploading}
                       >
                         <X className="h-3 w-3" />
                       </Button>
 
                       {/* Primary badge */}
-                      {photo.isPrimary && (
+                      {photo.isPrimary && !photo.isUploading && (
                         <Badge className="absolute bottom-2 left-2 text-xs pointer-events-none" variant="secondary">
-                          Plato
+                          Principal
                         </Badge>
                       )}
 
@@ -417,12 +491,30 @@ export function PhotoUpload({
                 )}
               </div>
 
-              {/* Instructions when photos are present */}
+              {/* Instructions and status */}
               <div className="text-center space-y-2">
-                <p className="text-xs text-muted-foreground">Mantén presionado y arrastra las fotos para reordenar</p>
-                <Badge variant="outline">
-                  {photos.length} de {maxPhotos} fotos
-                </Badge>
+                <p className="text-xs text-muted-foreground">
+                  {uploadingCount > 0
+                    ? `Subiendo ${uploadingCount} foto${uploadingCount > 1 ? "s" : ""}...`
+                    : "Mantén presionado y arrastra las fotos para reordenar"}
+                </p>
+                <div className="flex items-center justify-center gap-2">
+                  <Badge variant="outline">
+                    {photos.length} de {maxPhotos} fotos
+                  </Badge>
+                  {uploadingCount > 0 && (
+                    <Badge variant="secondary">
+                      <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                      Subiendo
+                    </Badge>
+                  )}
+                  {hasUploadErrors && (
+                    <Badge variant="destructive">
+                      <AlertCircle className="h-3 w-3 mr-1" />
+                      Error
+                    </Badge>
+                  )}
+                </div>
               </div>
             </div>
           )}
@@ -444,6 +536,16 @@ export function PhotoUpload({
         <Alert variant="destructive">
           <AlertCircle className="h-4 w-4" />
           <AlertDescription>{uploadError}</AlertDescription>
+        </Alert>
+      )}
+
+      {/* Upload errors from individual photos */}
+      {hasUploadErrors && (
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>
+            Algunas fotos tuvieron errores al subir. Puedes intentar eliminarlas y subirlas nuevamente.
+          </AlertDescription>
         </Alert>
       )}
     </div>
