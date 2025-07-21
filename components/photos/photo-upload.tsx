@@ -2,15 +2,20 @@
 
 import type React from "react"
 
-import { useState, useRef, useCallback, useEffect } from "react"
+import { useState, useRef, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
-import { X, Upload, Camera, AlertCircle, Plus, GripVertical } from "lucide-react"
+import { X, Upload, Camera, AlertCircle, Plus, GripVertical, Smartphone, Zap } from "lucide-react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { validateImageFile, getImageInfo } from "@/lib/image-compression"
-import { logDebug, logError, logDeviceInfo } from "@/lib/debug-logger"
+import {
+  validateImageFile,
+  getImageInfo,
+  compressImageAdvanced,
+  isMobileDevice,
+  willExceedPayloadLimit,
+} from "@/lib/image-compression"
 
 interface PhotoData {
   file: File | string
@@ -39,6 +44,7 @@ export function PhotoUpload({
   const [uploadError, setUploadError] = useState<string | null>(null)
   const [isProcessing, setIsProcessing] = useState(false)
   const [processingProgress, setProcessingProgress] = useState(0)
+  const [processingStatus, setProcessingStatus] = useState("")
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null)
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null)
 
@@ -48,94 +54,116 @@ export function PhotoUpload({
   const [isDragging, setIsDragging] = useState(false)
 
   const fileInputRef = useRef<HTMLInputElement>(null)
-
-  useEffect(() => {
-    logDebug("PhotoUpload", "Component mounted")
-    logDeviceInfo("PhotoUpload")
-  }, [])
+  const isMobile = isMobileDevice()
 
   const handleFiles = async (fileList: FileList) => {
     setUploadError(null)
     setIsProcessing(true)
     setProcessingProgress(0)
-
-    logDebug(
-      "PhotoUpload:handleFiles",
-      `Handling ${fileList.length} files. Current photo count: ${photos.length}. Max photos: ${maxPhotos}.`,
-    )
+    setProcessingStatus("Validando archivos...")
 
     const newPhotoData: PhotoData[] = []
     const errors: string[] = []
 
     // Verificar límite total de fotos
     if (photos.length + fileList.length > maxPhotos) {
-      const errorMsg = `Máximo ${maxPhotos} fotos permitidas. Intento de agregar ${fileList.length} a las ${photos.length} existentes.`
-      logError("PhotoUpload:handleFiles", errorMsg, null)
-      setUploadError(errorMsg)
+      setUploadError(`Máximo ${maxPhotos} fotos permitidas`)
       setIsProcessing(false)
       return
     }
 
-    for (let i = 0; i < fileList.length; i++) {
-      const file = fileList[i]
-      setProcessingProgress(((i + 1) / fileList.length) * 100)
+    // Convertir FileList a Array para mejor manejo
+    const filesArray = Array.from(fileList)
 
-      logDebug("PhotoUpload:handleFiles", `Processing file ${i + 1}/${fileList.length}`, {
-        name: file.name,
-        size: file.size,
-        type: file.type,
+    // Verificar si el payload será muy grande
+    const willExceedLimit = willExceedPayloadLimit(filesArray, 3.5)
+    const shouldCompress = isMobile || willExceedLimit || filesArray.some((f) => f.size > 2 * 1024 * 1024)
+
+    if (shouldCompress) {
+      console.log("📱 Compresión automática activada:", {
+        isMobile,
+        willExceedLimit,
+        totalFiles: filesArray.length,
+        totalSize: `${(filesArray.reduce((sum, f) => sum + f.size, 0) / 1024 / 1024).toFixed(2)}MB`,
       })
+    }
+
+    for (let i = 0; i < filesArray.length; i++) {
+      const file = filesArray[i]
+      const progressBase = (i / filesArray.length) * 100
+      setProcessingProgress(progressBase)
+      setProcessingStatus(`Procesando ${file.name}...`)
 
       try {
         // Validar archivo
         const validation = validateImageFile(file, maxSizePerPhoto, acceptedFormats)
         if (!validation.isValid) {
-          logError("PhotoUpload:handleFiles", `File validation failed for ${file.name}`, validation.error)
           errors.push(`${file.name}: ${validation.error}`)
           continue
         }
 
-        // Obtener información de la imagen
-        const imageInfo = await getImageInfo(file)
+        let processedFile = file
 
-        logDebug("PhotoUpload:handleFiles", `✅ File processed successfully: ${file.name}`, {
-          size: `${(file.size / 1024 / 1024).toFixed(2)}MB`,
+        // Comprimir si es necesario
+        if (shouldCompress) {
+          setProcessingStatus(`Optimizando ${file.name}...`)
+
+          try {
+            processedFile = await compressImageAdvanced(file, {
+              maxWidth: isMobile ? 800 : 1200,
+              maxHeight: isMobile ? 600 : 900,
+              quality: isMobile ? 0.6 : 0.7,
+              outputFormat: "jpeg",
+              isMobile,
+            })
+
+            console.log(`✅ Foto optimizada: ${file.name}`, {
+              original: `${(file.size / 1024 / 1024).toFixed(2)}MB`,
+              compressed: `${(processedFile.size / 1024 / 1024).toFixed(2)}MB`,
+              reduction: `${(((file.size - processedFile.size) / file.size) * 100).toFixed(1)}%`,
+            })
+          } catch (compressionError) {
+            console.warn(`⚠️ Error comprimiendo ${file.name}, usando original:`, compressionError)
+            // Si falla la compresión, usar el archivo original
+          }
+        }
+
+        // Obtener información de la imagen procesada
+        const imageInfo = await getImageInfo(processedFile)
+        console.log(`📷 Archivo procesado: ${processedFile.name}`, {
+          size: `${(processedFile.size / 1024 / 1024).toFixed(2)}MB`,
           dimensions: `${imageInfo.width}x${imageInfo.height}`,
-          type: file.type,
+          type: processedFile.type,
         })
 
         // Crear PhotoData object
         const photoData: PhotoData = {
-          file: file,
+          file: processedFile,
           isPrimary: false, // Will be set based on position
           id: `photo-${Date.now()}-${i}`,
         }
 
         newPhotoData.push(photoData)
       } catch (error) {
-        logError("PhotoUpload:handleFiles", `Error processing ${file.name}`, error)
+        console.error(`❌ Error procesando ${file.name}:`, error)
         errors.push(`${file.name}: Error al procesar`)
       }
     }
 
     if (errors.length > 0) {
-      logError("PhotoUpload:handleFiles", "Errors occurred during file processing", errors)
       setUploadError(errors.join(", "))
     }
 
     if (newPhotoData.length > 0) {
       const updatedPhotos = updatePrimaryPhoto([...photos, ...newPhotoData])
       onPhotosChange(updatedPhotos)
-      logDebug(
-        "PhotoUpload:handleFiles",
-        `✅ ${newPhotoData.length} photos added. Calling onPhotosChange. Total photos now: ${updatedPhotos.length}`,
-        {
-          newPhotoNames: newPhotoData.map((p) => (p.file as File).name),
-          totalPhotoCount: updatedPhotos.length,
-        },
-      )
-    } else {
-      logDebug("PhotoUpload:handleFiles", "No new photos were added after processing.")
+      console.log(`✅ ${newPhotoData.length} fotos agregadas correctamente`)
+
+      // Mostrar mensaje de optimización si se comprimieron fotos
+      if (shouldCompress && newPhotoData.length > 0) {
+        setProcessingStatus(`✨ ${newPhotoData.length} fotos optimizadas para móvil`)
+        setTimeout(() => setProcessingStatus(""), 3000)
+      }
     }
 
     setIsProcessing(false)
@@ -166,30 +194,24 @@ export function PhotoUpload({
     setDragActive(false)
 
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-      logDebug("PhotoUpload:handleDrop", `Dropped ${e.dataTransfer.files.length} files.`)
       handleFiles(e.dataTransfer.files)
     }
   }
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
-      logDebug("PhotoUpload:handleInputChange", `Selected ${e.target.files.length} files via input.`)
       handleFiles(e.target.files)
-      // Reset file input to allow selecting the same file again
-      e.target.value = ""
     }
   }
 
   const removePhoto = (index: number) => {
-    logDebug("PhotoUpload:removePhoto", `Attempting to remove photo at index ${index}.`)
     const newPhotos = photos.filter((_, i) => i !== index)
     const updatedPhotos = updatePrimaryPhoto(newPhotos)
     onPhotosChange(updatedPhotos)
-    logDebug("PhotoUpload:removePhoto", `🗑️ Photo ${index + 1} removed. Total photos now: ${updatedPhotos.length}`)
+    console.log(`🗑️ Foto ${index + 1} eliminada`)
   }
 
   const openFileDialog = () => {
-    logDebug("PhotoUpload:openFileDialog", "File dialog opened by user.")
     fileInputRef.current?.click()
   }
 
@@ -206,7 +228,6 @@ export function PhotoUpload({
     (fromIndex: number, toIndex: number) => {
       if (fromIndex === toIndex) return
 
-      logDebug("PhotoUpload:reorderPhotos", `Reordering photo from index ${fromIndex} to ${toIndex}.`)
       const newPhotos = [...photos]
       const draggedPhoto = newPhotos[fromIndex]
 
@@ -220,7 +241,7 @@ export function PhotoUpload({
       const updatedPhotos = updatePrimaryPhoto(newPhotos)
       onPhotosChange(updatedPhotos)
 
-      logDebug("PhotoUpload:reorderPhotos", `📷 Photo moved. Calling onPhotosChange.`)
+      console.log(`📷 Foto movida de posición ${fromIndex + 1} a ${toIndex + 1}`)
     },
     [photos, onPhotosChange],
   )
@@ -330,6 +351,19 @@ export function PhotoUpload({
 
   return (
     <div className="space-y-4">
+      {/* Mobile optimization notice */}
+      {isMobile && (
+        <Alert className="border-blue-200 bg-blue-50">
+          <Smartphone className="h-4 w-4 text-blue-600" />
+          <AlertDescription className="text-blue-800">
+            <div className="flex items-center gap-2">
+              <Zap className="h-3 w-3" />
+              <span className="text-xs">Optimización automática activada para móvil</span>
+            </div>
+          </AlertDescription>
+        </Alert>
+      )}
+
       {/* Upload Area */}
       <Card
         className={`border-2 border-dashed transition-colors cursor-pointer ${
@@ -350,8 +384,9 @@ export function PhotoUpload({
             <div className="flex flex-col items-center justify-center py-8 space-y-4">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto" />
               <div className="space-y-2 w-full max-w-xs">
-                <p className="text-sm text-muted-foreground text-center">Procesando fotos...</p>
+                <p className="text-sm text-muted-foreground text-center">{processingStatus}</p>
                 <Progress value={processingProgress} className="w-full" />
+                {isMobile && <p className="text-xs text-blue-600 text-center">✨ Optimizando para móvil...</p>}
               </div>
             </div>
           ) : photos.length === 0 ? (
@@ -363,6 +398,10 @@ export function PhotoUpload({
               </div>
               <div className="space-y-2">
                 <p className="text-sm font-medium">Arrastra fotos aquí o haz clic para seleccionar</p>
+                <div className="text-xs text-muted-foreground space-y-1">
+                  <p>Máximo {maxPhotos} fotos • JPG, PNG, WebP</p>
+                  {isMobile && <p className="text-blue-600">📱 Se optimizarán automáticamente para móvil</p>}
+                </div>
               </div>
             </div>
           ) : (
@@ -455,10 +494,20 @@ export function PhotoUpload({
 
               {/* Instructions when photos are present */}
               <div className="text-center space-y-2">
-                <p className="text-xs text-muted-foreground">Mantén presionado y arrastra las fotos para reordenar</p>
-                <Badge variant="outline">
-                  {photos.length} de {maxPhotos} fotos
-                </Badge>
+                <p className="text-xs text-muted-foreground">
+                  {isMobile ? "Mantén presionado para reordenar" : "Arrastra las fotos para reordenar"}
+                </p>
+                <div className="flex items-center justify-center gap-2">
+                  <Badge variant="outline">
+                    {photos.length} de {maxPhotos} fotos
+                  </Badge>
+                  {isMobile && (
+                    <Badge variant="outline" className="text-blue-600 border-blue-200">
+                      <Zap className="h-3 w-3 mr-1" />
+                      Optimizado
+                    </Badge>
+                  )}
+                </div>
               </div>
             </div>
           )}
@@ -479,7 +528,14 @@ export function PhotoUpload({
       {uploadError && (
         <Alert variant="destructive">
           <AlertCircle className="h-4 w-4" />
-          <AlertDescription>{uploadError}</AlertDescription>
+          <AlertDescription>
+            {uploadError}
+            {isMobile && uploadError.includes("muy grande") && (
+              <div className="mt-2 text-xs">
+                💡 Tip: Las fotos se optimizan automáticamente en móvil. Si persiste el error, intenta con menos fotos.
+              </div>
+            )}
+          </AlertDescription>
         </Alert>
       )}
     </div>
