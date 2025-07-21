@@ -19,7 +19,7 @@ export default function RootLayout({
   return (
     <html lang="es" suppressHydrationWarning>
       <head>
-        <meta name="format-detection" content="telephone=no" />
+        <meta name="format-detection" content="telephone=no, address=no, email=no" />
       </head>
       <body className={inter.className}>
         <ThemeProvider
