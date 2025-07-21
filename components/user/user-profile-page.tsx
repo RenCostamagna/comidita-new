@@ -35,7 +35,7 @@ export function UserProfilePage({ user, onBack }: UserProfilePageProps) {
     averageRating: 0,
   })
   const [isLoading, setIsLoading] = useState(true)
-  const [selectedReview, setSelectedReview] = useState<DetailedReview | null>(null)
+  const [selectedReviewId, setSelectedReviewId] = useState<string | null>(null)
 
   const supabase = createClient()
 
@@ -132,15 +132,27 @@ export function UserProfilePage({ user, onBack }: UserProfilePageProps) {
   }
 
   const handleViewReview = (review: DetailedReview) => {
-    setSelectedReview(review)
+    setSelectedReviewId(review.id)
   }
 
   const handleBackFromReview = () => {
-    setSelectedReview(null)
+    setSelectedReviewId(null)
   }
 
-  if (selectedReview) {
-    return <SingleReviewPage review={selectedReview} onBack={handleBackFromReview} />
+  // Si hay una reseña seleccionada, mostrar SingleReviewPage
+  if (selectedReviewId) {
+    return (
+      <SingleReviewPage
+        reviewId={selectedReviewId}
+        onBack={handleBackFromReview}
+        onViewPlace={() => {}}
+        onAddReview={() => {}}
+        onGoHome={() => {}}
+        onGoReview={() => {}}
+        onGoProfile={() => {}}
+        onNotificationClick={() => {}}
+      />
+    )
   }
 
   return (
@@ -265,37 +277,31 @@ export function UserProfilePage({ user, onBack }: UserProfilePageProps) {
         </TabsContent>
 
         <TabsContent value="reviews" className="space-y-6">
-          {selectedReview ? (
-            <SingleReviewPage review={selectedReview} onBack={handleBackFromReview} />
-          ) : (
-            <>
-              {/* Header de reseñas */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>Mis Reseñas ({userStats.totalReviews})</CardTitle>
-                </CardHeader>
-              </Card>
+          {/* Header de reseñas */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Mis Reseñas ({userStats.totalReviews})</CardTitle>
+            </CardHeader>
+          </Card>
 
-              {/* Lista de reseñas */}
-              {isLoading ? (
-                <div className="text-center py-8">
-                  <div className="text-muted-foreground">Cargando reseñas...</div>
-                </div>
-              ) : userReviews.length > 0 ? (
-                <div className="space-y-3">
-                  {userReviews.map((review) => (
-                    <ProfileReviewCard key={review.id} review={review} onViewReview={handleViewReview} />
-                  ))}
-                </div>
-              ) : (
-                <Card>
-                  <CardContent className="text-center py-8">
-                    <p className="text-muted-foreground">Aún no has hecho ninguna reseña.</p>
-                    <p className="text-sm text-muted-foreground mt-2">¡Comparte tu primera experiencia gastronómica!</p>
-                  </CardContent>
-                </Card>
-              )}
-            </>
+          {/* Lista de reseñas */}
+          {isLoading ? (
+            <div className="text-center py-8">
+              <div className="text-muted-foreground">Cargando reseñas...</div>
+            </div>
+          ) : userReviews.length > 0 ? (
+            <div className="space-y-3">
+              {userReviews.map((review) => (
+                <ProfileReviewCard key={review.id} review={review} onViewReview={handleViewReview} />
+              ))}
+            </div>
+          ) : (
+            <Card>
+              <CardContent className="text-center py-8">
+                <p className="text-muted-foreground">Aún no has hecho ninguna reseña.</p>
+                <p className="text-sm text-muted-foreground mt-2">¡Comparte tu primera experiencia gastronómica!</p>
+              </CardContent>
+            </Card>
           )}
         </TabsContent>
       </Tabs>
