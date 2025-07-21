@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
 import { createClient } from "@/lib/supabase/client"
@@ -57,7 +57,16 @@ export function LevelsShowcase({ currentUserPoints = 0, showStatistics = false }
         if (statsError) {
           console.error("Error fetching level statistics:", statsError)
         } else {
-          setStatistics(statsData || [])
+          // Calcular porcentajes correctos
+          const rawStats = statsData || []
+          const totalUsers = rawStats.reduce((sum: number, stat: any) => sum + (stat.user_count || 0), 0)
+
+          const correctedStats = rawStats.map((stat: any) => ({
+            ...stat,
+            percentage: totalUsers > 0 ? Math.round((stat.user_count / totalUsers) * 100) : 0,
+          }))
+
+          setStatistics(correctedStats)
         }
       }
     } catch (error) {
@@ -98,7 +107,6 @@ export function LevelsShowcase({ currentUserPoints = 0, showStatistics = false }
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">🏆 Niveles de Usuario</CardTitle>
-        
       </CardHeader>
       <CardContent>
         <div className="space-y-3">
@@ -158,7 +166,17 @@ export function LevelsShowcase({ currentUserPoints = 0, showStatistics = false }
                       <span>{level.max_points.toLocaleString()} pts</span>
                     </div>
                     <Progress
-                      value={((currentUserPoints - level.min_points) / (level.max_points - level.min_points)) * 100}
+                      value={
+                        level.max_points
+                          ? Math.min(
+                              100,
+                              Math.max(
+                                0,
+                                ((currentUserPoints - level.min_points) / (level.max_points - level.min_points)) * 100,
+                              ),
+                            )
+                          : 0
+                      }
                       className="h-2"
                     />
                   </div>
