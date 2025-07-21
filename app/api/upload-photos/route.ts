@@ -78,11 +78,20 @@ export async function POST(request: NextRequest) {
           continue
         }
 
+        // --- INICIO DEBUGGING ---
+        console.log(`[DEBUG] Original file name: "${file.name}"`)
+        console.log(`[DEBUG] File type: "${file.type}"`)
+        // --- FIN DEBUGGING ---
+
         // Generar nombre único
         const timestamp = Date.now()
         const randomSuffix = Math.random().toString(36).substring(2, 8)
         const fileExtension = file.name.split(".").pop()?.toLowerCase() || "jpg"
         const fileName = `review-photos/${user.id}_${reviewId}_${timestamp}_${randomSuffix}.${fileExtension}`
+
+        // --- INICIO DEBUGGING ---
+        console.log(`[DEBUG] Final pathname for Blob: "${fileName}"`)
+        // --- FIN DEBUGGING ---
 
         console.log(`Subiendo archivo como: ${fileName}`)
 
