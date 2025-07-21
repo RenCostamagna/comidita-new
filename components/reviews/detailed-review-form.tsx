@@ -319,41 +319,61 @@ export function DetailedReviewForm({
             </div>
 
             {/* Opciones dietéticas - NUEVAS CHECKBOXES */}
-            <div className="space-y-4">
-              <div className="space-y-1">
-                <Label className="text-base font-semibold">Opciones dietéticas</Label>
-              </div>
+<div className="space-y-4">
+  <div className="space-y-1">
+    <Label className="text-base font-semibold">Opciones dietéticas</Label>
+  </div>
 
-              <div className="grid grid-cols-1 gap-4">
-                <div className="flex items-center space-x-3 p-3 border rounded-lg bg-muted/30">
-                  <Checkbox
-                    id="celiac-friendly"
-                    checked={dietaryOptions.celiac_friendly}
-                    onCheckedChange={(checked) => handleDietaryOptionChange("celiac_friendly", !!checked)}
-                  />
-                  <div className="flex-1">
-                    <Label htmlFor="celiac-friendly" className="text-sm font-medium cursor-pointer">
-                      🌾 Celíaco friendly
-                    </Label>
-                    <p className="text-xs text-muted-foreground">Tiene opciones sin gluten/TACC</p>
-                  </div>
-                </div>
+  <div className="grid grid-cols-1 gap-4">
+    {/* Celíaco friendly */}
+    <label
+      htmlFor="celiac-friendly"
+      className={`flex items-center space-x-3 p-3 border rounded-lg cursor-pointer transition-colors ${
+        dietaryOptions.celiac_friendly
+          ? "bg-green-100 border-green-400"
+          : "bg-muted/30"
+      }`}
+    >
+      <Checkbox
+        id="celiac-friendly"
+        checked={dietaryOptions.celiac_friendly}
+        onCheckedChange={(checked) =>
+          handleDietaryOptionChange("celiac_friendly", !!checked)
+        }
+      />
+      <div className="flex-1">
+        <span className="text-sm font-medium">🌾 Celíaco friendly</span>
+        <p className="text-xs text-muted-foreground">
+          Tiene opciones sin gluten/TACC
+        </p>
+      </div>
+    </label>
 
-                <div className="flex items-center space-x-3 p-3 border rounded-lg bg-muted/30">
-                  <Checkbox
-                    id="vegetarian-friendly"
-                    checked={dietaryOptions.vegetarian_friendly}
-                    onCheckedChange={(checked) => handleDietaryOptionChange("vegetarian_friendly", !!checked)}
-                  />
-                  <div className="flex-1">
-                    <Label htmlFor="vegetarian-friendly" className="text-sm font-medium cursor-pointer">
-                      🥬 Vegetariano friendly
-                    </Label>
-                    <p className="text-xs text-muted-foreground">Tiene buenas opciones vegetarianas/veganas</p>
-                  </div>
-                </div>
-              </div>
-            </div>
+    {/* Vegetariano friendly */}
+    <label
+      htmlFor="vegetarian-friendly"
+      className={`flex items-center space-x-3 p-3 border rounded-lg cursor-pointer transition-colors ${
+        dietaryOptions.vegetarian_friendly
+          ? "bg-green-100 border-green-400"
+          : "bg-muted/30"
+      }`}
+    >
+      <Checkbox
+        id="vegetarian-friendly"
+        checked={dietaryOptions.vegetarian_friendly}
+        onCheckedChange={(checked) =>
+          handleDietaryOptionChange("vegetarian_friendly", !!checked)
+        }
+      />
+      <div className="flex-1">
+        <span className="text-sm font-medium">🥬 Vegetariano friendly</span>
+        <p className="text-xs text-muted-foreground">
+          Tiene buenas opciones vegetarianas/veganas
+        </p>
+      </div>
+    </label>
+  </div>
+</div>
 
             {/* Checkbox para recomendar plato */}
             <div className="space-y-3">
