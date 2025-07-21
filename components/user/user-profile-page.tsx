@@ -255,7 +255,7 @@ export function UserProfilePage({ user, onBack }: UserProfilePageProps) {
           <Card>
             <CardHeader>
               <CardTitle>Mis Reseñas ({userStats.totalReviews})</CardTitle>
-              <CardDescription>Todas tus reseñas y experiencias compartidas</CardDescription>
+              
             </CardHeader>
           </Card>
 

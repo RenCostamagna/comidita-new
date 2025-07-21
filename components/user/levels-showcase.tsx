@@ -98,7 +98,7 @@ export function LevelsShowcase({ currentUserPoints = 0, showStatistics = false }
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">🏆 Niveles de Usuario</CardTitle>
-        <CardDescription>Progresa a través de los niveles gastronómicos ganando puntos por tus reseñas</CardDescription>
+        
       </CardHeader>
       <CardContent>
         <div className="space-y-3">

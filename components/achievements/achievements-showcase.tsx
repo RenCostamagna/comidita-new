@@ -109,7 +109,7 @@ export function AchievementsShowcase({ userId }: AchievementsShowcaseProps) {
             <Trophy className="h-5 w-5" />
             Resumen de Logros
           </CardTitle>
-          <CardDescription>Tu progreso en el sistema de logros por categorías</CardDescription>
+          
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
