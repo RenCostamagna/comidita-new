@@ -1,35 +1,44 @@
+import { logDebug, logError } from "./debug-logger"
+
 // Función para subir múltiples fotos de reseñas usando la API route
 export async function uploadMultipleReviewPhotos(files: File[], userId: string, reviewId: string): Promise<string[]> {
-  console.log(`Iniciando upload de ${files.length} fotos para usuario ${userId}, reseña ${reviewId}`)
+  logDebug("uploadMultipleReviewPhotos", `Starting upload of ${files.length} photos`, { userId, reviewId })
 
   try {
     const formData = new FormData()
 
     // Agregar archivos al FormData con el nombre correcto
     files.forEach((file, index) => {
-      console.log(`Agregando archivo ${index + 1}: ${file.name} (${file.size} bytes)`)
+      logDebug("uploadMultipleReviewPhotos", `Appending file ${index + 1} to FormData`, {
+        name: file.name,
+        size: file.size,
+        type: file.type,
+      })
       formData.append("photos", file)
     })
 
     formData.append("reviewId", reviewId)
 
-    console.log("Enviando request a /api/upload-photos...")
+    logDebug("uploadMultipleReviewPhotos", "Sending POST request to /api/upload-photos")
 
     const response = await fetch("/api/upload-photos", {
       method: "POST",
       body: formData,
     })
 
-    console.log("Response status:", response.status)
+    logDebug("uploadMultipleReviewPhotos", "Received response from API", {
+      status: response.status,
+      statusText: response.statusText,
+    })
 
     if (!response.ok) {
       const errorData = await response.json()
-      console.error("Error response:", errorData)
+      logError("uploadMultipleReviewPhotos", "API response not OK", { status: response.status, errorData })
       throw new Error(errorData.error || `Error HTTP ${response.status}`)
     }
 
     const data = await response.json()
-    console.log("Upload response:", data)
+    logDebug("uploadMultipleReviewPhotos", "Successfully parsed API response", data)
 
     // Debug: verificar que las URLs sean de Vercel Blob
     console.log("URLs devueltas por la API:", data.uploadedUrls)
@@ -43,12 +52,12 @@ export async function uploadMultipleReviewPhotos(files: File[], userId: string, 
     })
 
     if (data.errors && data.errors.length > 0) {
-      console.warn("Algunos archivos tuvieron errores:", data.errors)
+      logError("uploadMultipleReviewPhotos", "API reported errors for some files", data.errors)
     }
 
     return data.uploadedUrls || []
   } catch (error) {
-    console.error("Error en uploadMultipleReviewPhotos:", error)
+    logError("uploadMultipleReviewPhotos", "Caught an exception", error)
     throw error
   }
 }

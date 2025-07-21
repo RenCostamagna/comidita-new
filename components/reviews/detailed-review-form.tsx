@@ -22,6 +22,7 @@ import { Progress } from "@/components/ui/progress"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { AlertCircle } from "lucide-react"
 import { cleanAddress, formatPlaceForStorage } from "@/lib/address-utils"
+import { logDebug, logError } from "@/lib/debug-logger"
 
 interface PhotoData {
   file: File | string
@@ -111,6 +112,8 @@ export function DetailedReviewForm({
     e.preventDefault()
     setUploadError(null)
 
+    logDebug("DetailedReviewForm", "handleSubmit triggered")
+
     if (!selectedPlace || !priceRange || !category) {
       alert("Por favor completa todos los campos obligatorios")
       return
@@ -122,12 +125,15 @@ export function DetailedReviewForm({
       return
     }
 
+    logDebug("DetailedReviewForm", "Form validation passed (basic)")
+
     // Ensure we have the required place fields
     const placeId = selectedPlace.google_place_id || selectedPlace.place_id
     const placeName = selectedPlace.name
     const placeAddress = selectedPlace.formatted_address || selectedPlace.address
 
     if (!placeId || !placeName || !placeAddress) {
+      logError("DetailedReviewForm", "Place ID, name, or address missing", { placeId, placeName, placeAddress })
       alert("Error: Información del lugar incompleta. Por favor selecciona el lugar nuevamente.")
       return
     }
@@ -137,6 +143,8 @@ export function DetailedReviewForm({
     setUploadStatus("Preparando...")
 
     try {
+      logDebug("DetailedReviewForm", "Starting submission process")
+
       // Generar un ID temporal para la reseña
       const tempReviewId = `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
 
@@ -149,6 +157,8 @@ export function DetailedReviewForm({
         return
       }
 
+      logDebug("DetailedReviewForm", "User authenticated", { userId: user.id })
+
       // Subir fotos a Vercel Blob si hay fotos
       let uploadedPhotoUrls: string[] = []
       if (photos.length > 0) {
@@ -158,11 +168,11 @@ export function DetailedReviewForm({
         // Filtrar solo los archivos File (no strings que ya son URLs)
         const filesToUpload = photos.map((photo) => photo.file).filter((file): file is File => file instanceof File)
 
-        console.log("=== DEBUG PHOTO UPLOAD ===")
-        console.log("Total photos:", photos.length)
-        console.log("Files to upload:", filesToUpload.length)
-        console.log("Photos array:", photos)
-        console.log("Files array:", filesToUpload)
+        logDebug("DetailedReviewForm", "Preparing to upload photos", {
+          totalPhotos: photos.length,
+          filesToUpload: filesToUpload.length,
+          photoState: photos,
+        })
 
         if (filesToUpload.length > 0) {
           try {
@@ -180,8 +190,11 @@ export function DetailedReviewForm({
               })
             })
 
+            logDebug("DetailedReviewForm", "Photos uploaded successfully", { urls: uploadedPhotoUrls })
+
             setUploadProgress(75)
           } catch (uploadError) {
+            logError("DetailedReviewForm", "Error during photo upload", uploadError)
             console.error("Error subiendo fotos:", uploadError)
             const errorMessage = uploadError instanceof Error ? uploadError.message : "Error desconocido"
             setUploadError(`Error subiendo fotos: ${errorMessage}`)
@@ -194,6 +207,8 @@ export function DetailedReviewForm({
             if (!continueWithoutPhotos) {
               return
             }
+
+            logDebug("DetailedReviewForm", "User chose to continue without photos after upload error.")
           }
         }
 
@@ -203,6 +218,7 @@ export function DetailedReviewForm({
           .filter((file): file is string => typeof file === "string")
 
         uploadedPhotoUrls = [...uploadedPhotoUrls, ...existingUrls]
+        logDebug("DetailedReviewForm", "Final list of photo URLs", { uploadedPhotoUrls })
       }
 
       setUploadStatus("Guardando reseña...")
@@ -238,18 +254,13 @@ export function DetailedReviewForm({
         vercel_blob_urls: uploadedPhotoUrls.filter((url) => url.includes("blob.vercel-storage.com")),
       }
 
-      console.log("[DEBUG REVIEW DATA]", {
-        photo_urls: reviewData.photo_urls,
-        vercel_blob_urls: reviewData.vercel_blob_urls,
-        primary_photo_url: reviewData.primary_photo_url,
-        total_photos: uploadedPhotoUrls.length,
-        cleaned_address: cleanedAddress,
-        original_address: placeAddress,
-      })
+      logDebug("DetailedReviewForm", "Final review data prepared for submission", reviewData)
 
       setUploadProgress(100)
       await onSubmit(reviewData)
+      logDebug("DetailedReviewForm", "onSubmit completed successfully")
     } catch (error) {
+      logError("DetailedReviewForm", "Error in handleSubmit", error)
       console.error("Error submitting review:", error)
       const errorMessage = error instanceof Error ? error.message : "Error desconocido"
       setUploadError(`Error al enviar la reseña: ${errorMessage}`)

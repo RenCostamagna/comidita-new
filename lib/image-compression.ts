@@ -1,3 +1,5 @@
+import { logDebug, logError } from "./debug-logger"
+
 // Tipos para la información de imagen
 export interface ImageInfo {
   width: number
@@ -28,27 +30,38 @@ export function validateImageFile(
   maxSizePerPhoto = 10,
   acceptedFormats: string[] = ["image/jpeg", "image/jpg", "image/png", "image/webp"],
 ): ValidationResult {
+  logDebug("validateImageFile", "Starting validation for file", {
+    name: file?.name,
+    size: file?.size,
+    type: file?.type,
+  })
+
   // Verificar que es un archivo
   if (!file) {
+    logError("validateImageFile", "Validation failed: No file provided", null)
     return { isValid: false, error: "No se proporcionó archivo" }
   }
 
   // Verificar tipo de archivo
   if (!file.type.startsWith("image/")) {
+    logError("validateImageFile", "Validation failed: Not an image", { type: file.type })
     return { isValid: false, error: "El archivo no es una imagen" }
   }
 
   // Verificar tamaño (convertir MB a bytes)
   const maxSize = maxSizePerPhoto * 1024 * 1024
   if (file.size > maxSize) {
+    logError("validateImageFile", "Validation failed: File too large", { size: file.size, maxSize })
     return { isValid: false, error: `El archivo es muy grande (máximo ${maxSizePerPhoto}MB)` }
   }
 
   // Verificar tipos permitidos
   if (!acceptedFormats.includes(file.type)) {
+    logError("validateImageFile", "Validation failed: Format not allowed", { type: file.type, acceptedFormats })
     return { isValid: false, error: "Tipo de archivo no permitido. Use JPG, PNG o WebP" }
   }
 
+  logDebug("validateImageFile", "Validation successful")
   return { isValid: true }
 }
 
@@ -70,6 +83,7 @@ export async function getImageInfo(file: File): Promise<ImageInfo> {
     }
 
     img.onerror = () => {
+      logError("getImageInfo", "Error loading image to get info", file.name)
       URL.revokeObjectURL(url)
       reject(new Error("Error cargando la imagen"))
     }
@@ -82,12 +96,15 @@ export async function getImageInfo(file: File): Promise<ImageInfo> {
 export async function compressImageAdvanced(file: File, options: CompressionOptions = {}): Promise<File> {
   const { maxWidth = 800, maxHeight = 600, quality = 0.8, outputFormat = "jpeg" } = options
 
+  logDebug("compressImageAdvanced", "Starting compression", { file: { name: file.name, size: file.size }, options })
+
   return new Promise((resolve, reject) => {
     const img = new Image()
     const canvas = document.createElement("canvas")
     const ctx = canvas.getContext("2d")
 
     if (!ctx) {
+      logError("compressImageAdvanced", "Could not create canvas context", null)
       reject(new Error("No se pudo crear contexto de canvas"))
       return
     }
@@ -117,6 +134,7 @@ export async function compressImageAdvanced(file: File, options: CompressionOpti
       canvas.toBlob(
         (blob) => {
           if (!blob) {
+            logError("compressImageAdvanced", "Canvas toBlob failed", null)
             reject(new Error("Error comprimiendo imagen"))
             return
           }
@@ -127,6 +145,10 @@ export async function compressImageAdvanced(file: File, options: CompressionOpti
             lastModified: Date.now(),
           })
 
+          logDebug("compressImageAdvanced", "Compression successful", {
+            originalSize: file.size,
+            compressedSize: compressedFile.size,
+          })
           resolve(compressedFile)
         },
         `image/${outputFormat}`,
@@ -135,6 +157,7 @@ export async function compressImageAdvanced(file: File, options: CompressionOpti
     }
 
     img.onerror = () => {
+      logError("compressImageAdvanced", "Error loading image for compression", file.name)
       reject(new Error("Error cargando imagen para comprimir"))
     }
 
