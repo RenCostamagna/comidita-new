@@ -5,7 +5,6 @@ import { Calendar, Star, LogOut } from "lucide-react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { UserLevelBadge } from "@/components/user/user-level-badge"
-import { DetailedReviewCard } from "@/components/reviews/detailed-review-card"
 import { createClient } from "@/lib/supabase/client"
 import type { DetailedReview } from "@/lib/types"
 import { Button } from "@/components/ui/button"
@@ -13,6 +12,8 @@ import { PointsHistory } from "@/components/user/points-history"
 import { LevelsShowcase } from "@/components/user/levels-showcase"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { AchievementsShowcase } from "@/components/achievements/achievements-showcase"
+import { ProfileReviewCard } from "@/components/reviews/profile-review-card"
+import { SingleReviewPage } from "@/components/reviews/single-review-page"
 
 const handleLogout = async () => {
   const supabase = createClient()
@@ -34,6 +35,7 @@ export function UserProfilePage({ user, onBack }: UserProfilePageProps) {
     averageRating: 0,
   })
   const [isLoading, setIsLoading] = useState(true)
+  const [selectedReview, setSelectedReview] = useState<DetailedReview | null>(null)
 
   const supabase = createClient()
 
@@ -129,54 +131,62 @@ export function UserProfilePage({ user, onBack }: UserProfilePageProps) {
     })
   }
 
+  const handleViewReview = (review: DetailedReview) => {
+    setSelectedReview(review)
+  }
+
+  const handleBackFromReview = () => {
+    setSelectedReview(null)
+  }
+
   return (
     <div className="max-w-2xl mx-auto space-y-6">
       {/* Información del perfil */}
-          <Card>
-            <CardHeader>
-              <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
-                {/* Avatar + nombre/email */}
-                <div className="flex gap-4 items-center sm:items-start">
-                  <Avatar className="h-20 w-20 shrink-0">
-                    <AvatarImage
-                      src={user.user_metadata?.avatar_url || "/placeholder.svg"}
-                      alt={user.user_metadata?.full_name}
-                    />
-                    <AvatarFallback className="text-2xl">
-                      {user.user_metadata?.full_name?.charAt(0) || user.email?.charAt(0) || "U"}
-                    </AvatarFallback>
-                  </Avatar>
+      <Card>
+        <CardHeader>
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
+            {/* Avatar + nombre/email */}
+            <div className="flex gap-4 items-center sm:items-start">
+              <Avatar className="h-20 w-20 shrink-0">
+                <AvatarImage
+                  src={user.user_metadata?.avatar_url || "/placeholder.svg"}
+                  alt={user.user_metadata?.full_name}
+                />
+                <AvatarFallback className="text-2xl">
+                  {user.user_metadata?.full_name?.charAt(0) || user.email?.charAt(0) || "U"}
+                </AvatarFallback>
+              </Avatar>
 
-                  <div className="flex flex-col justify-center sm:justify-start">
-                    <CardTitle className="text-lg sm:text-xl">{user.user_metadata?.full_name || "Usuario"}</CardTitle>
-                    <CardDescription className="text-sm break-words">{user.email}</CardDescription>
-                  </div>
-                </div>
-
-                {/* Nivel */}
-                <div className="w-full sm:ml-auto">
-                  <UserLevelBadge
-                    userId={user.id}
-                    userPoints={userStats.totalPoints}
-                    showProgress={true}
-                    showNextLevel={true}
-                  />
-                </div>
+              <div className="flex flex-col justify-center sm:justify-start">
+                <CardTitle className="text-lg sm:text-xl">{user.user_metadata?.full_name || "Usuario"}</CardTitle>
+                <CardDescription className="text-sm break-words">{user.email}</CardDescription>
               </div>
+            </div>
 
-              <div className="flex justify-end mt-4">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleLogout}
-                  className="flex items-center gap-2 bg-transparent"
-                >
-                  <LogOut className="h-4 w-4" />
-                  Cerrar sesión
-                </Button>
-              </div>
-            </CardHeader>
-          </Card>
+            {/* Nivel */}
+            <div className="w-full sm:ml-auto">
+              <UserLevelBadge
+                userId={user.id}
+                userPoints={userStats.totalPoints}
+                showProgress={true}
+                showNextLevel={true}
+              />
+            </div>
+          </div>
+
+          <div className="flex justify-end mt-4">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleLogout}
+              className="flex items-center gap-2 bg-transparent"
+            >
+              <LogOut className="h-4 w-4" />
+              Cerrar sesión
+            </Button>
+          </div>
+        </CardHeader>
+      </Card>
 
       {/* Estadísticas */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -251,32 +261,37 @@ export function UserProfilePage({ user, onBack }: UserProfilePageProps) {
         </TabsContent>
 
         <TabsContent value="reviews" className="space-y-6">
-          {/* Header de reseñas */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Mis Reseñas ({userStats.totalReviews})</CardTitle>
-              
-            </CardHeader>
-          </Card>
-
-          {/* Lista de reseñas */}
-          {isLoading ? (
-            <div className="text-center py-8">
-              <div className="text-muted-foreground">Cargando reseñas...</div>
-            </div>
-          ) : userReviews.length > 0 ? (
-            <div className="space-y-4">
-              {userReviews.map((review) => (
-                <DetailedReviewCard key={review.id} review={review} />
-              ))}
-            </div>
+          {selectedReview ? (
+            <SingleReviewPage review={selectedReview} onBack={handleBackFromReview} />
           ) : (
-            <Card>
-              <CardContent className="text-center py-8">
-                <p className="text-muted-foreground">Aún no has hecho ninguna reseña.</p>
-                <p className="text-sm text-muted-foreground mt-2">¡Comparte tu primera experiencia gastronómica!</p>
-              </CardContent>
-            </Card>
+            <>
+              {/* Header de reseñas */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Mis Reseñas ({userStats.totalReviews})</CardTitle>
+                </CardHeader>
+              </Card>
+
+              {/* Lista de reseñas */}
+              {isLoading ? (
+                <div className="text-center py-8">
+                  <div className="text-muted-foreground">Cargando reseñas...</div>
+                </div>
+              ) : userReviews.length > 0 ? (
+                <div className="space-y-3">
+                  {userReviews.map((review) => (
+                    <ProfileReviewCard key={review.id} review={review} onViewReview={handleViewReview} />
+                  ))}
+                </div>
+              ) : (
+                <Card>
+                  <CardContent className="text-center py-8">
+                    <p className="text-muted-foreground">Aún no has hecho ninguna reseña.</p>
+                    <p className="text-sm text-muted-foreground mt-2">¡Comparte tu primera experiencia gastronómica!</p>
+                  </CardContent>
+                </Card>
+              )}
+            </>
           )}
         </TabsContent>
       </Tabs>
