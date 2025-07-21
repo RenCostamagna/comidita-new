@@ -17,12 +17,10 @@ import { RESTAURANT_CATEGORIES } from "@/lib/types"
 import { PhotoUpload } from "@/components/photos/photo-upload"
 import { getRatingColor } from "@/lib/rating-labels"
 import { createClient } from "@/lib/supabase/client"
-import { uploadMultipleReviewPhotos } from "@/lib/storage"
 import { Progress } from "@/components/ui/progress"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { AlertCircle, Wifi, WifiOff } from "lucide-react"
+import { AlertCircle } from "lucide-react"
 import { cleanAddress, formatPlaceForStorage } from "@/lib/address-utils"
-import { isMobileDevice } from "@/lib/image-compression"
 
 interface PhotoData {
   file: File | string
@@ -52,7 +50,7 @@ export function DetailedReviewForm({
   const [uploadStatus, setUploadStatus] = useState("")
   const [uploadError, setUploadError] = useState<string | null>(null)
   const [wantsToRecommendDish, setWantsToRecommendDish] = useState(false)
-  const [isOnline, setIsOnline] = useState(true)
+  const [user, setUser] = useState<any>(null)
 
   // Puntuaciones (1-10) - valores iniciales en 5
   const [ratings, setRatings] = useState({
@@ -75,20 +73,15 @@ export function DetailedReviewForm({
   const [category, setCategory] = useState("")
 
   const supabase = createClient()
-  const isMobile = isMobileDevice()
 
-  // Monitor network status
   useEffect(() => {
-    const handleOnline = () => setIsOnline(true)
-    const handleOffline = () => setIsOnline(false)
-
-    window.addEventListener("online", handleOnline)
-    window.addEventListener("offline", handleOffline)
-
-    return () => {
-      window.removeEventListener("online", handleOnline)
-      window.removeEventListener("offline", handleOffline)
+    const getUser = async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+      setUser(user)
     }
+    getUser()
   }, [])
 
   useEffect(() => {
@@ -128,12 +121,6 @@ export function DetailedReviewForm({
     e.preventDefault()
     setUploadError(null)
 
-    // Check network connectivity
-    if (!isOnline) {
-      setUploadError("Sin conexión a internet. Verifica tu conexión y vuelve a intentar.")
-      return
-    }
-
     if (!selectedPlace || !priceRange || !category) {
       alert("Por favor completa todos los campos obligatorios")
       return
@@ -156,13 +143,10 @@ export function DetailedReviewForm({
     }
 
     setIsSubmitting(true)
-    setUploadProgress(0)
-    setUploadStatus("Preparando...")
+    setUploadProgress(50)
+    setUploadStatus("Guardando reseña...")
 
     try {
-      // Generar un ID temporal para la reseña
-      const tempReviewId = `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
-
       // Obtener el usuario actual
       const {
         data: { user },
@@ -172,87 +156,13 @@ export function DetailedReviewForm({
         return
       }
 
-      // Subir fotos a Vercel Blob si hay fotos
-      let uploadedPhotoUrls: string[] = []
-      if (photos.length > 0) {
-        setUploadStatus("Optimizando y subiendo fotos...")
-        setUploadProgress(10)
+      // Las fotos ya están subidas, solo extraer las URLs
+      const uploadedPhotoUrls = photos
+        .map((photo) => photo.file)
+        .filter((file): file is string => typeof file === "string")
 
-        // Filtrar solo los archivos File (no strings que ya son URLs)
-        const filesToUpload = photos.map((photo) => photo.file).filter((file): file is File => file instanceof File)
+      console.log("[DEBUG] Fotos ya subidas:", uploadedPhotoUrls)
 
-        console.log("=== DEBUG PHOTO UPLOAD ===")
-        console.log("Total photos:", photos.length)
-        console.log("Files to upload:", filesToUpload.length)
-        console.log("Is mobile:", isMobile)
-        console.log("Photos array:", photos)
-        console.log("Files array:", filesToUpload)
-
-        if (filesToUpload.length > 0) {
-          try {
-            console.log("🚀 Iniciando upload secuencial de fotos...")
-
-            // Usar la nueva función con callback de progreso
-            uploadedPhotoUrls = await uploadMultipleReviewPhotos(
-              filesToUpload,
-              user.id,
-              tempReviewId,
-              (progress, status) => {
-                setUploadProgress(10 + progress * 0.7) // 10% inicial + 70% para upload
-                setUploadStatus(status)
-              },
-            )
-
-            console.log("✅ Fotos subidas exitosamente:", uploadedPhotoUrls)
-
-            // DEBUG: Verificar que las URLs sean de Vercel Blob
-            uploadedPhotoUrls.forEach((url, index) => {
-              console.log(`[DEBUG VERCEL BLOB URL ${index}]`, {
-                url,
-                isVercelBlob: url.includes("blob.vercel-storage.com"),
-                isSupabase: url.includes("supabase.co"),
-                urlLength: url.length,
-              })
-            })
-
-            setUploadProgress(85)
-          } catch (uploadError) {
-            console.error("💥 Error subiendo fotos:", uploadError)
-            const errorMessage = uploadError instanceof Error ? uploadError.message : "Error desconocido"
-
-            // Manejar específicamente el error 413
-            if (
-              errorMessage.includes("413") ||
-              errorMessage.includes("Payload") ||
-              errorMessage.includes("muy grande")
-            ) {
-              setUploadError(
-                `Error 413: Las fotos son muy grandes. ${isMobile ? "Se intentó optimizar automáticamente pero aún exceden el límite." : "Intenta con menos fotos o comprime las imágenes."}`,
-              )
-            } else {
-              setUploadError(`Error subiendo fotos: ${errorMessage}`)
-            }
-
-            // Preguntar al usuario si quiere continuar sin fotos
-            const continueWithoutPhotos = confirm(
-              "Hubo un problema subiendo las fotos. ¿Quieres enviar la reseña sin fotos?",
-            )
-
-            if (!continueWithoutPhotos) {
-              return
-            }
-          }
-        }
-
-        // También incluir URLs que ya existen (strings)
-        const existingUrls = photos
-          .map((photo) => photo.file)
-          .filter((file): file is string => typeof file === "string")
-
-        uploadedPhotoUrls = [...uploadedPhotoUrls, ...existingUrls]
-      }
-
-      setUploadStatus("Guardando reseña...")
       setUploadProgress(90)
 
       // Clean the address before saving to database
@@ -261,7 +171,7 @@ export function DetailedReviewForm({
       const placeData = {
         google_place_id: placeId,
         name: placeName,
-        address: cleanedAddress, // Use cleaned address
+        address: cleanedAddress,
         latitude: selectedPlace.geometry?.location?.lat || selectedPlace.latitude || -32.9442426,
         longitude: selectedPlace.geometry?.location?.lng || selectedPlace.longitude || -60.6505388,
         phone: selectedPlace.formatted_phone_number || selectedPlace.phone || null,
@@ -269,7 +179,7 @@ export function DetailedReviewForm({
         id: selectedPlace.id || null,
       }
 
-      // Crear el objeto de datos de la reseña con las URLs de las fotos subidas
+      // Crear el objeto de datos de la reseña con las URLs ya subidas
       const reviewData = {
         place: placeData,
         dish_name: dishName.trim() || null,
@@ -281,36 +191,22 @@ export function DetailedReviewForm({
         comment: comment.trim() || null,
         photo_urls: uploadedPhotoUrls,
         primary_photo_url: uploadedPhotoUrls.length > 0 ? uploadedPhotoUrls[0] : null,
-        // DEBUG: Campo adicional para verificar las URLs
-        vercel_blob_urls: uploadedPhotoUrls.filter((url) => url.includes("blob.vercel-storage.com")),
       }
 
       console.log("[DEBUG REVIEW DATA]", {
         photo_urls: reviewData.photo_urls,
-        vercel_blob_urls: reviewData.vercel_blob_urls,
         primary_photo_url: reviewData.primary_photo_url,
         total_photos: uploadedPhotoUrls.length,
         cleaned_address: cleanedAddress,
         original_address: placeAddress,
-        is_mobile: isMobile,
       })
 
       setUploadProgress(100)
       await onSubmit(reviewData)
     } catch (error) {
-      console.error("💥 Error submitting review:", error)
+      console.error("Error submitting review:", error)
       const errorMessage = error instanceof Error ? error.message : "Error desconocido"
-
-      // Manejar errores específicos
-      if (errorMessage.includes("413") || errorMessage.includes("Payload")) {
-        setUploadError(
-          `Error 413: Contenido muy grande para subir. ${isMobile ? "Intenta con menos fotos." : "Reduce el tamaño de las imágenes o sube menos fotos."}`,
-        )
-      } else if (errorMessage.includes("network") || errorMessage.includes("fetch")) {
-        setUploadError("Error de conexión. Verifica tu internet y vuelve a intentar.")
-      } else {
-        setUploadError(`Error al enviar la reseña: ${errorMessage}`)
-      }
+      setUploadError(`Error al enviar la reseña: ${errorMessage}`)
     } finally {
       setIsSubmitting(false)
       setUploadProgress(0)
@@ -320,24 +216,6 @@ export function DetailedReviewForm({
 
   return (
     <div className="w-full max-w-2xl mx-auto space-y-6">
-      {/* Network status indicator */}
-      {!isOnline && (
-        <Alert variant="destructive">
-          <WifiOff className="h-4 w-4" />
-          <AlertDescription>Sin conexión a internet. Verifica tu conexión antes de enviar la reseña.</AlertDescription>
-        </Alert>
-      )}
-
-      {/* Mobile optimization notice */}
-      {isMobile && (
-        <Alert className="border-blue-200 bg-blue-50">
-          <Wifi className="h-4 w-4 text-blue-600" />
-          <AlertDescription className="text-blue-800">
-            📱 Modo móvil: Las fotos se optimizarán automáticamente para evitar errores de subida.
-          </AlertDescription>
-        </Alert>
-      )}
-
       <Card>
         <CardHeader>
           <CardTitle>Nueva Reseña</CardTitle>
@@ -349,21 +227,7 @@ export function DetailedReviewForm({
             {uploadError && (
               <Alert variant="destructive">
                 <AlertCircle className="h-4 w-4" />
-                <AlertDescription>
-                  {uploadError}
-                  {uploadError.includes("413") && (
-                    <div className="mt-2 space-y-1 text-xs">
-                      <p>
-                        <strong>Soluciones:</strong>
-                      </p>
-                      <ul className="list-disc list-inside space-y-1">
-                        <li>Sube menos fotos (máximo 3-4 en móvil)</li>
-                        <li>Las fotos se comprimen automáticamente</li>
-                        <li>Intenta con una conexión más estable</li>
-                      </ul>
-                    </div>
-                  )}
-                </AlertDescription>
+                <AlertDescription>{uploadError}</AlertDescription>
               </Alert>
             )}
 
@@ -522,7 +386,7 @@ export function DetailedReviewForm({
             </div>
 
             {/* Fotos - Componente mejorado */}
-            <PhotoUpload photos={photos} onPhotosChange={setPhotos} maxPhotos={isMobile ? 4 : 6} userId="temp-user" />
+            <PhotoUpload photos={photos} onPhotosChange={setPhotos} maxPhotos={6} userId={user?.id || "temp-user"} />
 
             {/* Comentario */}
             <div className="space-y-2">
@@ -545,9 +409,6 @@ export function DetailedReviewForm({
                   <span>{uploadProgress}%</span>
                 </div>
                 <Progress value={uploadProgress} className="w-full" />
-                {isMobile && uploadStatus.includes("Optimizando") && (
-                  <p className="text-xs text-blue-600">📱 Comprimiendo fotos para móvil...</p>
-                )}
               </div>
             )}
 
@@ -556,12 +417,12 @@ export function DetailedReviewForm({
                 type="button"
                 variant="outline"
                 onClick={onCancel}
-                disabled={isLoading || isSubmitting || !isOnline}
+                disabled={isLoading || isSubmitting}
                 className="flex-1 bg-transparent"
               >
                 Cancelar
               </Button>
-              <Button type="submit" disabled={isLoading || isSubmitting || !isOnline} className="flex-1">
+              <Button type="submit" disabled={isLoading || isSubmitting} className="flex-1">
                 {isSubmitting ? uploadStatus || "Enviando..." : "Enviar reseña"}
               </Button>
             </div>

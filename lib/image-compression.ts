@@ -14,23 +14,12 @@ export interface CompressionOptions {
   quality?: number
   maxSizeKB?: number
   outputFormat?: "jpeg" | "png" | "webp"
-  isMobile?: boolean
 }
 
 // Validación de archivos de imagen
 export interface ValidationResult {
   isValid: boolean
   error?: string
-}
-
-// Detectar si es dispositivo móvil
-export function isMobileDevice(): boolean {
-  if (typeof window === "undefined") return false
-
-  return (
-    /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
-    window.innerWidth <= 768
-  )
 }
 
 // Función para validar archivos de imagen
@@ -91,29 +80,7 @@ export async function getImageInfo(file: File): Promise<ImageInfo> {
 
 // Función para comprimir imagen usando Canvas (solo cliente)
 export async function compressImageAdvanced(file: File, options: CompressionOptions = {}): Promise<File> {
-  const isMobile = options.isMobile ?? isMobileDevice()
-
-  // Configuración más agresiva para móvil
-  const defaultOptions = isMobile
-    ? {
-        maxWidth: 800,
-        maxHeight: 600,
-        quality: 0.7,
-        outputFormat: "jpeg" as const,
-      }
-    : {
-        maxWidth: 1200,
-        maxHeight: 900,
-        quality: 0.8,
-        outputFormat: "jpeg" as const,
-      }
-
-  const {
-    maxWidth = defaultOptions.maxWidth,
-    maxHeight = defaultOptions.maxHeight,
-    quality = defaultOptions.quality,
-    outputFormat = defaultOptions.outputFormat,
-  } = options
+  const { maxWidth = 800, maxHeight = 600, quality = 0.8, outputFormat = "jpeg" } = options
 
   return new Promise((resolve, reject) => {
     const img = new Image()
@@ -143,10 +110,6 @@ export async function compressImageAdvanced(file: File, options: CompressionOpti
       canvas.width = width
       canvas.height = height
 
-      // Mejorar calidad de renderizado
-      ctx.imageSmoothingEnabled = true
-      ctx.imageSmoothingQuality = "high"
-
       // Dibujar imagen redimensionada
       ctx.drawImage(img, 0, 0, width, height)
 
@@ -164,13 +127,6 @@ export async function compressImageAdvanced(file: File, options: CompressionOpti
             lastModified: Date.now(),
           })
 
-          console.log(`📷 Imagen comprimida: ${file.name}`, {
-            originalSize: `${(file.size / 1024 / 1024).toFixed(2)}MB`,
-            compressedSize: `${(compressedFile.size / 1024 / 1024).toFixed(2)}MB`,
-            reduction: `${(((file.size - compressedFile.size) / file.size) * 100).toFixed(1)}%`,
-            dimensions: `${width}x${height}`,
-          })
-
           resolve(compressedFile)
         },
         `image/${outputFormat}`,
@@ -184,49 +140,4 @@ export async function compressImageAdvanced(file: File, options: CompressionOpti
 
     img.src = URL.createObjectURL(file)
   })
-}
-
-// Función para comprimir múltiples imágenes
-export async function compressMultipleImages(
-  files: File[],
-  options: CompressionOptions = {},
-  onProgress?: (progress: number, currentFile: string) => void,
-): Promise<File[]> {
-  const compressedFiles: File[] = []
-
-  for (let i = 0; i < files.length; i++) {
-    const file = files[i]
-
-    try {
-      onProgress?.(((i + 1) / files.length) * 100, file.name)
-
-      // Solo comprimir si el archivo es mayor a 1MB o si estamos en móvil
-      const shouldCompress = file.size > 1024 * 1024 || isMobileDevice()
-
-      if (shouldCompress) {
-        const compressed = await compressImageAdvanced(file, options)
-        compressedFiles.push(compressed)
-      } else {
-        compressedFiles.push(file)
-      }
-    } catch (error) {
-      console.error(`Error comprimiendo ${file.name}:`, error)
-      // Si falla la compresión, usar el archivo original
-      compressedFiles.push(file)
-    }
-  }
-
-  return compressedFiles
-}
-
-// Función para calcular el tamaño total de archivos
-export function calculateTotalSize(files: File[]): number {
-  return files.reduce((total, file) => total + file.size, 0)
-}
-
-// Función para verificar si el payload excederá el límite
-export function willExceedPayloadLimit(files: File[], limitMB = 4): boolean {
-  const totalSize = calculateTotalSize(files)
-  const limitBytes = limitMB * 1024 * 1024
-  return totalSize > limitBytes
 }

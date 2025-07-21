@@ -1,129 +1,54 @@
-import { compressImageAdvanced, isMobileDevice, willExceedPayloadLimit } from "./image-compression"
-
-// Función para subir una sola foto
-async function uploadSinglePhoto(file: File, userId: string, reviewId: string): Promise<string> {
-  console.log(`Subiendo foto individual: ${file.name} (${(file.size / 1024 / 1024).toFixed(2)}MB)`)
-
-  const formData = new FormData()
-  formData.append("photos", file)
-  formData.append("reviewId", reviewId)
-
-  const response = await fetch("/api/upload-photos", {
-    method: "POST",
-    body: formData,
-  })
-
-  if (!response.ok) {
-    const errorData = await response.json()
-    throw new Error(errorData.error || `Error HTTP ${response.status}`)
-  }
-
-  const data = await response.json()
-
-  if (!data.uploadedUrls || data.uploadedUrls.length === 0) {
-    throw new Error("No se recibió URL de la foto subida")
-  }
-
-  return data.uploadedUrls[0]
-}
-
-// Función para subir múltiples fotos de forma secuencial
-export async function uploadMultipleReviewPhotos(
-  files: File[],
-  userId: string,
-  reviewId: string,
-  onProgress?: (progress: number, status: string) => void,
-): Promise<string[]> {
-  console.log(`🚀 Iniciando upload secuencial de ${files.length} fotos para usuario ${userId}, reseña ${reviewId}`)
-
-  if (files.length === 0) {
-    return []
-  }
+// Función para subir múltiples fotos de reseñas usando la API route
+export async function uploadMultipleReviewPhotos(files: File[], userId: string, reviewId: string): Promise<string[]> {
+  console.log(`Iniciando upload de ${files.length} fotos para usuario ${userId}, reseña ${reviewId}`)
 
   try {
-    const uploadedUrls: string[] = []
-    const errors: string[] = []
+    const formData = new FormData()
 
-    // Comprimir fotos si es necesario (especialmente en móvil)
-    onProgress?.(10, "Optimizando fotos...")
+    // Agregar archivos al FormData con el nombre correcto
+    files.forEach((file, index) => {
+      console.log(`Agregando archivo ${index + 1}: ${file.name} (${file.size} bytes)`)
+      formData.append("photos", file)
+    })
 
-    let processedFiles = files
-    const isMobile = isMobileDevice()
-    const totalSizeExceedsLimit = willExceedPayloadLimit(files, 3.5) // Usar 3.5MB como límite seguro
+    formData.append("reviewId", reviewId)
 
-    if (isMobile || totalSizeExceedsLimit) {
-      console.log("📱 Dispositivo móvil o archivos grandes detectados, comprimiendo...")
+    console.log("Enviando request a /api/upload-photos...")
 
-      const compressedFiles: File[] = []
-      for (let i = 0; i < files.length; i++) {
-        const file = files[i]
-        try {
-          // Comprimir con configuración agresiva para móvil
-          const compressed = await compressImageAdvanced(file, {
-            maxWidth: isMobile ? 800 : 1200,
-            maxHeight: isMobile ? 600 : 900,
-            quality: isMobile ? 0.6 : 0.7,
-            outputFormat: "jpeg",
-            isMobile,
-          })
-          compressedFiles.push(compressed)
+    const response = await fetch("/api/upload-photos", {
+      method: "POST",
+      body: formData,
+    })
 
-          onProgress?.(10 + (i / files.length) * 20, `Optimizando ${file.name}...`)
-        } catch (error) {
-          console.error(`Error comprimiendo ${file.name}:`, error)
-          compressedFiles.push(file) // Usar original si falla la compresión
-        }
+    console.log("Response status:", response.status)
+
+    if (!response.ok) {
+      const errorData = await response.json()
+      console.error("Error response:", errorData)
+      throw new Error(errorData.error || `Error HTTP ${response.status}`)
+    }
+
+    const data = await response.json()
+    console.log("Upload response:", data)
+
+    // Debug: verificar que las URLs sean de Vercel Blob
+    console.log("URLs devueltas por la API:", data.uploadedUrls)
+    data.uploadedUrls?.forEach((url: string, index: number) => {
+      console.log(`URL ${index + 1}:`, url)
+      if (url.includes("blob.vercel-storage.com")) {
+        console.log("✅ URL de Vercel Blob correcta")
+      } else {
+        console.warn("⚠️ URL no es de Vercel Blob:", url)
       }
-      processedFiles = compressedFiles
+    })
 
-      const originalSize = files.reduce((sum, f) => sum + f.size, 0)
-      const compressedSize = processedFiles.reduce((sum, f) => sum + f.size, 0)
-      console.log(
-        `✅ Compresión completada: ${(originalSize / 1024 / 1024).toFixed(2)}MB → ${(compressedSize / 1024 / 1024).toFixed(2)}MB`,
-      )
+    if (data.errors && data.errors.length > 0) {
+      console.warn("Algunos archivos tuvieron errores:", data.errors)
     }
 
-    // Subir fotos una por una para evitar el límite de payload
-    onProgress?.(30, "Subiendo fotos...")
-
-    for (let i = 0; i < processedFiles.length; i++) {
-      const file = processedFiles[i]
-      const progressPercent = 30 + ((i + 1) / processedFiles.length) * 60
-
-      try {
-        onProgress?.(progressPercent, `Subiendo foto ${i + 1} de ${processedFiles.length}...`)
-
-        const url = await uploadSinglePhoto(file, userId, reviewId)
-        uploadedUrls.push(url)
-
-        console.log(`✅ Foto ${i + 1}/${processedFiles.length} subida: ${file.name}`)
-
-        // Pequeña pausa entre uploads para evitar rate limiting
-        if (i < processedFiles.length - 1) {
-          await new Promise((resolve) => setTimeout(resolve, 100))
-        }
-      } catch (error) {
-        console.error(`❌ Error subiendo foto ${i + 1} (${file.name}):`, error)
-        errors.push(`${file.name}: ${error instanceof Error ? error.message : "Error desconocido"}`)
-      }
-    }
-
-    onProgress?.(100, "Upload completado")
-
-    console.log(`📊 Resultado final: ${uploadedUrls.length}/${files.length} fotos subidas exitosamente`)
-
-    if (errors.length > 0) {
-      console.warn("⚠️ Errores durante el upload:", errors)
-    }
-
-    // Si no se subió ninguna foto, lanzar error
-    if (uploadedUrls.length === 0 && files.length > 0) {
-      throw new Error("No se pudo subir ninguna foto. " + (errors.length > 0 ? errors[0] : "Error desconocido"))
-    }
-
-    return uploadedUrls
+    return data.uploadedUrls || []
   } catch (error) {
-    console.error("💥 Error general en uploadMultipleReviewPhotos:", error)
+    console.error("Error en uploadMultipleReviewPhotos:", error)
     throw error
   }
 }
@@ -131,7 +56,7 @@ export async function uploadMultipleReviewPhotos(
 // Función para eliminar una foto usando la API route
 export async function deleteReviewPhoto(photoUrl: string): Promise<boolean> {
   try {
-    console.log("🗑️ Eliminando foto:", photoUrl)
+    console.log("Eliminando foto:", photoUrl)
 
     const response = await fetch(`/api/delete-photo?url=${encodeURIComponent(photoUrl)}`, {
       method: "DELETE",
@@ -143,7 +68,7 @@ export async function deleteReviewPhoto(photoUrl: string): Promise<boolean> {
       return false
     }
 
-    console.log("✅ Foto eliminada exitosamente")
+    console.log("Foto eliminada exitosamente")
     return true
   } catch (error) {
     console.error("Error en deleteReviewPhoto:", error)

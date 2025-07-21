@@ -2,11 +2,6 @@ import { type NextRequest, NextResponse } from "next/server"
 import { put } from "@vercel/blob"
 import { createClient } from "@/lib/supabase/server"
 
-// Límites de seguridad
-const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB por archivo
-const MAX_TOTAL_SIZE = 3.5 * 1024 * 1024 // 3.5MB total para evitar el límite de 4.5MB
-const MAX_FILES_PER_REQUEST = 1 // Procesar de a una foto para evitar límites
-
 export async function POST(request: NextRequest) {
   try {
     console.log("=== INICIO UPLOAD PHOTOS API ===")
@@ -59,33 +54,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "No se encontraron archivos" }, { status: 400 })
     }
 
-    // Verificar límites de seguridad
-    if (files.length > MAX_FILES_PER_REQUEST) {
-      console.warn(`Demasiados archivos en una request: ${files.length}. Máximo: ${MAX_FILES_PER_REQUEST}`)
-      return NextResponse.json(
-        {
-          error: `Máximo ${MAX_FILES_PER_REQUEST} archivo por request. Use upload secuencial.`,
-        },
-        { status: 413 },
-      )
-    }
-
-    // Calcular tamaño total
-    const totalSize = files.reduce((sum, file) => sum + file.size, 0)
-    console.log(`Tamaño total del payload: ${(totalSize / 1024 / 1024).toFixed(2)}MB`)
-
-    if (totalSize > MAX_TOTAL_SIZE) {
-      console.warn(
-        `Payload muy grande: ${(totalSize / 1024 / 1024).toFixed(2)}MB. Máximo: ${(MAX_TOTAL_SIZE / 1024 / 1024).toFixed(2)}MB`,
-      )
-      return NextResponse.json(
-        {
-          error: `Payload muy grande (${(totalSize / 1024 / 1024).toFixed(2)}MB). Máximo ${(MAX_TOTAL_SIZE / 1024 / 1024).toFixed(2)}MB. Use compresión o upload secuencial.`,
-        },
-        { status: 413 },
-      )
-    }
-
     const uploadedUrls: string[] = []
     const errors: string[] = []
 
@@ -94,19 +62,19 @@ export async function POST(request: NextRequest) {
       const file = files[i]
       console.log(`Procesando archivo ${i + 1}:`, {
         name: file.name,
-        size: `${(file.size / 1024 / 1024).toFixed(2)}MB`,
+        size: file.size,
         type: file.type,
       })
 
       try {
-        // Validar archivo individual
+        // Validar archivo
         if (!file.type.startsWith("image/")) {
           errors.push(`Archivo ${file.name}: No es una imagen`)
           continue
         }
 
-        if (file.size > MAX_FILE_SIZE) {
-          errors.push(`Archivo ${file.name}: Muy grande (máximo ${MAX_FILE_SIZE / 1024 / 1024}MB)`)
+        if (file.size > 10 * 1024 * 1024) {
+          errors.push(`Archivo ${file.name}: Muy grande (máximo 10MB)`)
           continue
         }
 
@@ -125,71 +93,25 @@ export async function POST(request: NextRequest) {
         })
 
         uploadedUrls.push(blob.url)
-        console.log(`✅ Archivo subido exitosamente: ${blob.url}`)
-
-        // Verificar que la URL es de Vercel Blob
-        if (blob.url.includes("blob.vercel-storage.com")) {
-          console.log("✅ URL de Vercel Blob confirmada")
-        } else {
-          console.warn("⚠️ URL no es de Vercel Blob:", blob.url)
-        }
+        console.log(`Archivo subido exitosamente: ${blob.url}`)
       } catch (uploadError) {
-        console.error(`❌ Error subiendo archivo ${file.name}:`, uploadError)
-
-        // Manejar específicamente el error 413
-        if (uploadError instanceof Error && uploadError.message.includes("413")) {
-          errors.push(`${file.name}: Archivo muy grande para subir`)
-        } else {
-          errors.push(
-            `Error subiendo ${file.name}: ${uploadError instanceof Error ? uploadError.message : "Error desconocido"}`,
-          )
-        }
+        console.error(`Error subiendo archivo ${file.name}:`, uploadError)
+        errors.push(
+          `Error subiendo ${file.name}: ${uploadError instanceof Error ? uploadError.message : "Error desconocido"}`,
+        )
       }
     }
 
-    console.log(`📊 Resultado final: ${uploadedUrls.length} archivos subidos, ${errors.length} errores`)
+    console.log(`Resultado final: ${uploadedUrls.length} archivos subidos, ${errors.length} errores`)
 
-    // Si hay errores pero también uploads exitosos, devolver éxito parcial
-    if (uploadedUrls.length > 0) {
-      return NextResponse.json({
-        success: true,
-        uploadedUrls,
-        errors: errors.length > 0 ? errors : undefined,
-        message:
-          errors.length > 0
-            ? `${uploadedUrls.length} de ${files.length} fotos subidas correctamente. ${errors.length} errores.`
-            : `${uploadedUrls.length} fotos subidas correctamente`,
-      })
-    } else {
-      // Si no se subió nada, devolver error
-      return NextResponse.json(
-        {
-          success: false,
-          uploadedUrls: [],
-          errors,
-          message: "No se pudo subir ninguna foto",
-        },
-        { status: 400 },
-      )
-    }
+    return NextResponse.json({
+      success: uploadedUrls.length > 0,
+      uploadedUrls,
+      errors: errors.length > 0 ? errors : undefined,
+      message: `${uploadedUrls.length} de ${files.length} fotos subidas correctamente`,
+    })
   } catch (error) {
-    console.error("💥 Error general en upload-photos:", error)
-
-    // Manejar específicamente errores de payload
-    if (
-      error instanceof Error &&
-      (error.message.includes("413") || error.message.includes("Payload") || error.message.includes("too large"))
-    ) {
-      return NextResponse.json(
-        {
-          error: "Archivos muy grandes. Intenta con menos fotos o comprime las imágenes.",
-          details: "Error 413: Payload demasiado grande",
-          suggestion: "Sube las fotos de a una o reduce su tamaño",
-        },
-        { status: 413 },
-      )
-    }
-
+    console.error("Error general en upload-photos:", error)
     return NextResponse.json(
       {
         error: "Error interno del servidor",
