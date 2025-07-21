@@ -330,7 +330,7 @@ export function DetailedReviewForm({
       htmlFor="celiac-friendly"
       className={`flex items-center space-x-3 p-3 border rounded-lg cursor-pointer transition-colors ${
         dietaryOptions.celiac_friendly
-          ? "bg-green-100 border-green-400"
+          ? "bg-red-100 border-red-400"
           : "bg-muted/30"
       }`}
     >
@@ -354,7 +354,7 @@ export function DetailedReviewForm({
       htmlFor="vegetarian-friendly"
       className={`flex items-center space-x-3 p-3 border rounded-lg cursor-pointer transition-colors ${
         dietaryOptions.vegetarian_friendly
-          ? "bg-green-100 border-green-400"
+          ? "bg-red-100 border-red-400"
           : "bg-muted/30"
       }`}
     >
