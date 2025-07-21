@@ -2,7 +2,7 @@
 
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Star, Eye } from "lucide-react"
+import { Star } from "lucide-react"
 import type { DetailedReview } from "@/lib/types"
 
 interface ProfileReviewCardProps {
@@ -26,7 +26,9 @@ export function ProfileReviewCard({ review, onViewReview }: ProfileReviewCardPro
       review.furniture_comfort,
       review.cleanliness,
       review.service,
-    ]
+    ].filter((rating) => rating != null && !isNaN(rating))
+
+    if (ratings.length === 0) return 0
     return ratings.reduce((sum, rating) => sum + rating, 0) / ratings.length
   }
 
@@ -57,8 +59,7 @@ export function ProfileReviewCard({ review, onViewReview }: ProfileReviewCardPro
 
           {/* View button */}
           <Button variant="outline" size="sm" onClick={() => onViewReview(review)} className="ml-4 shrink-0">
-            <Eye className="h-4 w-4 mr-1" />
-            Ver
+            Ver reseña
           </Button>
         </div>
       </CardContent>
