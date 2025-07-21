@@ -133,15 +133,23 @@ export function TopRatedPlaces({ onPlaceSelect, onReviewSelect }: TopRatedPlaces
         `)
         .not("dish_name", "is", null)
         .not("dish_name", "eq", "")
+        .or("photo_1_url.not.is.null,photo_2_url.not.is.null")
         .order("created_at", { ascending: false })
-        .limit(12)
+        .limit(20)
 
       if (error) {
         console.error("Error fetching recommendations:", error)
         setRecommendations([])
       } else {
         const processedRecommendations = (data || [])
-          .filter((item) => item.user && item.place && item.dish_name && item.user.full_name && item.place.name)
+          .filter((item) => {
+            // Ensure all required fields exist
+            const hasRequiredFields =
+              item.user && item.place && item.dish_name && item.user.full_name && item.place.name
+            // Ensure at least one photo exists
+            const hasPhoto = item.photo_1_url || item.photo_2_url
+            return hasRequiredFields && hasPhoto
+          })
           .map((item) => ({
             reviewId: item.id,
             place: item.place,
@@ -151,14 +159,9 @@ export function TopRatedPlaces({ onPlaceSelect, onReviewSelect }: TopRatedPlaces
               avatar_url: item.user.avatar_url || "/placeholder.svg?height=40&width=40",
             },
             dish_name: item.dish_name,
-            photo_url: item.photo_1_url || item.photo_2_url || null,
+            photo_url: item.photo_1_url || item.photo_2_url, // Always use the first available photo
           }))
-          .sort((a, b) => {
-            if (a.photo_url && !b.photo_url) return -1
-            if (!a.photo_url && b.photo_url) return 1
-            return 0
-          })
-          .slice(0, 4)
+          .slice(0, 4) // Take maximum 4 reviews
 
         setRecommendations(processedRecommendations)
       }
