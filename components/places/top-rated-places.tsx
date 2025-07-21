@@ -263,9 +263,13 @@ export function TopRatedPlaces({ onPlaceSelect, onReviewSelect }: TopRatedPlaces
         {/* Content - Fixed structure, always visible */}
         <CardContent className="relative z-10 text-white h-full flex flex-col justify-between p-6">
           {/* Top section */}
-          <div className="flex justify-end">
-            <p className="text-xs font-medium text-white bg-black/30 backdrop-blur-sm px-2 py-1 rounded-full">
-              por <span className="text-primary font-medium">{currentRecommendation.user.full_name}</span>
+          <div className="flex justify-end relative">
+            {/* Gradient overlay for better text readability */}
+            <div className="absolute -top-3 -right-2 w-80 h-32 
+    bg-gradient-to-bl from-black/20 via-black/10 via-40% to-transparent to-70% 
+    blur-md rounded-tl-2xl pointer-events-none" />
+            <p className="text-xs font-medium text-white relative z-10">
+              por <span className="text-white font-medium">{currentRecommendation.user.full_name}</span>
             </p>
           </div>
 
@@ -274,7 +278,10 @@ export function TopRatedPlaces({ onPlaceSelect, onReviewSelect }: TopRatedPlaces
             {/* Dish and place info */}
             <div className="text-sm font-medium text-white leading-tight">
               <div>
-                <span className="text-white font-medium">{currentRecommendation.dish_name}</span>
+                <span className="text-white font-medium">
+                  {currentRecommendation.dish_name.charAt(0).toUpperCase() +
+                    currentRecommendation.dish_name.slice(1).toLowerCase()}
+                </span>
                 <span className="text-white font-medium"> de</span>
               </div>
               <div className="text-white font-medium">{currentRecommendation.place.name}</div>
