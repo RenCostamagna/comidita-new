@@ -37,30 +37,35 @@ export function ProfileReviewCard({ review, onViewReview }: ProfileReviewCardPro
   return (
     <Card className="hover:shadow-md transition-shadow">
       <CardContent className="p-4">
-        <div className="flex items-center justify-between">
-          <div className="flex-1 min-w-0">
+        <div className="relative">
+          {/* Rating in top right corner */}
+          <div className="absolute top-0 right-0 flex items-center gap-1">
+            <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
+            <span className="font-medium text-sm">{overallRating.toFixed(1)}</span>
+          </div>
+
+          <div className="pr-16">
             {/* Place name */}
             <h3 className="font-semibold text-lg truncate">{review.place?.name || "Lugar desconocido"}</h3>
 
             {/* Dish name */}
             <p className="text-muted-foreground text-sm truncate mt-1">{review.dish_name}</p>
 
-            {/* Rating */}
-            <div className="flex items-center gap-2 mt-2">
-              <div className="flex items-center gap-1">
-                <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
-                <span className="font-medium text-sm">{overallRating.toFixed(1)}</span>
-              </div>
-              <span className="text-xs text-muted-foreground">
-                {new Date(review.created_at).toLocaleDateString("es-AR")}
-              </span>
-            </div>
-          </div>
+            {/* Date */}
+            <p className="text-xs text-muted-foreground mt-2">
+              {new Date(review.created_at).toLocaleDateString("es-AR")}
+            </p>
 
-          {/* View button */}
-          <Button variant="outline" size="sm" onClick={() => onViewReview(review)} className="ml-4 shrink-0">
-            Ver reseña
-          </Button>
+            {/* View button */}
+            <Button
+              variant="default"
+              size="sm"
+              onClick={() => onViewReview(review)}
+              className="mt-3 bg-red-500 hover:bg-red-600 text-white"
+            >
+              Ver reseña
+            </Button>
+          </div>
         </div>
       </CardContent>
     </Card>

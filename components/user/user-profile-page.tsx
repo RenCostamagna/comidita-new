@@ -1,134 +1,91 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Calendar, Star, LogOut } from "lucide-react"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { UserLevelBadge } from "@/components/user/user-level-badge"
 import { createClient } from "@/lib/supabase/client"
-import type { DetailedReview } from "@/lib/types"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { PointsHistory } from "@/components/user/points-history"
-import { LevelsShowcase } from "@/components/user/levels-showcase"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { AchievementsShowcase } from "@/components/achievements/achievements-showcase"
-import { ProfileReviewCard } from "@/components/reviews/profile-review-card"
-import { SingleReviewPage } from "@/components/reviews/single-review-page"
-
-const handleLogout = async () => {
-  const supabase = createClient()
-  await supabase.auth.signOut()
-  window.location.reload()
-}
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Star, Trophy, ArrowLeft } from "lucide-react"
+import { UserLevelBadge } from "./user-level-badge"
+import { AchievementsShowcase } from "../achievements/achievements-showcase"
+import { AchievementsProgress } from "../achievements/achievements-progress"
+import { LevelsShowcase } from "./levels-showcase"
+import { PointsHistory } from "./points-history"
+import { ProfileReviewCard } from "../reviews/profile-review-card"
+import { SingleReviewPage } from "../reviews/single-review-page"
+import type { DetailedReview, UserProfile, Achievement, UserAchievement, Place } from "@/lib/types"
 
 interface UserProfilePageProps {
-  user: any
+  userId: string
   onBack: () => void
 }
 
-export function UserProfilePage({ user, onBack }: UserProfilePageProps) {
-  const [userReviews, setUserReviews] = useState<DetailedReview[]>([])
-  const [userStats, setUserStats] = useState({
-    totalReviews: 0,
-    totalPoints: 0,
-    placesReviewed: 0,
-    averageRating: 0,
-  })
-  const [isLoading, setIsLoading] = useState(true)
+export function UserProfilePage({ userId, onBack }: UserProfilePageProps) {
+  const [profile, setProfile] = useState<UserProfile | null>(null)
+  const [reviews, setReviews] = useState<DetailedReview[]>([])
+  const [achievements, setAchievements] = useState<Achievement[]>([])
+  const [userAchievements, setUserAchievements] = useState<UserAchievement[]>([])
+  const [places, setPlaces] = useState<Place[]>([])
+  const [loading, setLoading] = useState(true)
   const [selectedReview, setSelectedReview] = useState<DetailedReview | null>(null)
-
   const supabase = createClient()
 
   useEffect(() => {
     fetchUserData()
-  }, [user.id])
+  }, [userId])
 
   const fetchUserData = async () => {
     try {
-      // Obtener reseñas del usuario
-      const { data: reviewsData, error: reviewsError } = await supabase
-        .from("detailed_reviews")
+      // Fetch user profile
+      const { data: profileData } = await supabase.from("user_profiles").select("*").eq("user_id", userId).single()
+
+      if (profileData) {
+        setProfile(profileData)
+      }
+
+      // Fetch user reviews with place information
+      const { data: reviewsData } = await supabase
+        .from("reviews")
         .select(`
           *,
-          place:places(*),
-          user:users(*)
+          place:places(*)
         `)
-        .eq("user_id", user.id)
+        .eq("user_id", userId)
         .order("created_at", { ascending: false })
 
-      if (reviewsError) {
-        console.error("Error fetching user reviews:", reviewsError)
-        setUserReviews([])
-      } else {
-        // Asegurar que cada reseña tenga la información del usuario actual
-        const reviewsWithUser = (reviewsData || []).map((review) => ({
-          ...review,
-          user: review.user || {
-            id: user.id,
-            email: user.email,
-            full_name: user.user_metadata?.full_name || user.email?.split("@")[0] || "Usuario",
-            avatar_url: user.user_metadata?.avatar_url || "/placeholder.svg",
-          },
-        }))
-        setUserReviews(reviewsWithUser)
+      if (reviewsData) {
+        setReviews(reviewsData)
       }
 
-      // Obtener estadísticas del usuario
-      const { data: userData, error: userError } = await supabase
-        .from("users")
-        .select("points")
-        .eq("id", user.id)
-        .single()
+      // Fetch achievements
+      const { data: achievementsData } = await supabase.from("achievements").select("*")
 
-      if (userError) {
-        console.error("Error fetching user data:", userError)
+      if (achievementsData) {
+        setAchievements(achievementsData)
       }
 
-      // Calcular estadísticas
-      const reviews = reviewsData || []
-      const totalReviews = reviews.length
-      const totalPoints = userData?.points || 0
-      const placesReviewed = new Set(reviews.map((r) => r.place_id)).size
-      const averageRating =
-        reviews.length > 0
-          ? reviews.reduce((sum, review) => {
-              const ratings = [
-                review.food_taste,
-                review.presentation,
-                review.portion_size,
-                review.drinks_variety,
-                review.veggie_options,
-                review.gluten_free_options,
-                review.vegan_options,
-                review.music_acoustics,
-                review.ambiance,
-                review.furniture_comfort,
-                review.cleanliness,
-                review.service,
-              ]
-              return sum + ratings.reduce((a, b) => a + b, 0) / ratings.length
-            }, 0) / reviews.length
-          : 0
+      // Fetch user achievements
+      const { data: userAchievementsData } = await supabase.from("user_achievements").select("*").eq("user_id", userId)
 
-      setUserStats({
-        totalReviews,
-        totalPoints,
-        placesReviewed,
-        averageRating,
-      })
+      if (userAchievementsData) {
+        setUserAchievements(userAchievementsData)
+      }
+
+      // Fetch places the user has reviewed
+      const { data: placesData } = await supabase
+        .from("places")
+        .select("*")
+        .in("id", reviewsData?.map((r) => r.place_id) || [])
+
+      if (placesData) {
+        setPlaces(placesData)
+      }
     } catch (error) {
       console.error("Error fetching user data:", error)
     } finally {
-      setIsLoading(false)
+      setLoading(false)
     }
-  }
-
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString("es-AR", {
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-    })
   }
 
   const handleViewReview = (review: DetailedReview) => {
@@ -139,162 +96,167 @@ export function UserProfilePage({ user, onBack }: UserProfilePageProps) {
     setSelectedReview(null)
   }
 
-  return (
-    <div className="max-w-2xl mx-auto space-y-6">
-      {/* Información del perfil */}
-      <Card>
-        <CardHeader>
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
-            {/* Avatar + nombre/email */}
-            <div className="flex gap-4 items-center sm:items-start">
-              <Avatar className="h-20 w-20 shrink-0">
-                <AvatarImage
-                  src={user.user_metadata?.avatar_url || "/placeholder.svg"}
-                  alt={user.user_metadata?.full_name}
-                />
-                <AvatarFallback className="text-2xl">
-                  {user.user_metadata?.full_name?.charAt(0) || user.email?.charAt(0) || "U"}
-                </AvatarFallback>
-              </Avatar>
+  if (selectedReview) {
+    return <SingleReviewPage review={selectedReview} onBack={handleBackFromReview} />
+  }
 
-              <div className="flex flex-col justify-center sm:justify-start">
-                <CardTitle className="text-lg sm:text-xl">{user.user_metadata?.full_name || "Usuario"}</CardTitle>
-                <CardDescription className="text-sm break-words">{user.email}</CardDescription>
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-red-500"></div>
+      </div>
+    )
+  }
+
+  if (!profile) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <p>Usuario no encontrado</p>
+      </div>
+    )
+  }
+
+  const totalReviews = reviews.length
+  const totalPlaces = new Set(reviews.map((r) => r.place_id)).size
+  const averageRating =
+    reviews.length > 0
+      ? reviews.reduce((sum, review) => {
+          const ratings = [
+            review.food_taste,
+            review.presentation,
+            review.portion_size,
+            review.drinks_variety,
+            review.veggie_options,
+            review.gluten_free_options,
+            review.vegan_options,
+            review.music_acoustics,
+            review.ambiance,
+            review.furniture_comfort,
+            review.cleanliness,
+            review.service,
+          ].filter((rating) => rating != null && !isNaN(rating))
+
+          return sum + ratings.reduce((a, b) => a + b, 0) / ratings.length
+        }, 0) / reviews.length
+      : 0
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      {/* Header */}
+      <div className="bg-white border-b">
+        <div className="max-w-4xl mx-auto px-4 py-4">
+          <Button variant="ghost" onClick={onBack} className="mb-4">
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Volver
+          </Button>
+
+          <div className="flex items-center gap-4">
+            <Avatar className="h-20 w-20">
+              <AvatarImage src={profile.avatar_url || undefined} />
+              <AvatarFallback className="text-2xl">
+                {profile.display_name?.charAt(0) || profile.email?.charAt(0) || "U"}
+              </AvatarFallback>
+            </Avatar>
+
+            <div className="flex-1">
+              <h1 className="text-2xl font-bold">{profile.display_name || "Usuario"}</h1>
+              <p className="text-muted-foreground">{profile.email}</p>
+              <div className="flex items-center gap-4 mt-2">
+                <UserLevelBadge points={profile.total_points} level={profile.level} />
+                <div className="flex items-center gap-1">
+                  <Trophy className="h-4 w-4 text-yellow-500" />
+                  <span className="text-sm font-medium">{profile.total_points} puntos</span>
+                </div>
               </div>
             </div>
-
-            {/* Nivel */}
-            <div className="w-full sm:ml-auto">
-              <UserLevelBadge
-                userId={user.id}
-                userPoints={userStats.totalPoints}
-                showProgress={true}
-                showNextLevel={true}
-              />
-            </div>
           </div>
-
-          <div className="flex justify-end mt-4">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleLogout}
-              className="flex items-center gap-2 bg-transparent"
-            >
-              <LogOut className="h-4 w-4" />
-              Cerrar sesión
-            </Button>
-          </div>
-        </CardHeader>
-      </Card>
-
-      {/* Estadísticas */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card>
-          <CardContent className="p-4 text-center">
-            <div className="text-2xl font-bold text-primary">{userStats.totalReviews}</div>
-            <div className="text-sm text-muted-foreground">Reseñas</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4 text-center">
-            <div className="text-2xl font-bold text-primary">{userStats.totalPoints.toLocaleString()}</div>
-            <div className="text-sm text-muted-foreground">Puntos</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4 text-center">
-            <div className="text-2xl font-bold text-primary">{userStats.placesReviewed}</div>
-            <div className="text-sm text-muted-foreground">Lugares</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4 text-center">
-            <div className="text-2xl font-bold text-primary">{userStats.averageRating.toFixed(1)}</div>
-            <div className="text-sm text-muted-foreground">Promedio</div>
-          </CardContent>
-        </Card>
+        </div>
       </div>
 
-      {/* Tabs para organizar el contenido */}
-      <Tabs defaultValue="activity" className="w-full">
-        <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="activity">Actividad</TabsTrigger>
-          <TabsTrigger value="achievements">Logros</TabsTrigger>
-          <TabsTrigger value="levels">Niveles</TabsTrigger>
-          <TabsTrigger value="reviews">Reseñas</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="activity" className="space-y-6">
-          {/* Historial de puntos */}
-          <PointsHistory userId={user.id} />
-
-          {/* Información adicional */}
+      {/* Stats Cards */}
+      <div className="max-w-4xl mx-auto px-4 py-6">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
           <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Calendar className="h-5 w-5" />
-                Información
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              <div className="flex items-center gap-2 text-sm">
-                <Calendar className="h-4 w-4 text-muted-foreground" />
-                <span>Miembro desde {formatDate(user.created_at || new Date().toISOString())}</span>
-              </div>
-              {userStats.totalReviews > 0 && (
-                <div className="flex items-center gap-2 text-sm">
-                  <Star className="h-4 w-4 text-muted-foreground" />
-                  <span>Última reseña: {formatDate(userReviews[0]?.created_at)}</span>
-                </div>
-              )}
+            <CardContent className="p-4 text-center">
+              <div className="text-2xl font-bold text-red-500">{totalReviews}</div>
+              <div className="text-sm text-muted-foreground">Reseñas</div>
             </CardContent>
           </Card>
-        </TabsContent>
 
-        <TabsContent value="achievements">
-          <AchievementsShowcase userId={user.id} />
-        </TabsContent>
+          <Card>
+            <CardContent className="p-4 text-center">
+              <div className="text-2xl font-bold text-blue-500">{profile.total_points}</div>
+              <div className="text-sm text-muted-foreground">Puntos</div>
+            </CardContent>
+          </Card>
 
-        <TabsContent value="levels">
-          <LevelsShowcase currentUserPoints={userStats.totalPoints} showStatistics={true} />
-        </TabsContent>
+          <Card>
+            <CardContent className="p-4 text-center">
+              <div className="text-2xl font-bold text-green-500">{totalPlaces}</div>
+              <div className="text-sm text-muted-foreground">Lugares</div>
+            </CardContent>
+          </Card>
 
-        <TabsContent value="reviews" className="space-y-6">
-          {selectedReview ? (
-            <SingleReviewPage review={selectedReview} onBack={handleBackFromReview} />
-          ) : (
-            <>
-              {/* Header de reseñas */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>Mis Reseñas ({userStats.totalReviews})</CardTitle>
-                </CardHeader>
-              </Card>
+          <Card>
+            <CardContent className="p-4 text-center">
+              <div className="flex items-center justify-center gap-1">
+                <Star className="h-5 w-5 fill-yellow-400 text-yellow-400" />
+                <span className="text-2xl font-bold text-yellow-500">{averageRating.toFixed(1)}</span>
+              </div>
+              <div className="text-sm text-muted-foreground">Promedio</div>
+            </CardContent>
+          </Card>
+        </div>
 
-              {/* Lista de reseñas */}
-              {isLoading ? (
-                <div className="text-center py-8">
-                  <div className="text-muted-foreground">Cargando reseñas...</div>
-                </div>
-              ) : userReviews.length > 0 ? (
-                <div className="space-y-3">
-                  {userReviews.map((review) => (
-                    <ProfileReviewCard key={review.id} review={review} onViewReview={handleViewReview} />
-                  ))}
-                </div>
-              ) : (
-                <Card>
-                  <CardContent className="text-center py-8">
-                    <p className="text-muted-foreground">Aún no has hecho ninguna reseña.</p>
-                    <p className="text-sm text-muted-foreground mt-2">¡Comparte tu primera experiencia gastronómica!</p>
-                  </CardContent>
-                </Card>
-              )}
-            </>
-          )}
-        </TabsContent>
-      </Tabs>
+        {/* Tabs */}
+        <Tabs defaultValue="activity" className="w-full">
+          <TabsList className="grid w-full grid-cols-4">
+            <TabsTrigger value="activity">Actividad</TabsTrigger>
+            <TabsTrigger value="achievements">Logros</TabsTrigger>
+            <TabsTrigger value="levels">Niveles</TabsTrigger>
+            <TabsTrigger value="reviews">Reseñas</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="activity" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Actividad Reciente</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <PointsHistory userId={userId} />
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="achievements" className="space-y-4">
+            <AchievementsShowcase achievements={achievements} userAchievements={userAchievements} />
+            <AchievementsProgress userId={userId} achievements={achievements} userAchievements={userAchievements} />
+          </TabsContent>
+
+          <TabsContent value="levels" className="space-y-4">
+            <LevelsShowcase currentLevel={profile.level} totalPoints={profile.total_points} />
+          </TabsContent>
+
+          <TabsContent value="reviews" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Mis Reseñas ({totalReviews})</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {reviews.length === 0 ? (
+                  <p className="text-center text-muted-foreground py-8">No has escrito ninguna reseña aún</p>
+                ) : (
+                  <div className="space-y-4">
+                    {reviews.map((review) => (
+                      <ProfileReviewCard key={review.id} review={review} onViewReview={handleViewReview} />
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
+      </div>
     </div>
   )
 }
