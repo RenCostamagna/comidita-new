@@ -11,7 +11,7 @@ interface ProfileReviewCardProps {
 }
 
 export function ProfileReviewCard({ review, onViewReview }: ProfileReviewCardProps) {
-  // Calculate overall rating
+  // Calculate overall rating from all individual ratings
   const calculateOverallRating = (review: DetailedReview) => {
     const ratings = [
       review.food_taste,
@@ -33,39 +33,42 @@ export function ProfileReviewCard({ review, onViewReview }: ProfileReviewCardPro
   }
 
   const overallRating = calculateOverallRating(review)
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString("es-AR", {
+      day: "numeric",
+      month: "numeric",
+      year: "numeric",
+    })
+  }
 
   return (
-    <Card className="hover:shadow-md transition-shadow">
+    <Card className="relative">
       <CardContent className="p-4">
-        <div className="relative">
-          {/* Rating in top right corner */}
-          <div className="absolute top-0 right-0 flex items-center gap-1">
-            <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
-            <span className="font-medium text-sm">{overallRating.toFixed(1)}</span>
-          </div>
+        {/* Rating in top right corner */}
+        <div className="absolute top-3 right-3 flex items-center gap-1 bg-yellow-50 px-2 py-1 rounded-full">
+          <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
+          <span className="text-sm font-medium">{overallRating.toFixed(1)}</span>
+        </div>
 
-          <div className="pr-16">
-            {/* Place name */}
-            <h3 className="font-semibold text-lg truncate">{review.place?.name || "Lugar desconocido"}</h3>
+        <div className="pr-16">
+          {/* Place name */}
+          <h3 className="font-semibold text-lg mb-1">{review.place?.name}</h3>
 
-            {/* Dish name */}
-            <p className="text-muted-foreground text-sm truncate mt-1">{review.dish_name}</p>
+          {/* Dish name */}
+          <p className="text-muted-foreground mb-2">🍽️ {review.dish_name}</p>
 
-            {/* Date */}
-            <p className="text-xs text-muted-foreground mt-2">
-              {new Date(review.created_at).toLocaleDateString("es-AR")}
-            </p>
+          {/* Date */}
+          <p className="text-sm text-muted-foreground mb-3">{formatDate(review.created_at)}</p>
 
-            {/* View button */}
-            <Button
-              variant="default"
-              size="sm"
-              onClick={() => onViewReview(review)}
-              className="mt-3 bg-red-500 hover:bg-red-600 text-white"
-            >
-              Ver reseña
-            </Button>
-          </div>
+          {/* View button */}
+          <Button
+            variant="default"
+            size="sm"
+            onClick={() => onViewReview(review)}
+            className="bg-red-500 hover:bg-red-600 text-white"
+          >
+            Ver reseña
+          </Button>
         </div>
       </CardContent>
     </Card>
