@@ -134,8 +134,8 @@ export function UserProfilePage({ user, onBack }: UserProfilePageProps) {
       {/* Información del perfil */}
       <Card>
         <CardHeader>
-          <div className="flex items-start gap-4">
-            <Avatar className="h-20 w-20">
+          <div className="flex flex-col sm:flex-row sm:items-start gap-4">
+            <Avatar className="h-20 w-20 shrink-0">
               <AvatarImage
                 src={user.user_metadata?.avatar_url || "/placeholder.svg"}
                 alt={user.user_metadata?.full_name}
@@ -146,15 +146,19 @@ export function UserProfilePage({ user, onBack }: UserProfilePageProps) {
             </Avatar>
             <div className="flex-1 space-y-2">
               <div>
-                <CardTitle className="text-xl">{user.user_metadata?.full_name || "Usuario"}</CardTitle>
-                <CardDescription>{user.email}</CardDescription>
+                <CardTitle className="text-lg sm:text-xl">{user.user_metadata?.full_name || "Usuario"}</CardTitle>
+                <CardDescription className="text-sm break-words">{user.email}</CardDescription>
               </div>
-              <UserLevelBadge
-                userId={user.id}
-                userPoints={userStats.totalPoints}
-                showProgress={true}
-                showNextLevel={true}
-              />
+
+              <div className="max-w-full overflow-hidden">
+                <UserLevelBadge
+                  userId={user.id}
+                  userPoints={userStats.totalPoints}
+                  showProgress={true}
+                  showNextLevel={true}
+                />
+              </div>
+
             </div>
           </div>
           <div className="flex justify-end mt-4">
