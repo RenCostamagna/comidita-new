@@ -132,48 +132,51 @@ export function UserProfilePage({ user, onBack }: UserProfilePageProps) {
   return (
     <div className="max-w-2xl mx-auto space-y-6">
       {/* Información del perfil */}
-      <Card>
-        <CardHeader>
-          <div className="flex flex-col sm:flex-row sm:items-start gap-4">
-            <Avatar className="h-20 w-20 shrink-0">
-              <AvatarImage
-                src={user.user_metadata?.avatar_url || "/placeholder.svg"}
-                alt={user.user_metadata?.full_name}
-              />
-              <AvatarFallback className="text-2xl">
-                {user.user_metadata?.full_name?.charAt(0) || user.email?.charAt(0) || "U"}
-              </AvatarFallback>
-            </Avatar>
-            <div className="flex-1 space-y-2">
-              <div>
-                <CardTitle className="text-lg sm:text-xl">{user.user_metadata?.full_name || "Usuario"}</CardTitle>
-                <CardDescription className="text-sm break-words">{user.email}</CardDescription>
+          <Card>
+            <CardHeader>
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
+                {/* Avatar + nombre/email */}
+                <div className="flex gap-4 items-center sm:items-start">
+                  <Avatar className="h-20 w-20 shrink-0">
+                    <AvatarImage
+                      src={user.user_metadata?.avatar_url || "/placeholder.svg"}
+                      alt={user.user_metadata?.full_name}
+                    />
+                    <AvatarFallback className="text-2xl">
+                      {user.user_metadata?.full_name?.charAt(0) || user.email?.charAt(0) || "U"}
+                    </AvatarFallback>
+                  </Avatar>
+
+                  <div className="flex flex-col justify-center sm:justify-start">
+                    <CardTitle className="text-lg sm:text-xl">{user.user_metadata?.full_name || "Usuario"}</CardTitle>
+                    <CardDescription className="text-sm break-words">{user.email}</CardDescription>
+                  </div>
+                </div>
+
+                {/* Nivel */}
+                <div className="w-full sm:ml-auto">
+                  <UserLevelBadge
+                    userId={user.id}
+                    userPoints={userStats.totalPoints}
+                    showProgress={true}
+                    showNextLevel={true}
+                  />
+                </div>
               </div>
 
-              <div className="max-w-full overflow-hidden">
-                <UserLevelBadge
-                  userId={user.id}
-                  userPoints={userStats.totalPoints}
-                  showProgress={true}
-                  showNextLevel={true}
-                />
+              <div className="flex justify-end mt-4">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleLogout}
+                  className="flex items-center gap-2 bg-transparent"
+                >
+                  <LogOut className="h-4 w-4" />
+                  Cerrar sesión
+                </Button>
               </div>
-
-            </div>
-          </div>
-          <div className="flex justify-end mt-4">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleLogout}
-              className="flex items-center gap-2 bg-transparent"
-            >
-              <LogOut className="h-4 w-4" />
-              Cerrar sesión
-            </Button>
-          </div>
-        </CardHeader>
-      </Card>
+            </CardHeader>
+          </Card>
 
       {/* Estadísticas */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
