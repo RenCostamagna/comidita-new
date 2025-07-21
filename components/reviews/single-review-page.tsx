@@ -215,7 +215,7 @@ export function SingleReviewPage({
         onNotificationClick={onNotificationClick}
       />
 
-      <main className="container mx-auto px-4 py-4 pt-16 max-w-2xl pb-24">
+      <main className="container mx-auto px-4 py-6 pt-20 max-w-2xl pb-24">
         <Card>
           <CardContent className="p-6 space-y-6">
             {/* Place info with rating */}
