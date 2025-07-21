@@ -12,7 +12,6 @@ import { PointsHistory } from "@/components/user/points-history"
 import { LevelsShowcase } from "@/components/user/levels-showcase"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { AchievementsShowcase } from "@/components/achievements/achievements-showcase"
-import { SingleReviewPage } from "@/components/reviews/single-review-page"
 
 const handleLogout = async () => {
   const supabase = createClient()
@@ -34,7 +33,6 @@ export function UserProfilePage({ user, onBack }: UserProfilePageProps) {
     averageRating: 0,
   })
   const [isLoading, setIsLoading] = useState(true)
-  const [selectedReviewId, setSelectedReviewId] = useState<string | null>(null)
 
   const supabase = createClient()
 
@@ -131,7 +129,8 @@ export function UserProfilePage({ user, onBack }: UserProfilePageProps) {
   }
 
   const handleViewReview = (reviewId: string) => {
-    setSelectedReviewId(reviewId)
+    window.history.pushState({ reviewId }, "", `#review-${reviewId}`)
+    onBack()
   }
 
   return (
@@ -318,9 +317,6 @@ export function UserProfilePage({ user, onBack }: UserProfilePageProps) {
           )}
         </TabsContent>
       </Tabs>
-
-      {/* Mostrar SingleReviewPage si hay una reseña seleccionada */}
-      {selectedReviewId && <SingleReviewPage reviewId={selectedReviewId} onBack={() => setSelectedReviewId(null)} />}
     </div>
   )
 }
