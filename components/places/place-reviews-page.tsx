@@ -8,6 +8,7 @@ import { DetailedReviewCard } from "@/components/reviews/detailed-review-card"
 import { createClient } from "@/lib/supabase/client"
 import type { Place, Review, DetailedReview } from "@/lib/types"
 import { Header } from "@/components/layout/header"
+import { LayoutBase } from "@/components/layout/layout-base"
 import { BottomNavigation } from "@/components/layout/bottom-navigation"
 
 interface PlaceReviewsPageProps {
@@ -148,11 +149,11 @@ export function PlaceReviewsPage({
     return (
       <div className="min-h-screen bg-background">
         <Header showBackButton={true} onBack={onBack} user={currentUser} onPlaceSelect={handleHeaderPlaceSelect} />
-        <main className="container mx-auto px-4 py-8 pt-20">
+        <LayoutBase maxWidth="max-w-2xl" className="py-8">
           <div className="flex items-center justify-center py-12">
             <div className="text-muted-foreground">Cargando reseñas...</div>
           </div>
-        </main>
+        </LayoutBase>
       </div>
     )
   }
@@ -167,7 +168,7 @@ export function PlaceReviewsPage({
         onNotificationClick={onNotificationClick}
       />
 
-      <main className="container mx-auto px-4 py-6 pt-20 max-w-2xl pb-24">
+      <LayoutBase maxWidth="max-w-2xl" className="py-6">
         <Card>
           <CardHeader>
             <CardTitle>Reseñas de {place.name}</CardTitle>
@@ -200,7 +201,7 @@ export function PlaceReviewsPage({
             </Card>
           )}
         </div>
-      </main>
+      </LayoutBase>
 
       <BottomNavigation
         currentPage="home"
