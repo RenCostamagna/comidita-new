@@ -278,29 +278,39 @@ export function UserProfilePage({ user, onBack, onReviewClick }: UserProfilePage
                   ].reduce((sum, rating) => sum + rating, 0) / 7
 
                 return (
-                  <Card key={review.id} className="hover:shadow-md transition-shadow">
-                    <CardContent className="p-4">
-                      <div className="flex flex-col justify-between h-full min-h-[100px]">
-                        <div className="flex justify-between items-start">
-                          <h3 className="font-medium text-sm">{review.place?.name}</h3>
-                          {review.dish_name && <p className="text-sm text-muted-foreground mt-1">{review.dish_name}</p>}
-                          <div className="flex items-center gap-1">
-                            <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
-                            <span className="text-sm font-medium">{averageRating.toFixed(1)}</span>
+                    <Card key={review.id} className="hover:shadow-md transition-shadow max-w-md">
+                      <CardContent className="p-3">
+                        <div className="flex flex-col justify-between h-full min-h-[80px]">
+                          {/* Parte superior */}
+                          <div className="flex justify-between items-start">
+                            <div>
+                              <h3 className="font-medium text-sm">{review.place?.name}</h3>
+                              {review.dish_name && (
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  {review.dish_name}
+                                </p>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
+                              <span className="text-sm font-medium">{averageRating.toFixed(1)}</span>
+                            </div>
+                          </div>
+
+                          {/* Botón inferior */}
+                          <div className="flex justify-end mt-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="text-xs px-3 py-1"
+                              onClick={() => onReviewClick(review.id)}
+                            >
+                              Ver reseña
+                            </Button>
                           </div>
                         </div>
-                        <div className="flex justify-end mt-4">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => onReviewClick(review.id)}
-                          >
-                            Ver reseña
-                          </Button>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
+                      </CardContent>
+                    </Card>
                 )
               })}
             </div>
