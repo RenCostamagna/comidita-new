@@ -7,30 +7,14 @@ import { ReviewCard } from "@/components/reviews/review-card"
 import { DetailedReviewCard } from "@/components/reviews/detailed-review-card"
 import { createClient } from "@/lib/supabase/client"
 import type { Place, Review, DetailedReview } from "@/lib/types"
-import { Header } from "@/components/layout/header"
-import { BottomNavigation } from "@/components/layout/bottom-navigation"
 
 interface PlaceReviewsPageProps {
   place: Place
-  onBack: () => void
   onAddReview: (place: Place) => void
   currentUser: any
-  onGoHome?: () => void
-  onGoReview?: () => void
-  onGoProfile?: () => void
-  onNotificationClick?: (notification: any) => void
 }
 
-export function PlaceReviewsPage({
-  place,
-  onBack,
-  onAddReview,
-  currentUser,
-  onGoHome,
-  onGoReview,
-  onGoProfile,
-  onNotificationClick,
-}: PlaceReviewsPageProps) {
+export function PlaceReviewsPage({ place, onAddReview, currentUser }: PlaceReviewsPageProps) {
   const [reviews, setReviews] = useState<Review[]>([])
   const [detailedReviews, setDetailedReviews] = useState<DetailedReview[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -138,76 +122,50 @@ export function PlaceReviewsPage({
     }
   }
 
-  const handleHeaderPlaceSelect = async (selectedPlace: any) => {
-    if (onGoHome) {
-      onGoHome()
-    }
-  }
-
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-background">
-        <Header showBackButton={true} onBack={onBack} user={currentUser} onPlaceSelect={handleHeaderPlaceSelect} />
-        <main className="container mx-auto px-4 py-8 pt-20">
-          <div className="flex items-center justify-center py-12">
-            <div className="text-muted-foreground">Cargando reseñas...</div>
-          </div>
-        </main>
+      <div className="container mx-auto px-4 py-8 max-w-2xl">
+        <div className="flex items-center justify-center py-12">
+          <div className="text-muted-foreground">Cargando reseñas...</div>
+        </div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <Header
-        showBackButton={true}
-        onBack={onBack}
-        user={currentUser}
-        onPlaceSelect={handleHeaderPlaceSelect}
-        onNotificationClick={onNotificationClick}
-      />
-
-      <main className="container mx-auto px-4 py-6 pt-20 max-w-2xl pb-24">
-        <Card>
-          <CardHeader>
-            <CardTitle>Reseñas de {place.name}</CardTitle>
-            <CardDescription>
-              {reviews.length + detailedReviews.length}{" "}
-              {reviews.length + detailedReviews.length === 1 ? "reseña" : "reseñas"}
-            </CardDescription>
-          </CardHeader>
-        </Card>
-        <div className="space-y-4 mt-6">
-          {detailedReviews.length > 0 || reviews.length > 0 ? (
-            <>
-              {detailedReviews.map((review) => (
-                <DetailedReviewCard key={review.id} review={review} />
-              ))}
-              {reviews.map((review) => (
-                <ReviewCard key={review.id} review={review} />
-              ))}
-            </>
-          ) : (
-            <Card>
-              <CardContent className="text-center py-8">
-                <p className="text-muted-foreground">Aún no hay reseñas para este lugar.</p>
-                {currentUser && (
-                  <Button className="mt-4" onClick={() => onAddReview(place)}>
-                    Ser el primero en reseñar
-                  </Button>
-                )}
-              </CardContent>
-            </Card>
-          )}
-        </div>
-      </main>
-
-      <BottomNavigation
-        currentPage="home"
-        onGoHome={onGoHome}
-        onGoReview={onGoReview}
-        onGoProfile={onGoProfile || (() => {})}
-      />
+    <div className="container mx-auto px-4 py-6 max-w-2xl">
+      <Card>
+        <CardHeader>
+          <CardTitle>Reseñas de {place.name}</CardTitle>
+          <CardDescription>
+            {reviews.length + detailedReviews.length}{" "}
+            {reviews.length + detailedReviews.length === 1 ? "reseña" : "reseñas"}
+          </CardDescription>
+        </CardHeader>
+      </Card>
+      <div className="space-y-4 mt-6">
+        {detailedReviews.length > 0 || reviews.length > 0 ? (
+          <>
+            {detailedReviews.map((review) => (
+              <DetailedReviewCard key={review.id} review={review} />
+            ))}
+            {reviews.map((review) => (
+              <ReviewCard key={review.id} review={review} />
+            ))}
+          </>
+        ) : (
+          <Card>
+            <CardContent className="text-center py-8">
+              <p className="text-muted-foreground">Aún no hay reseñas para este lugar.</p>
+              {currentUser && (
+                <Button className="mt-4" onClick={() => onAddReview(place)}>
+                  Ser el primero en reseñar
+                </Button>
+              )}
+            </CardContent>
+          </Card>
+        )}
+      </div>
     </div>
   )
 }

@@ -731,31 +731,46 @@ export function HomePage({ user: initialUser }: HomePageProps) {
 
   if (showAllCategories) {
     return (
-      <AllCategoriesPage
-        onBack={() => setShowAllCategories(false)}
-        onCategorySelect={(category) => {
-          setShowAllCategories(false)
-          handleCategorySelect(category)
-        }}
-        currentUser={currentUser}
-        onGoHome={goToHome}
-        onGoReview={goToReview}
-        onGoProfile={goToProfile}
-      />
+      <div className="min-h-screen bg-background">
+        <Header
+          showBackButton={true}
+          onBack={() => setShowAllCategories(false)}
+          user={currentUser}
+          onPlaceSelect={handleHeaderPlaceSelect}
+          onNotificationClick={handleNotificationClick}
+        />
+
+        <main className="pt-20 pb-24">
+          <AllCategoriesPage
+            onCategorySelect={(category) => {
+              setShowAllCategories(false)
+              handleCategorySelect(category)
+            }}
+          />
+        </main>
+
+        <BottomNavigation currentPage="home" onGoHome={goToHome} onGoReview={goToReview} onGoProfile={goToProfile} />
+      </div>
     )
   }
 
   if (showReviews && selectedPlace) {
     return (
-      <PlaceReviewsPage
-        place={selectedPlace}
-        onBack={handleBackFromPlaceReviews}
-        onAddReview={handleAddReview}
-        currentUser={currentUser}
-        onGoHome={goToHome}
-        onGoProfile={goToProfile}
-        onGoReview={goToReview}
-      />
+      <div className="min-h-screen bg-background">
+        <Header
+          showBackButton={true}
+          onBack={handleBackFromPlaceReviews}
+          user={currentUser}
+          onPlaceSelect={handleHeaderPlaceSelect}
+          onNotificationClick={handleNotificationClick}
+        />
+
+        <main className="pt-20 pb-24">
+          <PlaceReviewsPage place={selectedPlace} onAddReview={handleAddReview} currentUser={currentUser} />
+        </main>
+
+        <BottomNavigation currentPage="home" onGoHome={goToHome} onGoReview={goToReview} onGoProfile={goToProfile} />
+      </div>
     )
   }
 
@@ -842,22 +857,31 @@ export function HomePage({ user: initialUser }: HomePageProps) {
 
   if (showCategoryPlaces && selectedCategory) {
     return (
-      <CategoryPlacesPage
-        selectedCategory={selectedCategory}
-        onBack={() => {
-          setShowCategoryPlaces(false)
-          setSelectedCategory("")
-        }}
-        onPlaceSelect={(place) => {
-          setSelectedPlace(place)
-          setShowReviews(true)
-        }}
-        onAddReview={handleAddReview}
-        currentUser={currentUser}
-        onGoHome={goToHome}
-        onGoReview={goToReview}
-        onGoProfile={goToProfile}
-      />
+      <div className="min-h-screen bg-background">
+        <Header
+          showBackButton={true}
+          onBack={() => {
+            setShowCategoryPlaces(false)
+            setSelectedCategory("")
+          }}
+          user={currentUser}
+          onPlaceSelect={handleHeaderPlaceSelect}
+          onNotificationClick={handleNotificationClick}
+        />
+
+        <main className="pt-20 pb-24">
+          <CategoryPlacesPage
+            selectedCategory={selectedCategory}
+            onPlaceSelect={(place) => {
+              setSelectedPlace(place)
+              setShowReviews(true)
+            }}
+            onAddReview={handleAddReview}
+          />
+        </main>
+
+        <BottomNavigation currentPage="home" onGoHome={goToHome} onGoReview={goToReview} onGoProfile={goToProfile} />
+      </div>
     )
   }
 

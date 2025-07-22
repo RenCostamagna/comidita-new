@@ -6,17 +6,9 @@ import { Badge } from "@/components/ui/badge"
 import { Utensils, Coffee, Home, Crown, Beef, Pizza, ChefHat, Truck, Wine, ChevronRight } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { RESTAURANT_CATEGORIES } from "@/lib/types"
-import { Header } from "@/components/layout/header"
-import { BottomNavigation } from "@/components/layout/bottom-navigation"
 
 interface AllCategoriesPageProps {
-  onBack: () => void
   onCategorySelect: (category: string) => void
-  currentUser: any
-  onGoHome?: () => void
-  onGoReview?: () => void
-  onGoProfile?: () => void
-  onNotificationClick?: (notification: any) => void // Nueva prop
 }
 
 // Mapeo de categorías a iconos y colores (mismo que en categories-section)
@@ -63,15 +55,7 @@ const CATEGORY_CONFIG = {
   },
 }
 
-export function AllCategoriesPage({
-  onBack,
-  onCategorySelect,
-  currentUser,
-  onGoHome,
-  onGoReview,
-  onGoProfile,
-  onNotificationClick, // Nueva prop
-}: AllCategoriesPageProps) {
+export function AllCategoriesPage({ onCategorySelect }: AllCategoriesPageProps) {
   const [categoryCounts, setCategoryCounts] = useState<Record<string, number>>({})
   const [isLoading, setIsLoading] = useState(true)
 
@@ -111,99 +95,73 @@ export function AllCategoriesPage({
     onCategorySelect(categoryKey)
   }
 
-  // Nueva función para manejar selección desde el header
-  const handleHeaderPlaceSelect = async (selectedPlace: any) => {
-    // Navegar a las reseñas del lugar seleccionado
-    if (onGoHome) {
-      onGoHome() // Esto debería manejar la navegación en el componente padre
-    }
-  }
-
   return (
-    <div className="min-h-screen bg-background">
-      <Header
-        showBackButton={true}
-        onBack={onBack}
-        user={currentUser}
-        onPlaceSelect={handleHeaderPlaceSelect}
-        onNotificationClick={onNotificationClick} // Pasar la prop
-      />
+    <div className="container mx-auto px-4 py-6 max-w-4xl">
+      {/* Grid de categorías */}
+      {isLoading ? (
+        <div className="flex items-center justify-center py-12">
+          <div className="text-muted-foreground">Cargando categorías...</div>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          {Object.entries(RESTAURANT_CATEGORIES).map(([key, label]) => {
+            const config = CATEGORY_CONFIG[key as keyof typeof CATEGORY_CONFIG]
+            const count = categoryCounts[key] || 0
+            const IconComponent = config?.icon || Utensils
 
-      <main className="container mx-auto px-4 py-6 pt-20 max-w-4xl pb-24">
-        {/* Grid de categorías */}
-        {isLoading ? (
-          <div className="flex items-center justify-center py-12">
-            <div className="text-muted-foreground">Cargando categorías...</div>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {Object.entries(RESTAURANT_CATEGORIES).map(([key, label]) => {
-              const config = CATEGORY_CONFIG[key as keyof typeof CATEGORY_CONFIG]
-              const count = categoryCounts[key] || 0
-              const IconComponent = config?.icon || Utensils
+            return (
+              <Card
+                key={key}
+                className={`relative overflow-hidden cursor-pointer hover:shadow-xl hover:scale-105 transition-all duration-300 h-48 border-0 ${config?.color || "bg-gradient-to-br from-gray-500 to-gray-600"}`}
+                onClick={() => handleCategoryClick(key)}
+              >
+                <CardContent className="p-6 h-full flex flex-col justify-between text-white relative">
+                  {/* Background pattern/texture */}
+                  <div className="absolute inset-0 bg-black/10"></div>
 
-              return (
-                <Card
-                  key={key}
-                  className={`relative overflow-hidden cursor-pointer hover:shadow-xl hover:scale-105 transition-all duration-300 h-48 border-0 ${config?.color || "bg-gradient-to-br from-gray-500 to-gray-600"}`}
-                  onClick={() => handleCategoryClick(key)}
-                >
-                  <CardContent className="p-6 h-full flex flex-col justify-between text-white relative">
-                    {/* Background pattern/texture */}
-                    <div className="absolute inset-0 bg-black/10"></div>
+                  {/* Decorative elements */}
+                  <div className="absolute top-0 right-0 w-20 h-20 bg-white/5 rounded-full -translate-y-10 translate-x-10"></div>
+                  <div className="absolute bottom-0 left-0 w-16 h-16 bg-white/5 rounded-full translate-y-8 -translate-x-8"></div>
 
-                    {/* Decorative elements */}
-                    <div className="absolute top-0 right-0 w-20 h-20 bg-white/5 rounded-full -translate-y-10 translate-x-10"></div>
-                    <div className="absolute bottom-0 left-0 w-16 h-16 bg-white/5 rounded-full translate-y-8 -translate-x-8"></div>
-
-                    {/* Content */}
-                    <div className="relative z-10">
-                      {/* Top row with icon */}
-                      <div className="flex items-start justify-between mb-4">
-                        <div className="p-3 bg-white/20 backdrop-blur-sm rounded-xl">
-                          <IconComponent className="h-8 w-8 text-white" />
-                        </div>
-                        <Badge
-                          variant="secondary"
-                          className="bg-white/20 backdrop-blur-sm text-white border-white/30 text-sm font-semibold"
-                        >
-                          {count} {count === 1 ? "lugar" : "lugares"}
-                        </Badge>
+                  {/* Content */}
+                  <div className="relative z-10">
+                    {/* Top row with icon */}
+                    <div className="flex items-start justify-between mb-4">
+                      <div className="p-3 bg-white/20 backdrop-blur-sm rounded-xl">
+                        <IconComponent className="h-8 w-8 text-white" />
                       </div>
-
-                      {/* Category info */}
-                      <div className="space-y-2">
-                        <h3 className="font-bold text-xl text-white leading-tight">{label}</h3>
-                        <p className="text-white/80 text-sm">
-                          {count > 0
-                            ? `Descubre ${count} ${count === 1 ? "lugar" : "lugares"} ${count === 1 ? "reseñado" : "reseñados"}`
-                            : "Sé el primero en reseñar"}
-                        </p>
-                      </div>
+                      <Badge
+                        variant="secondary"
+                        className="bg-white/20 backdrop-blur-sm text-white border-white/30 text-sm font-semibold"
+                      >
+                        {count} {count === 1 ? "lugar" : "lugares"}
+                      </Badge>
                     </div>
 
-                    {/* Hover effect indicator */}
-                    <div className="absolute inset-0 bg-white/0 hover:bg-white/10 transition-all duration-300 rounded-lg"></div>
-
-                    {/* Arrow indicator */}
-                    <div className="absolute bottom-4 right-4 opacity-60">
-                      <ChevronRight className="h-5 w-5 text-white" />
+                    {/* Category info */}
+                    <div className="space-y-2">
+                      <h3 className="font-bold text-xl text-white leading-tight">{label}</h3>
+                      <p className="text-white/80 text-sm">
+                        {count > 0
+                          ? `Descubre ${count} ${count === 1 ? "lugar" : "lugares"} ${count === 1 ? "reseñado" : "reseñados"}`
+                          : "Sé el primero en reseñar"}
+                      </p>
                     </div>
-                  </CardContent>
-                </Card>
-              )
-            })}
-          </div>
-        )}
-      </main>
+                  </div>
 
-      {/* Bottom Navigation */}
-      <BottomNavigation
-        currentPage="home"
-        onGoHome={onGoHome || (() => {})}
-        onGoReview={onGoReview || (() => {})}
-        onGoProfile={onGoProfile || (() => {})}
-      />
+                  {/* Hover effect indicator */}
+                  <div className="absolute inset-0 bg-white/0 hover:bg-white/10 transition-all duration-300 rounded-lg"></div>
+
+                  {/* Arrow indicator */}
+                  <div className="absolute bottom-4 right-4 opacity-60">
+                    <ChevronRight className="h-5 w-5 text-white" />
+                  </div>
+                </CardContent>
+              </Card>
+            )
+          })}
+        </div>
+      )}
     </div>
   )
 }
