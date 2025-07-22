@@ -633,7 +633,7 @@ export function HomePage({ user: initialUser }: HomePageProps) {
         onAddReview={handleAddReview}
         currentUser={currentUser}
         onGoHome={goToHome}
-        onGoSearch={goToProfile}
+        onGoProfile={goToProfile}
         onGoReview={goToReview}
       />
     )
