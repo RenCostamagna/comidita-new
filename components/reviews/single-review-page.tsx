@@ -11,30 +11,14 @@ import { createClient } from "@/lib/supabase/client"
 import { PRICE_RANGES, RESTAURANT_CATEGORIES } from "@/lib/types"
 import { getRatingColor } from "@/lib/rating-labels"
 import type { DetailedReview } from "@/lib/types"
-import { Header } from "@/components/layout/header"
-import { BottomNavigation } from "@/components/layout/bottom-navigation"
 
 interface SingleReviewPageProps {
   reviewId: string
-  onBack: () => void
   onViewPlace?: (place: any) => void
   onAddReview?: (place: any) => void
-  onGoHome?: () => void
-  onGoReview?: () => void
-  onGoProfile?: () => void
-  onNotificationClick?: (notification: any) => void
 }
 
-export function SingleReviewPage({
-  reviewId,
-  onBack,
-  onViewPlace,
-  onAddReview,
-  onGoHome,
-  onGoReview,
-  onGoProfile,
-  onNotificationClick,
-}: SingleReviewPageProps) {
+export function SingleReviewPage({ reviewId, onViewPlace, onAddReview }: SingleReviewPageProps) {
   const [review, setReview] = useState<DetailedReview | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [selectedImage, setSelectedImage] = useState<string | null>(null)
@@ -116,12 +100,6 @@ export function SingleReviewPage({
     setSelectedImage(null)
   }
 
-  const handleHeaderPlaceSelect = async (selectedPlace: any) => {
-    if (onGoHome) {
-      onGoHome()
-    }
-  }
-
   // Obtener fotos - priorizar nueva estructura, fallback a campos legacy
   const getReviewPhotos = () => {
     if (review?.photos && review.photos.length > 0) {
@@ -175,26 +153,20 @@ export function SingleReviewPage({
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-background">
-        <Header showBackButton={true} onBack={onBack} user={review?.user} onPlaceSelect={handleHeaderPlaceSelect} />
-        <main className="container mx-auto px-4 py-8 pt-20">
-          <div className="flex items-center justify-center py-12">
-            <div className="text-muted-foreground">Cargando reseña...</div>
-          </div>
-        </main>
+      <div className="container mx-auto px-4 py-8">
+        <div className="flex items-center justify-center py-12">
+          <div className="text-muted-foreground">Cargando reseña...</div>
+        </div>
       </div>
     )
   }
 
   if (!review) {
     return (
-      <div className="min-h-screen bg-background">
-        <Header showBackButton={true} onBack={onBack} user={null} onPlaceSelect={handleHeaderPlaceSelect} />
-        <main className="container mx-auto px-4 py-8 pt-20">
-          <div className="flex items-center justify-center py-12">
-            <div className="text-muted-foreground">No se pudo cargar la reseña</div>
-          </div>
-        </main>
+      <div className="container mx-auto px-4 py-8">
+        <div className="flex items-center justify-center py-12">
+          <div className="text-muted-foreground">No se pudo cargar la reseña</div>
+        </div>
       </div>
     )
   }
@@ -206,199 +178,186 @@ export function SingleReviewPage({
   const otherPhotos = photos.filter((p) => !p.is_primary)
 
   return (
-    <div className="min-h-screen bg-background">
-      <Header
-        showBackButton={true}
-        onBack={onBack}
-        user={review?.user}
-        onPlaceSelect={handleHeaderPlaceSelect}
-        onNotificationClick={onNotificationClick}
-      />
-
-      <main className="container mx-auto px-4 py-6 pt-20 max-w-2xl pb-24">
-        <Card>
-          <CardContent className="p-6 space-y-6">
-            {/* Place info with rating */}
-            <div className="space-y-3">
-              <div className="flex items-start justify-between">
-                <div className="flex-1">
-                  <h2 className="font-semibold text-lg">{review.place?.name}</h2>
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1">
-                    <MapPin className="h-4 w-4" />
-                    <span>{review.place?.address}</span>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2 ml-4">
-                  <Star className="h-5 w-5 fill-yellow-400 text-yellow-400" />
-                  <span className="text-xl font-semibold">{averageRating.toFixed(1)}</span>
-                </div>
-              </div>
-
-              <div className="flex gap-2">
-                <Button
-                  onClick={handleViewPlace}
-                  size="sm"
-                  variant="outline"
-                  className="flex-1 flex items-center gap-1 bg-transparent"
-                >
-                  Ver lugar
-                </Button>
-                <Button onClick={handleAddReview} size="sm" className="flex-1 flex items-center gap-1">
-                  Reseñar
-                </Button>
-              </div>
-
-              <div className="text-center">
-                <span className="text-sm text-muted-foreground">
-                  {RESTAURANT_CATEGORIES[review.restaurant_category as keyof typeof RESTAURANT_CATEGORIES]}
-                </span>
-              </div>
-            </div>
-
-            {/* Dish info */}
-            <div className="flex flex-wrap items-center gap-4 py-3 border-t border-b text-sm text-muted-foreground">
-              {review.dish_name && (
-                <div className="flex items-center gap-1">
-                  <Utensils className="h-4 w-4" />
-                  <span>{review.dish_name}</span>
-                </div>
-              )}
-              <div className="flex items-center gap-1">
-                <DollarSign className="h-4 w-4" />
-                <span>{PRICE_RANGES[review.price_range as keyof typeof PRICE_RANGES]}</span>
-              </div>
-            </div>
-
-            {/* User info */}
-            <div className="flex items-center gap-3">
-              <Avatar className="h-8 w-8">
-                <AvatarImage src={review.user?.avatar_url || "/placeholder.svg"} alt={review.user?.full_name} />
-                <AvatarFallback className="text-xs">
-                  {review.user?.full_name?.charAt(0) || review.user?.email?.charAt(0) || "U"}
-                </AvatarFallback>
-              </Avatar>
+    <div className="container mx-auto px-4 py-6 max-w-2xl">
+      <Card>
+        <CardContent className="p-6 space-y-6">
+          {/* Place info with rating */}
+          <div className="space-y-3">
+            <div className="flex items-start justify-between">
               <div className="flex-1">
-                <p className="font-medium text-sm">{review.user?.full_name || "Usuario anónimo"}</p>
-                <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                  <Calendar className="h-3 w-3" />
-                  {formatDate(review.created_at)}
+                <h2 className="font-semibold text-lg">{review.place?.name}</h2>
+                <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1">
+                  <MapPin className="h-4 w-4" />
+                  <span>{review.place?.address}</span>
                 </div>
+              </div>
+              <div className="flex items-center gap-2 ml-4">
+                <Star className="h-5 w-5 fill-yellow-400 text-yellow-400" />
+                <span className="text-xl font-semibold">{averageRating.toFixed(1)}</span>
               </div>
             </div>
 
-            {/* Opciones dietéticas - NUEVOS BADGES INFORMATIVOS */}
-            {(review.celiac_friendly || review.vegetarian_friendly) && (
-              <div className="flex flex-wrap gap-2 py-2 border-t border-b">
-                {review.celiac_friendly && (
-                  <Badge
-                    variant="secondary"
-                    className="bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-200"
-                  >
-                    🌾 Celíaco friendly
-                  </Badge>
-                )}
-                {review.vegetarian_friendly && (
-                  <Badge
-                    variant="secondary"
-                    className="bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-200"
-                  >
-                    🥬 Vegetariano friendly
-                  </Badge>
-                )}
+            <div className="flex gap-2">
+              <Button
+                onClick={handleViewPlace}
+                size="sm"
+                variant="outline"
+                className="flex-1 flex items-center gap-1 bg-transparent"
+              >
+                Ver lugar
+              </Button>
+              <Button onClick={handleAddReview} size="sm" className="flex-1 flex items-center gap-1">
+                Reseñar
+              </Button>
+            </div>
+
+            <div className="text-center">
+              <span className="text-sm text-muted-foreground">
+                {RESTAURANT_CATEGORIES[review.restaurant_category as keyof typeof RESTAURANT_CATEGORIES]}
+              </span>
+            </div>
+          </div>
+
+          {/* Dish info */}
+          <div className="flex flex-wrap items-center gap-4 py-3 border-t border-b text-sm text-muted-foreground">
+            {review.dish_name && (
+              <div className="flex items-center gap-1">
+                <Utensils className="h-4 w-4" />
+                <span>{review.dish_name}</span>
               </div>
             )}
+            <div className="flex items-center gap-1">
+              <DollarSign className="h-4 w-4" />
+              <span>{PRICE_RANGES[review.price_range as keyof typeof PRICE_RANGES]}</span>
+            </div>
+          </div>
 
-            {/* Photos mejoradas */}
-            {photos.length > 0 && (
-              <div className="space-y-4">
-                {/* Foto principal */}
-                {primaryPhoto && (
-                  <div className="relative">
-                    <div className="aspect-video max-w-lg mx-auto">
+          {/* User info */}
+          <div className="flex items-center gap-3">
+            <Avatar className="h-8 w-8">
+              <AvatarImage src={review.user?.avatar_url || "/placeholder.svg"} alt={review.user?.full_name} />
+              <AvatarFallback className="text-xs">
+                {review.user?.full_name?.charAt(0) || review.user?.email?.charAt(0) || "U"}
+              </AvatarFallback>
+            </Avatar>
+            <div className="flex-1">
+              <p className="font-medium text-sm">{review.user?.full_name || "Usuario anónimo"}</p>
+              <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                <Calendar className="h-3 w-3" />
+                {formatDate(review.created_at)}
+              </div>
+            </div>
+          </div>
+
+          {/* Opciones dietéticas - NUEVOS BADGES INFORMATIVOS */}
+          {(review.celiac_friendly || review.vegetarian_friendly) && (
+            <div className="flex flex-wrap gap-2 py-2 border-t border-b">
+              {review.celiac_friendly && (
+                <Badge variant="secondary" className="bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-200">
+                  🌾 Celíaco friendly
+                </Badge>
+              )}
+              {review.vegetarian_friendly && (
+                <Badge
+                  variant="secondary"
+                  className="bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-200"
+                >
+                  🥬 Vegetariano friendly
+                </Badge>
+              )}
+            </div>
+          )}
+
+          {/* Photos mejoradas */}
+          {photos.length > 0 && (
+            <div className="space-y-4">
+              {/* Foto principal */}
+              {primaryPhoto && (
+                <div className="relative">
+                  <div className="aspect-video max-w-lg mx-auto">
+                    <img
+                      src={primaryPhoto.photo_url || "/placeholder.svg"}
+                      alt="Foto principal de la reseña"
+                      className="w-full h-full object-cover rounded-lg cursor-pointer hover:opacity-90 transition-opacity"
+                      crossOrigin="anonymous"
+                      onClick={() => handleImageClick(primaryPhoto.photo_url, 0)}
+                      onError={(e) => {
+                        console.error("Error cargando foto principal:", primaryPhoto.photo_url)
+                        const target = e.target as HTMLImageElement
+                        target.src = "/placeholder.svg?height=400&width=600&text=Error+cargando+imagen"
+                      }}
+                      onLoad={() => {
+                        console.log("✅ Foto principal cargada:", primaryPhoto.photo_url)
+                      }}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Otras fotos en grid */}
+              {otherPhotos.length > 0 && (
+                <div className="grid grid-cols-3 gap-2">
+                  {otherPhotos.map((photo, index) => (
+                    <div key={index} className="aspect-square">
                       <img
-                        src={primaryPhoto.photo_url || "/placeholder.svg"}
-                        alt="Foto principal de la reseña"
-                        className="w-full h-full object-cover rounded-lg cursor-pointer hover:opacity-90 transition-opacity"
+                        src={photo.photo_url || "/placeholder.svg"}
+                        alt={`Foto adicional ${index + 1}`}
+                        className="w-full h-full object-cover rounded-md cursor-pointer hover:opacity-90 transition-opacity"
                         crossOrigin="anonymous"
-                        onClick={() => handleImageClick(primaryPhoto.photo_url, 0)}
+                        onClick={() => handleImageClick(photo.photo_url, index + 1)}
                         onError={(e) => {
-                          console.error("Error cargando foto principal:", primaryPhoto.photo_url)
+                          console.error(`Error cargando foto ${index + 1}:`, photo.photo_url)
                           const target = e.target as HTMLImageElement
-                          target.src = "/placeholder.svg?height=400&width=600&text=Error+cargando+imagen"
+                          target.src = "/placeholder.svg?height=150&width=150&text=Error"
                         }}
                         onLoad={() => {
-                          console.log("✅ Foto principal cargada:", primaryPhoto.photo_url)
+                          console.log(`✅ Foto ${index + 1} cargada:`, photo.photo_url)
                         }}
                       />
                     </div>
-                  </div>
-                )}
+                  ))}
+                </div>
+              )}
 
-                {/* Otras fotos en grid */}
-                {otherPhotos.length > 0 && (
-                  <div className="grid grid-cols-3 gap-2">
-                    {otherPhotos.map((photo, index) => (
-                      <div key={index} className="aspect-square">
-                        <img
-                          src={photo.photo_url || "/placeholder.svg"}
-                          alt={`Foto adicional ${index + 1}`}
-                          className="w-full h-full object-cover rounded-md cursor-pointer hover:opacity-90 transition-opacity"
-                          crossOrigin="anonymous"
-                          onClick={() => handleImageClick(photo.photo_url, index + 1)}
-                          onError={(e) => {
-                            console.error(`Error cargando foto ${index + 1}:`, photo.photo_url)
-                            const target = e.target as HTMLImageElement
-                            target.src = "/placeholder.svg?height=150&width=150&text=Error"
-                          }}
-                          onLoad={() => {
-                            console.log(`✅ Foto ${index + 1} cargada:`, photo.photo_url)
-                          }}
-                        />
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {photos.length > 1 && (
-                  <div className="text-center text-xs text-muted-foreground">
-                    {photos.length} foto{photos.length > 1 ? "s" : ""} • Toca para ampliar
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Rating categories - CAMPOS ACTUALIZADOS */}
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                {ratingCategories.map((category) => {
-                  const rating = review[category.key as keyof DetailedReview] as number
-                  const ratingColor = getRatingColor(rating)
-
-                  return (
-                    <div key={category.key} className="space-y-2">
-                      <div className="flex justify-between items-center">
-                        <span className="text-sm text-muted-foreground">{category.label}</span>
-                        <div className="flex items-center gap-1">
-                          <span className="text-sm font-medium">{rating}/10</span>
-                        </div>
-                      </div>
-                      <Progress value={rating * 10} className="h-2" />
-                    </div>
-                  )
-                })}
-              </div>
+              {photos.length > 1 && (
+                <div className="text-center text-xs text-muted-foreground">
+                  {photos.length} foto{photos.length > 1 ? "s" : ""} • Toca para ampliar
+                </div>
+              )}
             </div>
+          )}
 
-            {/* Comment */}
-            {review.comment && (
-              <div className="pt-4 border-t">
-                <h3 className="font-medium mb-2">Comentario</h3>
-                <p className="text-sm leading-relaxed text-muted-foreground">{review.comment}</p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </main>
+          {/* Rating categories - CAMPOS ACTUALIZADOS */}
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              {ratingCategories.map((category) => {
+                const rating = review[category.key as keyof DetailedReview] as number
+                const ratingColor = getRatingColor(rating)
+
+                return (
+                  <div key={category.key} className="space-y-2">
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-muted-foreground">{category.label}</span>
+                      <div className="flex items-center gap-1">
+                        <span className="text-sm font-medium">{rating}/10</span>
+                      </div>
+                    </div>
+                    <Progress value={rating * 10} className="h-2" />
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+
+          {/* Comment */}
+          {review.comment && (
+            <div className="pt-4 border-t">
+              <h3 className="font-medium mb-2">Comentario</h3>
+              <p className="text-sm leading-relaxed text-muted-foreground">{review.comment}</p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Image Modal mejorado */}
       {selectedImage && (
@@ -464,13 +423,6 @@ export function SingleReviewPage({
           </div>
         </div>
       )}
-
-      <BottomNavigation
-        currentPage="home"
-        onGoHome={onGoHome || (() => {})}
-        onGoReview={onGoReview || (() => {})}
-        onGoProfile={onGoProfile || (() => {})}
-      />
     </div>
   )
 }

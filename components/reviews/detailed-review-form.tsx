@@ -304,237 +304,235 @@ export function DetailedReviewForm({
   const successCount = photos.filter((photo) => photo.url && !photo.uploadError).length
 
   return (
-    <div className="w-full max-w-2xl mx-auto space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle>{editMode ? "Editar Reseña" : "Nueva Reseña"}</CardTitle>
-          <CardDescription>{editMode ? "Modifica tu experiencia" : "Comparte tu experiencia completa"}</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Error Alert */}
-            {submitError && (
-              <Alert variant="destructive">
-                <AlertCircle className="h-4 w-4" />
-                <AlertDescription>{submitError}</AlertDescription>
-              </Alert>
+    <Card>
+      <CardHeader>
+        <CardTitle>{editMode ? "Editar Reseña" : "Nueva Reseña"}</CardTitle>
+        <CardDescription>{editMode ? "Modifica tu experiencia" : "Comparte tu experiencia completa"}</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <form onSubmit={handleSubmit} className="space-y-6">
+          {/* Error Alert */}
+          {submitError && (
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>{submitError}</AlertDescription>
+            </Alert>
+          )}
+
+          {/* Upload Status Alert */}
+          {(uploadingCount > 0 || errorCount > 0) && (
+            <Alert>
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>
+                {uploadingCount > 0 && `${uploadingCount} foto(s) subiendo... `}
+                {errorCount > 0 && `${errorCount} foto(s) con errores. `}
+                {successCount > 0 && `${successCount} foto(s) listas.`}
+              </AlertDescription>
+            </Alert>
+          )}
+
+          {/* Búsqueda de lugar */}
+          <div className="space-y-2">
+            <Label>Lugar *</Label>
+            {!selectedPlace ? (
+              <div className="w-full">
+                <PlaceSearch onPlaceSelect={handlePlaceSelect} searchMode="api" />
+                {preSelectedPlace && (
+                  <div className="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded text-xs text-yellow-800">
+                    Debug: Lugar preseleccionado - {preSelectedPlace.name} (ID:{" "}
+                    {preSelectedPlace.google_place_id || preSelectedPlace.place_id})
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="flex items-center justify-between p-3 border rounded-md bg-muted">
+                <div>
+                  <p className="font-medium">{selectedPlace.name}</p>
+                  <p className="text-sm text-muted-foreground">
+                    {cleanAddress(selectedPlace.formatted_address || selectedPlace.address)}
+                  </p>
+                </div>
+                <Button type="button" variant="outline" size="sm" onClick={() => setSelectedPlace(null)}>
+                  Cambiar
+                </Button>
+              </div>
             )}
+          </div>
 
-            {/* Upload Status Alert */}
-            {(uploadingCount > 0 || errorCount > 0) && (
-              <Alert>
-                <AlertCircle className="h-4 w-4" />
-                <AlertDescription>
-                  {uploadingCount > 0 && `${uploadingCount} foto(s) subiendo... `}
-                  {errorCount > 0 && `${errorCount} foto(s) con errores. `}
-                  {successCount > 0 && `${successCount} foto(s) listas.`}
-                </AlertDescription>
-              </Alert>
-            )}
+          {/* Puntuaciones */}
+          <div className="space-y-4">
+            <div className="space-y-1">
+              <Label className="text-base font-semibold">Puntuaciones (1-10)</Label>
+            </div>
 
-            {/* Búsqueda de lugar */}
-            <div className="space-y-2">
-              <Label>Lugar *</Label>
-              {!selectedPlace ? (
-                <div className="w-full">
-                  <PlaceSearch onPlaceSelect={handlePlaceSelect} searchMode="api" />
-                  {preSelectedPlace && (
-                    <div className="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded text-xs text-yellow-800">
-                      Debug: Lugar preseleccionado - {preSelectedPlace.name} (ID:{" "}
-                      {preSelectedPlace.google_place_id || preSelectedPlace.place_id})
+            {Object.entries(ratingLabels).map(([key, label]) => {
+              const currentRating = ratings[key as keyof typeof ratings]
+              const ratingColor = getRatingColor(currentRating)
+
+              return (
+                <div key={key} className="space-y-1.5">
+                  <div className="flex justify-between items-center">
+                    <Label className="text-sm font-medium">{label}</Label>
+                    <div className="flex items-center gap-2">
+                      <span
+                        className={`text-lg font-bold ${ratingColor} bg-muted/50 px-2 py-1 rounded-md min-w-[50px] text-center`}
+                      >
+                        {currentRating}/10
+                      </span>
                     </div>
-                  )}
-                </div>
-              ) : (
-                <div className="flex items-center justify-between p-3 border rounded-md bg-muted">
-                  <div>
-                    <p className="font-medium">{selectedPlace.name}</p>
-                    <p className="text-sm text-muted-foreground">
-                      {cleanAddress(selectedPlace.formatted_address || selectedPlace.address)}
-                    </p>
                   </div>
-                  <Button type="button" variant="outline" size="sm" onClick={() => setSelectedPlace(null)}>
-                    Cambiar
-                  </Button>
-                </div>
-              )}
-            </div>
-
-            {/* Puntuaciones */}
-            <div className="space-y-4">
-              <div className="space-y-1">
-                <Label className="text-base font-semibold">Puntuaciones (1-10)</Label>
-              </div>
-
-              {Object.entries(ratingLabels).map(([key, label]) => {
-                const currentRating = ratings[key as keyof typeof ratings]
-                const ratingColor = getRatingColor(currentRating)
-
-                return (
-                  <div key={key} className="space-y-1.5">
-                    <div className="flex justify-between items-center">
-                      <Label className="text-sm font-medium">{label}</Label>
-                      <div className="flex items-center gap-2">
-                        <span
-                          className={`text-lg font-bold ${ratingColor} bg-muted/50 px-2 py-1 rounded-md min-w-[50px] text-center`}
-                        >
-                          {currentRating}/10
-                        </span>
-                      </div>
-                    </div>
-                    <RatingSlider
-                      value={[currentRating]}
-                      onValueChange={(value) => handleRatingChange(key, value)}
-                      min={1}
-                      max={10}
-                      step={1}
-                      className="w-full"
-                    />
-                  </div>
-                )
-              })}
-            </div>
-
-            {/* Opciones dietéticas - NUEVAS CHECKBOXES */}
-            <div className="space-y-4">
-              <div className="space-y-1">
-                <Label className="text-base font-semibold">Opciones dietéticas</Label>
-              </div>
-
-              <div className="grid grid-cols-1 gap-4">
-                {/* Celíaco friendly */}
-                <label
-                  htmlFor="celiac-friendly"
-                  className={`flex items-center space-x-3 p-3 border rounded-lg cursor-pointer transition-colors ${
-                    dietaryOptions.celiac_friendly ? "bg-red-100 border-red-400" : "bg-muted/30"
-                  }`}
-                >
-                  <Checkbox
-                    id="celiac-friendly"
-                    checked={dietaryOptions.celiac_friendly}
-                    onCheckedChange={(checked) => handleDietaryOptionChange("celiac_friendly", !!checked)}
-                  />
-                  <div className="flex-1">
-                    <span className="text-sm font-medium">🌾 Celíaco friendly</span>
-                    <p className="text-xs text-muted-foreground">Tiene opciones sin gluten/TACC</p>
-                  </div>
-                </label>
-
-                {/* Vegetariano friendly */}
-                <label
-                  htmlFor="vegetarian-friendly"
-                  className={`flex items-center space-x-3 p-3 border rounded-lg cursor-pointer transition-colors ${
-                    dietaryOptions.vegetarian_friendly ? "bg-red-100 border-red-400" : "bg-muted/30"
-                  }`}
-                >
-                  <Checkbox
-                    id="vegetarian-friendly"
-                    checked={dietaryOptions.vegetarian_friendly}
-                    onCheckedChange={(checked) => handleDietaryOptionChange("vegetarian_friendly", !!checked)}
-                  />
-                  <div className="flex-1">
-                    <span className="text-sm font-medium">🥬 Vegetariano friendly</span>
-                    <p className="text-xs text-muted-foreground">Tiene buenas opciones vegetarianas/veganas</p>
-                  </div>
-                </label>
-              </div>
-            </div>
-
-            {/* Checkbox para recomendar plato */}
-            <div className="space-y-3">
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="recommend-dish"
-                  checked={wantsToRecommendDish}
-                  onCheckedChange={(checked) => {
-                    setWantsToRecommendDish(!!checked)
-                    if (!checked) {
-                      setDishName("")
-                    }
-                  }}
-                />
-                <Label htmlFor="recommend-dish" className="text-sm font-medium">
-                  ¿Querés recomendar algún plato?
-                </Label>
-              </div>
-
-              {wantsToRecommendDish && (
-                <div className="space-y-2 ml-6">
-                  <Label htmlFor="dish">Nombre del plato</Label>
-                  <Input
-                    id="dish"
-                    placeholder="Ej: Milanesa napolitana, Pizza margherita..."
-                    value={dishName}
-                    onChange={(e) => setDishName(e.target.value)}
+                  <RatingSlider
+                    value={[currentRating]}
+                    onValueChange={(value) => handleRatingChange(key, value)}
+                    min={1}
+                    max={10}
+                    step={1}
+                    className="w-full"
                   />
                 </div>
-              )}
+              )
+            })}
+          </div>
+
+          {/* Opciones dietéticas - NUEVAS CHECKBOXES */}
+          <div className="space-y-4">
+            <div className="space-y-1">
+              <Label className="text-base font-semibold">Opciones dietéticas</Label>
             </div>
 
-            {/* Precio por persona - Slider */}
-            <div className="space-y-3">
-              <Label className="text-base font-semibold">Precio por persona *</Label>
-              <PriceSlider value={priceRange} onValueChange={setPriceRange} className="w-full" />
-            </div>
-
-            {/* Categorías - Dropdown */}
-            <div className="space-y-2">
-              <Label className="text-base font-semibold">Categoría del restaurante *</Label>
-              <Select value={category} onValueChange={setCategory}>
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Selecciona una categoría" />
-                </SelectTrigger>
-                <SelectContent className="rounded-[var(--radius-dropdown)]">
-                  {Object.entries(RESTAURANT_CATEGORIES).map(([key, label]) => (
-                    <SelectItem key={key} value={key} className="rounded-[var(--radius-dropdown)]">
-                      {label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* Fotos - Componente mejorado */}
-            <PhotoUpload photos={photos} onPhotosChange={setPhotos} maxPhotos={6} userId="temp-user" />
-
-            {/* Comentario */}
-            <div className="space-y-2">
-              <Label htmlFor="comment">Comentario adicional (opcional)</Label>
-              <Textarea
-                className="py-3"
-                id="comment"
-                placeholder="Cuéntanos más detalles..."
-                value={comment}
-                onChange={(e) => setComment(e.target.value)}
-                rows={4}
-              />
-            </div>
-
-            <div className="flex gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={onCancel}
-                disabled={isLoading || isSubmitting}
-                className="flex-1 bg-transparent"
+            <div className="grid grid-cols-1 gap-4">
+              {/* Celíaco friendly */}
+              <label
+                htmlFor="celiac-friendly"
+                className={`flex items-center space-x-3 p-3 border rounded-lg cursor-pointer transition-colors ${
+                  dietaryOptions.celiac_friendly ? "bg-red-100 border-red-400" : "bg-muted/30"
+                }`}
               >
-                Cancelar
-              </Button>
-              <Button type="submit" disabled={isLoading || isSubmitting || uploadingCount > 0} className="flex-1">
-                {isSubmitting
-                  ? editMode
-                    ? "Actualizando..."
-                    : "Enviando..."
-                  : uploadingCount > 0
-                    ? `Subiendo ${uploadingCount} foto(s)...`
-                    : editMode
-                      ? "Actualizar reseña"
-                      : "Enviar reseña"}
-              </Button>
+                <Checkbox
+                  id="celiac-friendly"
+                  checked={dietaryOptions.celiac_friendly}
+                  onCheckedChange={(checked) => handleDietaryOptionChange("celiac_friendly", !!checked)}
+                />
+                <div className="flex-1">
+                  <span className="text-sm font-medium">🌾 Celíaco friendly</span>
+                  <p className="text-xs text-muted-foreground">Tiene opciones sin gluten/TACC</p>
+                </div>
+              </label>
+
+              {/* Vegetariano friendly */}
+              <label
+                htmlFor="vegetarian-friendly"
+                className={`flex items-center space-x-3 p-3 border rounded-lg cursor-pointer transition-colors ${
+                  dietaryOptions.vegetarian_friendly ? "bg-red-100 border-red-400" : "bg-muted/30"
+                }`}
+              >
+                <Checkbox
+                  id="vegetarian-friendly"
+                  checked={dietaryOptions.vegetarian_friendly}
+                  onCheckedChange={(checked) => handleDietaryOptionChange("vegetarian_friendly", !!checked)}
+                />
+                <div className="flex-1">
+                  <span className="text-sm font-medium">🥬 Vegetariano friendly</span>
+                  <p className="text-xs text-muted-foreground">Tiene buenas opciones vegetarianas/veganas</p>
+                </div>
+              </label>
             </div>
-          </form>
-        </CardContent>
-      </Card>
-    </div>
+          </div>
+
+          {/* Checkbox para recomendar plato */}
+          <div className="space-y-3">
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="recommend-dish"
+                checked={wantsToRecommendDish}
+                onCheckedChange={(checked) => {
+                  setWantsToRecommendDish(!!checked)
+                  if (!checked) {
+                    setDishName("")
+                  }
+                }}
+              />
+              <Label htmlFor="recommend-dish" className="text-sm font-medium">
+                ¿Querés recomendar algún plato?
+              </Label>
+            </div>
+
+            {wantsToRecommendDish && (
+              <div className="space-y-2 ml-6">
+                <Label htmlFor="dish">Nombre del plato</Label>
+                <Input
+                  id="dish"
+                  placeholder="Ej: Milanesa napolitana, Pizza margherita..."
+                  value={dishName}
+                  onChange={(e) => setDishName(e.target.value)}
+                />
+              </div>
+            )}
+          </div>
+
+          {/* Precio por persona - Slider */}
+          <div className="space-y-3">
+            <Label className="text-base font-semibold">Precio por persona *</Label>
+            <PriceSlider value={priceRange} onValueChange={setPriceRange} className="w-full" />
+          </div>
+
+          {/* Categorías - Dropdown */}
+          <div className="space-y-2">
+            <Label className="text-base font-semibold">Categoría del restaurante *</Label>
+            <Select value={category} onValueChange={setCategory}>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Selecciona una categoría" />
+              </SelectTrigger>
+              <SelectContent className="rounded-[var(--radius-dropdown)]">
+                {Object.entries(RESTAURANT_CATEGORIES).map(([key, label]) => (
+                  <SelectItem key={key} value={key} className="rounded-[var(--radius-dropdown)]">
+                    {label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Fotos - Componente mejorado */}
+          <PhotoUpload photos={photos} onPhotosChange={setPhotos} maxPhotos={6} userId="temp-user" />
+
+          {/* Comentario */}
+          <div className="space-y-2">
+            <Label htmlFor="comment">Comentario adicional (opcional)</Label>
+            <Textarea
+              className="py-3"
+              id="comment"
+              placeholder="Cuéntanos más detalles..."
+              value={comment}
+              onChange={(e) => setComment(e.target.value)}
+              rows={4}
+            />
+          </div>
+
+          <div className="flex gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={onCancel}
+              disabled={isLoading || isSubmitting}
+              className="flex-1 bg-transparent"
+            >
+              Cancelar
+            </Button>
+            <Button type="submit" disabled={isLoading || isSubmitting || uploadingCount > 0} className="flex-1">
+              {isSubmitting
+                ? editMode
+                  ? "Actualizando..."
+                  : "Enviando..."
+                : uploadingCount > 0
+                  ? `Subiendo ${uploadingCount} foto(s)...`
+                  : editMode
+                    ? "Actualizar reseña"
+                    : "Enviar reseña"}
+            </Button>
+          </div>
+        </form>
+      </CardContent>
+    </Card>
   )
 }
