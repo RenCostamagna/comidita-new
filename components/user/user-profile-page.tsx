@@ -314,24 +314,24 @@ export function UserProfilePage({ user, onBack, onReviewClick }: UserProfilePage
                                 <MoreVertical className="h-4 w-4" />
                               </Button>
                             </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="w-40">
+                            <DropdownMenuContent align="end" className="w-40 rounded-[var(--radius-dropdown)]">
                               <DropdownMenuItem
                                 onClick={() => onReviewClick(review.id)}
-                                className="flex items-center gap-2 cursor-pointer"
+                                className="flex items-center gap-2 cursor-pointer rounded-[var(--radius-dropdown)]"
                               >
                                 <Eye className="h-4 w-4" />
                                 Ver reseña
                               </DropdownMenuItem>
                               <DropdownMenuItem
                                 onClick={() => handleEditReview(review.id)}
-                                className="flex items-center gap-2 cursor-pointer"
+                                className="flex items-center gap-2 cursor-pointer rounded-[var(--radius-dropdown)]"
                               >
                                 <Edit className="h-4 w-4" />
                                 Modificar
                               </DropdownMenuItem>
                               <DropdownMenuItem
                                 onClick={() => handleDeleteReview(review.id)}
-                                className="flex items-center gap-2 cursor-pointer text-red-600 focus:text-red-600"
+                                className="flex items-center gap-2 cursor-pointer text-red-600 focus:text-red-600 rounded-[var(--radius-dropdown)]"
                               >
                                 <Trash2 className="h-4 w-4" />
                                 Eliminar
