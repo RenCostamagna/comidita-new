@@ -87,11 +87,17 @@ export function DetailedReviewForm({
   // Efecto para cargar datos de la reseña existente en modo edición
   useEffect(() => {
     if (isEditMode && existingReview) {
+      console.log("[DEBUG] Cargando datos de reseña existente:", existingReview)
+
       // Cargar datos básicos
       setDishName(existingReview.dish_name || "")
       setComment(existingReview.comment || "")
       setPriceRange(existingReview.price_range || "under_10000")
-      setCategory(existingReview.restaurant_category || "")
+
+      // CORREGIR: Cargar categoría correctamente
+      const reviewCategory = existingReview.restaurant_category || ""
+      console.log("[DEBUG] Categoría de la reseña:", reviewCategory)
+      setCategory(reviewCategory)
 
       // Cargar puntuaciones
       setRatings({
@@ -119,8 +125,13 @@ export function DetailedReviewForm({
         setSelectedPlace(existingReview.place)
       }
 
-      // Cargar fotos existentes
-      if (existingReview.photo_urls && existingReview.photo_urls.length > 0) {
+      // CORREGIR: Cargar fotos existentes correctamente
+      console.log("[DEBUG] Photo URLs de la reseña:", existingReview.photo_urls)
+      if (
+        existingReview.photo_urls &&
+        Array.isArray(existingReview.photo_urls) &&
+        existingReview.photo_urls.length > 0
+      ) {
         const existingPhotos: PhotoData[] = existingReview.photo_urls.map((url: string, index: number) => ({
           file: url,
           isPrimary: index === 0,
@@ -128,7 +139,11 @@ export function DetailedReviewForm({
           id: `existing-${index}`,
           previewUrl: url,
         }))
+        console.log("[DEBUG] Fotos procesadas:", existingPhotos)
         setPhotos(existingPhotos)
+      } else {
+        console.log("[DEBUG] No hay fotos para cargar")
+        setPhotos([])
       }
     } else if (selectedPlaceFromProps) {
       if (selectedPlaceFromProps.name) {
@@ -268,6 +283,7 @@ export function DetailedReviewForm({
         original_address: placeAddress,
         isEditMode,
         existingReviewId: existingReview?.id,
+        category: reviewData.restaurant_category,
       })
 
       if (isEditMode && existingReview) {
@@ -320,6 +336,15 @@ export function DetailedReviewForm({
   const uploadingCount = photos.filter((photo) => photo.isUploading).length
   const errorCount = photos.filter((photo) => photo.uploadError).length
   const successCount = photos.filter((photo) => photo.url && !photo.uploadError).length
+
+  // Debug logs para verificar el estado
+  console.log("[DEBUG RENDER]", {
+    isEditMode,
+    category,
+    photosCount: photos.length,
+    existingReviewCategory: existingReview?.restaurant_category,
+    existingReviewPhotos: existingReview?.photo_urls,
+  })
 
   return (
     <div className="w-full max-w-2xl mx-auto space-y-6">
@@ -493,7 +518,7 @@ export function DetailedReviewForm({
               <PriceSlider value={priceRange} onValueChange={setPriceRange} className="w-full" />
             </div>
 
-            {/* Categorías - Dropdown */}
+            {/* Categorías - Dropdown CORREGIDO */}
             <div className="space-y-2">
               <Label className="text-base font-semibold">Categoría del restaurante *</Label>
               <Select value={category} onValueChange={setCategory}>

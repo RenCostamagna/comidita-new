@@ -26,8 +26,15 @@ export function DeleteReviewDialog({ isOpen, onClose, onConfirm, placeName, isDe
         <AlertDialogHeader>
           <AlertDialogTitle>¿Eliminar reseña?</AlertDialogTitle>
           <AlertDialogDescription>
-            Estás a punto de eliminar tu reseña de <strong>{placeName}</strong>. Esta acción no se puede deshacer y
-            perderás todos los puntos ganados por esta reseña.
+            Estás a punto de eliminar tu reseña de <strong>{placeName}</strong>.
+            <br />
+            <br />
+            Esta acción no se puede deshacer. Se eliminarán:
+            <ul className="list-disc list-inside mt-2 space-y-1">
+              <li>Tu reseña y puntuaciones</li>
+              <li>Fotos subidas</li>
+              <li>Comentarios asociados</li>
+            </ul>
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>

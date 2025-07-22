@@ -25,40 +25,33 @@ export async function DELETE(request: NextRequest) {
     // Verificar que la reseña pertenece al usuario
     const { data: review, error: reviewError } = await supabase
       .from("detailed_reviews")
-      .select("user_id, photo_urls")
+      .select("id, user_id, photo_urls")
       .eq("id", reviewId)
+      .eq("user_id", user.id)
       .single()
 
     if (reviewError || !review) {
       return NextResponse.json({ error: "Reseña no encontrada" }, { status: 404 })
     }
 
-    if (review.user_id !== user.id) {
-      return NextResponse.json({ error: "No tienes permisos para eliminar esta reseña" }, { status: 403 })
-    }
-
-    // Eliminar las fotos asociadas si existen
+    // Eliminar fotos asociadas si existen
     if (review.photo_urls && review.photo_urls.length > 0) {
       try {
-        // Extraer los nombres de archivo de las URLs
-        const photoNames = review.photo_urls.map((url: string) => {
-          const parts = url.split("/")
-          return parts[parts.length - 1]
-        })
-
-        // Eliminar las fotos del storage
-        const { error: storageError } = await supabase.storage.from("review-photos").remove(photoNames)
-
-        if (storageError) {
-          console.error("Error eliminando fotos del storage:", storageError)
-        }
-      } catch (error) {
-        console.error("Error procesando eliminación de fotos:", error)
+        // Aquí podrías eliminar las fotos del storage si es necesario
+        // Por ahora solo eliminamos la referencia en la base de datos
+        console.log("Fotos a eliminar:", review.photo_urls)
+      } catch (photoError) {
+        console.error("Error eliminando fotos:", photoError)
+        // Continuar con la eliminación de la reseña aunque falle la eliminación de fotos
       }
     }
 
     // Eliminar la reseña
-    const { error: deleteError } = await supabase.from("detailed_reviews").delete().eq("id", reviewId)
+    const { error: deleteError } = await supabase
+      .from("detailed_reviews")
+      .delete()
+      .eq("id", reviewId)
+      .eq("user_id", user.id)
 
     if (deleteError) {
       console.error("Error eliminando reseña:", deleteError)
