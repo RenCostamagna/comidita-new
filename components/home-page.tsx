@@ -668,7 +668,6 @@ export function HomePage({ user: initialUser }: HomePageProps) {
             onPlaceSelect={handleHeaderPlaceSelect}
             onNotificationClick={handleNotificationClick}
           />
-          <main className="container mx-auto px-4 py-8 pt-20 pb-24">
             <SingleReviewPage
               reviewId={selectedReviewId}
               onBack={() => setSelectedReviewId(null)}
@@ -679,7 +678,6 @@ export function HomePage({ user: initialUser }: HomePageProps) {
               onGoProfile={goToProfile}
               onNotificationClick={handleNotificationClick}
             />
-          </main>
           {currentUser && (
             <BottomNavigation
               currentPage="profile"
