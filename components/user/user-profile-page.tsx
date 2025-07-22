@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Calendar, Star, LogOut } from "lucide-react"
+import { Calendar, Star, LogOut, MoreVertical, Eye, Edit, Trash2 } from "lucide-react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { UserLevelBadge } from "@/components/user/user-level-badge"
@@ -12,6 +12,7 @@ import { PointsHistory } from "@/components/user/points-history"
 import { LevelsShowcase } from "@/components/user/levels-showcase"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { AchievementsShowcase } from "@/components/achievements/achievements-showcase"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 
 const handleLogout = async () => {
   const supabase = createClient()
@@ -90,18 +91,14 @@ export function UserProfilePage({ user, onBack, onReviewClick }: UserProfilePage
       const averageRating =
         reviews.length > 0
           ? reviews.reduce((sum, review) => {
+              // Use only the 7 active rating fields
               const ratings = [
                 review.food_taste,
                 review.presentation,
                 review.portion_size,
-                review.drinks_variety,
-                review.veggie_options,
-                review.gluten_free_options,
-                review.vegan_options,
                 review.music_acoustics,
                 review.ambiance,
                 review.furniture_comfort,
-                review.cleanliness,
                 review.service,
               ]
               return sum + ratings.reduce((a, b) => a + b, 0) / ratings.length
@@ -127,6 +124,16 @@ export function UserProfilePage({ user, onBack, onReviewClick }: UserProfilePage
       month: "long",
       day: "numeric",
     })
+  }
+
+  const handleEditReview = (reviewId: string) => {
+    // Placeholder function - functionality to be implemented later
+    console.log("Edit review:", reviewId)
+  }
+
+  const handleDeleteReview = (reviewId: string) => {
+    // Placeholder function - functionality to be implemented later
+    console.log("Delete review:", reviewId)
   }
 
   return (
@@ -278,42 +285,63 @@ export function UserProfilePage({ user, onBack, onReviewClick }: UserProfilePage
                   ].reduce((sum, rating) => sum + rating, 0) / 7
 
                 return (
-                    <Card
-                      key={review.id}
-                      className="hover:shadow-md transition-shadow h-[120px] w-full"
-                    >
-                      <CardContent className="p-3 h-full">
-                        <div className="flex flex-col justify-between h-full">
-                          {/* Parte superior: nombre y puntaje */}
-                          <div className="flex justify-between items-start">
-                            <div>
-                              <h3 className="font-medium text-sm">{review.place?.name}</h3>
-                              {review.dish_name && (
-                                <p className="text-xs text-muted-foreground mt-1 line-clamp-1">
-                                  {review.dish_name}
-                                </p>
-                              )}
-                            </div>
-                            <div className="flex items-center gap-1">
-                              <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
-                              <span className="text-sm font-medium">{averageRating.toFixed(1)}</span>
-                            </div>
+                  <Card key={review.id} className="hover:shadow-md transition-shadow h-[120px] w-full">
+                    <CardContent className="p-3 h-full">
+                      <div className="flex flex-col justify-between h-full">
+                        {/* Parte superior: nombre y puntaje */}
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <h3 className="font-medium text-sm">{review.place?.name}</h3>
+                            {review.dish_name && (
+                              <p className="text-xs text-muted-foreground mt-1 line-clamp-1">{review.dish_name}</p>
+                            )}
                           </div>
-
-                          {/* Parte inferior: botón */}
-                          <div className="flex justify-end">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="text-xs px-3 py-1"
-                              onClick={() => onReviewClick(review.id)}
-                            >
-                              Ver reseña
-                            </Button>
+                          <div className="flex items-center gap-1">
+                            <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
+                            <span className="text-sm font-medium">{averageRating.toFixed(1)}</span>
                           </div>
                         </div>
-                      </CardContent>
-                    </Card>
+
+                        {/* Parte inferior: dropdown de acciones */}
+                        <div className="flex justify-end">
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="text-xs px-2 py-1 bg-transparent h-8 w-8 p-0"
+                              >
+                                <MoreVertical className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-40">
+                              <DropdownMenuItem
+                                onClick={() => onReviewClick(review.id)}
+                                className="flex items-center gap-2 cursor-pointer"
+                              >
+                                <Eye className="h-4 w-4" />
+                                Ver reseña
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={() => handleEditReview(review.id)}
+                                className="flex items-center gap-2 cursor-pointer"
+                              >
+                                <Edit className="h-4 w-4" />
+                                Modificar
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={() => handleDeleteReview(review.id)}
+                                className="flex items-center gap-2 cursor-pointer text-red-600 focus:text-red-600"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                                Eliminar
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
                 )
               })}
             </div>
