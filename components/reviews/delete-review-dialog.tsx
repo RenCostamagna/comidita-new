@@ -37,7 +37,7 @@ export function DeleteReviewDialog({ isOpen, onClose, onConfirm, placeName, isDe
             disabled={isDeleting}
             className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
           >
-            {isDeleting ? "Eliminando..." : "Eliminar"}
+            {isDeleting ? "Eliminando..." : "Eliminar reseña"}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

@@ -20,6 +20,7 @@ import { createClient } from "@/lib/supabase/client"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { AlertCircle } from "lucide-react"
 import { cleanAddress, formatPlaceForStorage } from "@/lib/address-utils"
+import type { DetailedReview } from "@/lib/types"
 
 interface PhotoData {
   file: File | string
@@ -32,19 +33,28 @@ interface PhotoData {
 }
 
 interface DetailedReviewFormProps {
-  onSubmit: (reviewData: any) => Promise<void>
+  onSubmit?: (reviewData: any) => Promise<void>
   onCancel: () => void
+  onSuccess?: () => void
   isLoading?: boolean
   preSelectedPlace?: any
+  place?: any
+  existingReview?: DetailedReview | null
 }
 
 export function DetailedReviewForm({
   onSubmit,
   onCancel,
+  onSuccess,
   isLoading = false,
   preSelectedPlace,
+  place,
+  existingReview,
 }: DetailedReviewFormProps) {
-  const [selectedPlace, setSelectedPlace] = useState<any>(preSelectedPlace || null)
+  const isEditMode = !!existingReview
+  const selectedPlaceFromProps = place || preSelectedPlace
+
+  const [selectedPlace, setSelectedPlace] = useState<any>(selectedPlaceFromProps || null)
   const [dishName, setDishName] = useState("")
   const [comment, setComment] = useState("")
   const [photos, setPhotos] = useState<PhotoData[]>([])
@@ -74,13 +84,58 @@ export function DetailedReviewForm({
 
   const supabase = createClient()
 
+  // Efecto para cargar datos de la reseña existente en modo edición
   useEffect(() => {
-    if (preSelectedPlace) {
-      if (preSelectedPlace.name) {
-        setSelectedPlace(preSelectedPlace)
+    if (isEditMode && existingReview) {
+      // Cargar datos básicos
+      setDishName(existingReview.dish_name || "")
+      setComment(existingReview.comment || "")
+      setPriceRange(existingReview.price_range || "under_10000")
+      setCategory(existingReview.restaurant_category || "")
+
+      // Cargar puntuaciones
+      setRatings({
+        food_taste: existingReview.food_taste || 5,
+        presentation: existingReview.presentation || 5,
+        portion_size: existingReview.portion_size || 5,
+        music_acoustics: existingReview.music_acoustics || 5,
+        ambiance: existingReview.ambiance || 5,
+        furniture_comfort: existingReview.furniture_comfort || 5,
+        service: existingReview.service || 5,
+      })
+
+      // Cargar opciones dietéticas
+      setDietaryOptions({
+        celiac_friendly: existingReview.celiac_friendly || false,
+        vegetarian_friendly: existingReview.vegetarian_friendly || false,
+      })
+
+      // Configurar recomendación de plato
+      const hasDishName = !!existingReview.dish_name?.trim()
+      setWantsToRecommendDish(hasDishName)
+
+      // Cargar lugar
+      if (existingReview.place) {
+        setSelectedPlace(existingReview.place)
+      }
+
+      // Cargar fotos existentes
+      if (existingReview.photo_urls && existingReview.photo_urls.length > 0) {
+        const existingPhotos: PhotoData[] = existingReview.photo_urls.map((url: string, index: number) => ({
+          file: url,
+          isPrimary: index === 0,
+          url: url,
+          id: `existing-${index}`,
+          previewUrl: url,
+        }))
+        setPhotos(existingPhotos)
+      }
+    } else if (selectedPlaceFromProps) {
+      if (selectedPlaceFromProps.name) {
+        setSelectedPlace(selectedPlaceFromProps)
       }
     }
-  }, [preSelectedPlace])
+  }, [isEditMode, existingReview, selectedPlaceFromProps])
 
   // Labels actualizados sin las opciones dietéticas
   const ratingLabels = {
@@ -117,13 +172,13 @@ export function DetailedReviewForm({
     }
 
     // Enhanced place validation
-    if (!selectedPlace.place_id && !selectedPlace.google_place_id) {
+    if (!selectedPlace.place_id && !selectedPlace.google_place_id && !selectedPlace.id) {
       alert("Error: Información del lugar incompleta. Por favor selecciona el lugar nuevamente.")
       return
     }
 
     // Ensure we have the required place fields
-    const placeId = selectedPlace.google_place_id || selectedPlace.place_id
+    const placeId = selectedPlace.google_place_id || selectedPlace.place_id || selectedPlace.id
     const placeName = selectedPlace.name
     const placeAddress = selectedPlace.formatted_address || selectedPlace.address
 
@@ -211,13 +266,51 @@ export function DetailedReviewForm({
         total_photos: uploadedPhotoUrls.length,
         cleaned_address: cleanedAddress,
         original_address: placeAddress,
+        isEditMode,
+        existingReviewId: existingReview?.id,
       })
 
-      await onSubmit(reviewData)
+      if (isEditMode && existingReview) {
+        // Modo edición: actualizar reseña existente
+        const { error: updateError } = await supabase
+          .from("detailed_reviews")
+          .update({
+            dish_name: reviewData.dish_name,
+            food_taste: reviewData.food_taste,
+            presentation: reviewData.presentation,
+            portion_size: reviewData.portion_size,
+            music_acoustics: reviewData.music_acoustics,
+            ambiance: reviewData.ambiance,
+            furniture_comfort: reviewData.furniture_comfort,
+            service: reviewData.service,
+            celiac_friendly: reviewData.celiac_friendly,
+            vegetarian_friendly: reviewData.vegetarian_friendly,
+            price_range: reviewData.price_range,
+            restaurant_category: reviewData.restaurant_category,
+            comment: reviewData.comment,
+            photo_urls: reviewData.photo_urls,
+            primary_photo_url: reviewData.primary_photo_url,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", existingReview.id)
+
+        if (updateError) {
+          throw updateError
+        }
+
+        if (onSuccess) {
+          onSuccess()
+        }
+      } else {
+        // Modo creación: usar la función onSubmit existente
+        if (onSubmit) {
+          await onSubmit(reviewData)
+        }
+      }
     } catch (error) {
       console.error("Error submitting review:", error)
       const errorMessage = error instanceof Error ? error.message : "Error desconocido"
-      setSubmitError(`Error al enviar la reseña: ${errorMessage}`)
+      setSubmitError(`Error al ${isEditMode ? "actualizar" : "enviar"} la reseña: ${errorMessage}`)
     } finally {
       setIsSubmitting(false)
     }
@@ -232,8 +325,10 @@ export function DetailedReviewForm({
     <div className="w-full max-w-2xl mx-auto space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle>Nueva Reseña</CardTitle>
-          <CardDescription>Comparte tu experiencia completa</CardDescription>
+          <CardTitle>{isEditMode ? "Editar Reseña" : "Nueva Reseña"}</CardTitle>
+          <CardDescription>
+            {isEditMode ? "Modifica tu experiencia" : "Comparte tu experiencia completa"}
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-6">
@@ -263,12 +358,6 @@ export function DetailedReviewForm({
               {!selectedPlace ? (
                 <div className="w-full">
                   <PlaceSearch onPlaceSelect={handlePlaceSelect} searchMode="api" />
-                  {preSelectedPlace && (
-                    <div className="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded text-xs text-yellow-800">
-                      Debug: Lugar preseleccionado - {preSelectedPlace.name} (ID:{" "}
-                      {preSelectedPlace.google_place_id || preSelectedPlace.place_id})
-                    </div>
-                  )}
                 </div>
               ) : (
                 <div className="flex items-center justify-between p-3 border rounded-md bg-muted">
@@ -278,9 +367,11 @@ export function DetailedReviewForm({
                       {cleanAddress(selectedPlace.formatted_address || selectedPlace.address)}
                     </p>
                   </div>
-                  <Button type="button" variant="outline" size="sm" onClick={() => setSelectedPlace(null)}>
-                    Cambiar
-                  </Button>
+                  {!isEditMode && (
+                    <Button type="button" variant="outline" size="sm" onClick={() => setSelectedPlace(null)}>
+                      Cambiar
+                    </Button>
+                  )}
                 </div>
               )}
             </div>
@@ -447,10 +538,14 @@ export function DetailedReviewForm({
               </Button>
               <Button type="submit" disabled={isLoading || isSubmitting || uploadingCount > 0} className="flex-1">
                 {isSubmitting
-                  ? "Enviando..."
+                  ? isEditMode
+                    ? "Actualizando..."
+                    : "Enviando..."
                   : uploadingCount > 0
                     ? `Subiendo ${uploadingCount} foto(s)...`
-                    : "Enviar reseña"}
+                    : isEditMode
+                      ? "Actualizar reseña"
+                      : "Enviar reseña"}
               </Button>
             </div>
           </form>
