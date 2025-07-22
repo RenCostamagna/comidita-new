@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Calendar, Star, LogOut } from "lucide-react"
+import { Calendar, Star, LogOut, Edit, Trash2, MoreVertical, Eye } from "lucide-react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { UserLevelBadge } from "@/components/user/user-level-badge"
@@ -12,6 +12,10 @@ import { PointsHistory } from "@/components/user/points-history"
 import { LevelsShowcase } from "@/components/user/levels-showcase"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { AchievementsShowcase } from "@/components/achievements/achievements-showcase"
+import { DeleteReviewDialog } from "@/components/reviews/delete-review-dialog"
+import { DetailedReviewForm } from "@/components/reviews/detailed-review-form"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { useToast } from "@/hooks/use-toast"
 
 const handleLogout = async () => {
   const supabase = createClient()
@@ -34,8 +38,21 @@ export function UserProfilePage({ user, onBack, onReviewClick }: UserProfilePage
     averageRating: 0,
   })
   const [isLoading, setIsLoading] = useState(true)
+  const [deleteDialog, setDeleteDialog] = useState<{
+    isOpen: boolean
+    reviewId: string | null
+    placeName: string
+    isDeleting: boolean
+  }>({
+    isOpen: false,
+    reviewId: null,
+    placeName: "",
+    isDeleting: false,
+  })
+  const [editingReview, setEditingReview] = useState<DetailedReview | null>(null)
 
   const supabase = createClient()
+  const { toast } = useToast()
 
   useEffect(() => {
     fetchUserData()
@@ -49,7 +66,8 @@ export function UserProfilePage({ user, onBack, onReviewClick }: UserProfilePage
         .select(`
           *,
           place:places(*),
-          user:users(*)
+          user:users(*),
+          photos:review_photos(*)
         `)
         .eq("user_id", user.id)
         .order("created_at", { ascending: false })
@@ -94,14 +112,9 @@ export function UserProfilePage({ user, onBack, onReviewClick }: UserProfilePage
                 review.food_taste,
                 review.presentation,
                 review.portion_size,
-                review.drinks_variety,
-                review.veggie_options,
-                review.gluten_free_options,
-                review.vegan_options,
                 review.music_acoustics,
                 review.ambiance,
                 review.furniture_comfort,
-                review.cleanliness,
                 review.service,
               ]
               return sum + ratings.reduce((a, b) => a + b, 0) / ratings.length
@@ -121,12 +134,90 @@ export function UserProfilePage({ user, onBack, onReviewClick }: UserProfilePage
     }
   }
 
+  const handleDeleteReview = async () => {
+    if (!deleteDialog.reviewId) return
+
+    setDeleteDialog((prev) => ({ ...prev, isDeleting: true }))
+
+    try {
+      const response = await fetch(`/api/reviews/delete?id=${deleteDialog.reviewId}`, {
+        method: "DELETE",
+      })
+
+      if (!response.ok) {
+        throw new Error("Error eliminando reseña")
+      }
+
+      // Actualizar la lista de reseñas
+      setUserReviews((prev) => prev.filter((review) => review.id !== deleteDialog.reviewId))
+
+      // Actualizar estadísticas
+      setUserStats((prev) => ({
+        ...prev,
+        totalReviews: prev.totalReviews - 1,
+      }))
+
+      toast({
+        title: "Reseña eliminada",
+        description: "Tu reseña ha sido eliminada exitosamente.",
+      })
+
+      setDeleteDialog({
+        isOpen: false,
+        reviewId: null,
+        placeName: "",
+        isDeleting: false,
+      })
+    } catch (error) {
+      console.error("Error deleting review:", error)
+      toast({
+        title: "Error",
+        description: "No se pudo eliminar la reseña. Inténtalo de nuevo.",
+        variant: "destructive",
+      })
+    } finally {
+      setDeleteDialog((prev) => ({ ...prev, isDeleting: false }))
+    }
+  }
+
+  const handleEditReview = (review: DetailedReview) => {
+    setEditingReview(review)
+  }
+
+  const handleReviewUpdated = () => {
+    setEditingReview(null)
+    fetchUserData() // Refrescar los datos
+    toast({
+      title: "Reseña actualizada",
+      description: "Tu reseña ha sido actualizada exitosamente.",
+    })
+  }
+
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString("es-AR", {
       year: "numeric",
       month: "long",
       day: "numeric",
     })
+  }
+
+  // Si estamos editando una reseña, mostrar el formulario
+  if (editingReview) {
+    return (
+      <div className="max-w-2xl mx-auto">
+        <div className="mb-4">
+          <Button variant="outline" onClick={() => setEditingReview(null)}>
+            ← Volver al perfil
+          </Button>
+        </div>
+        <DetailedReviewForm
+          place={editingReview.place!}
+          existingReview={editingReview}
+          onSuccess={handleReviewUpdated}
+          onCancel={() => setEditingReview(null)}
+        />
+      </div>
+    )
   }
 
   return (
@@ -258,7 +349,7 @@ export function UserProfilePage({ user, onBack, onReviewClick }: UserProfilePage
             </CardHeader>
           </Card>
 
-          {/* Lista de reseñas simplificada */}
+          {/* Lista de reseñas con menú dropdown integrado */}
           {isLoading ? (
             <div className="text-center py-8">
               <div className="text-muted-foreground">Cargando reseñas...</div>
@@ -288,10 +379,42 @@ export function UserProfilePage({ user, onBack, onReviewClick }: UserProfilePage
                             <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
                             <span className="text-sm font-medium">{averageRating.toFixed(1)}</span>
                           </div>
+                          <div className="text-xs text-muted-foreground mt-1">{formatDate(review.created_at)}</div>
                         </div>
-                        <Button variant="outline" size="sm" onClick={() => onReviewClick(review.id)} className="ml-4">
-                          Ver reseña
-                        </Button>
+
+                        <div className="ml-4">
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="outline" size="sm" className="h-8 w-8 p-0 bg-transparent">
+                                <MoreVertical className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => onReviewClick(review.id)}>
+                                <Eye className="h-4 w-4 mr-2" />
+                                Ver reseña
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleEditReview(review)}>
+                                <Edit className="h-4 w-4 mr-2" />
+                                Editar
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={() =>
+                                  setDeleteDialog({
+                                    isOpen: true,
+                                    reviewId: review.id,
+                                    placeName: review.place?.name || "este lugar",
+                                    isDeleting: false,
+                                  })
+                                }
+                                className="text-destructive focus:text-destructive"
+                              >
+                                <Trash2 className="h-4 w-4 mr-2" />
+                                Eliminar
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
                       </div>
                     </CardContent>
                   </Card>
@@ -308,6 +431,15 @@ export function UserProfilePage({ user, onBack, onReviewClick }: UserProfilePage
           )}
         </TabsContent>
       </Tabs>
+
+      {/* Dialog de confirmación para eliminar */}
+      <DeleteReviewDialog
+        isOpen={deleteDialog.isOpen}
+        onClose={() => setDeleteDialog((prev) => ({ ...prev, isOpen: false }))}
+        onConfirm={handleDeleteReview}
+        placeName={deleteDialog.placeName}
+        isDeleting={deleteDialog.isDeleting}
+      />
     </div>
   )
 }
