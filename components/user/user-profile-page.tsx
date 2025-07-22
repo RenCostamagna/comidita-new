@@ -280,18 +280,24 @@ export function UserProfilePage({ user, onBack, onReviewClick }: UserProfilePage
                 return (
                   <Card key={review.id} className="hover:shadow-md transition-shadow">
                     <CardContent className="p-4">
-                      <div className="flex items-center justify-between">
-                        <div className="flex-1">
+                      <div className="flex flex-col justify-between h-full min-h-[100px]">
+                        <div className="flex justify-between items-start">
                           <h3 className="font-medium text-sm">{review.place?.name}</h3>
                           {review.dish_name && <p className="text-sm text-muted-foreground mt-1">{review.dish_name}</p>}
-                          <div className="flex items-center gap-1 mt-2">
+                          <div className="flex items-center gap-1">
                             <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
                             <span className="text-sm font-medium">{averageRating.toFixed(1)}</span>
                           </div>
                         </div>
-                        <Button variant="outline" size="sm" onClick={() => onReviewClick(review.id)} className="ml-4">
-                          Ver reseña
-                        </Button>
+                        <div className="flex justify-end mt-4">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => onReviewClick(review.id)}
+                          >
+                            Ver reseña
+                          </Button>
+                        </div>
                       </div>
                     </CardContent>
                   </Card>
