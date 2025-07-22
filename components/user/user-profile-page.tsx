@@ -291,34 +291,6 @@ export function UserProfilePage({ user, onBack, onReviewClick, onEditReview }: U
         </CardHeader>
       </Card>
 
-      {/* Estadísticas */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card>
-          <CardContent className="p-4 text-center">
-            <div className="text-2xl font-bold text-primary">{userStats.totalReviews}</div>
-            <div className="text-sm text-muted-foreground">Reseñas</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4 text-center">
-            <div className="text-2xl font-bold text-primary">{userStats.totalPoints.toLocaleString()}</div>
-            <div className="text-sm text-muted-foreground">Puntos</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4 text-center">
-            <div className="text-2xl font-bold text-primary">{userStats.placesReviewed}</div>
-            <div className="text-sm text-muted-foreground">Lugares</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4 text-center">
-            <div className="text-2xl font-bold text-primary">{userStats.averageRating.toFixed(1)}</div>
-            <div className="text-sm text-muted-foreground">Promedio</div>
-          </CardContent>
-        </Card>
-      </div>
-
       {/* Tabs para organizar el contenido */}
       <Tabs defaultValue="activity" className="w-full">
         <TabsList className="grid w-full grid-cols-4">
