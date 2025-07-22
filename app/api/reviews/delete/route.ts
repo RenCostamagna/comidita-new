@@ -1,5 +1,5 @@
-import { createClient } from "@/lib/supabase/server"
 import { type NextRequest, NextResponse } from "next/server"
+import { createClient } from "@/lib/supabase/server"
 
 export async function DELETE(request: NextRequest) {
   try {
@@ -14,7 +14,6 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: "No autorizado" }, { status: 401 })
     }
 
-    // Obtener el ID de la reseña desde los parámetros de la URL
     const { searchParams } = new URL(request.url)
     const reviewId = searchParams.get("id")
 
@@ -23,44 +22,58 @@ export async function DELETE(request: NextRequest) {
     }
 
     // Verificar que la reseña pertenece al usuario
-    const { data: review, error: reviewError } = await supabase
+    const { data: review, error: fetchError } = await supabase
       .from("detailed_reviews")
-      .select("id, user_id, photo_urls")
+      .select("id, user_id, photo_urls, photo_1_url, photo_2_url, photo_3_url, photo_4_url, photo_5_url, photo_6_url")
       .eq("id", reviewId)
-      .eq("user_id", user.id)
       .single()
 
-    if (reviewError || !review) {
+    if (fetchError || !review) {
       return NextResponse.json({ error: "Reseña no encontrada" }, { status: 404 })
     }
 
-    // Eliminar fotos asociadas si existen
-    if (review.photo_urls && review.photo_urls.length > 0) {
-      try {
-        // Aquí podrías eliminar las fotos del storage si es necesario
-        // Por ahora solo eliminamos la referencia en la base de datos
-        console.log("Fotos a eliminar:", review.photo_urls)
-      } catch (photoError) {
-        console.error("Error eliminando fotos:", photoError)
-        // Continuar con la eliminación de la reseña aunque falle la eliminación de fotos
+    if (review.user_id !== user.id) {
+      return NextResponse.json({ error: "No tienes permisos para eliminar esta reseña" }, { status: 403 })
+    }
+
+    // Recopilar todas las URLs de fotos para eliminar
+    const photoUrls = []
+    if (review.photo_urls && Array.isArray(review.photo_urls)) {
+      photoUrls.push(...review.photo_urls)
+    }
+
+    // También verificar campos individuales de fotos
+    for (let i = 1; i <= 6; i++) {
+      const photoUrl = review[`photo_${i}_url` as keyof typeof review]
+      if (photoUrl && typeof photoUrl === "string") {
+        photoUrls.push(photoUrl)
       }
     }
 
-    // Eliminar la reseña
-    const { error: deleteError } = await supabase
-      .from("detailed_reviews")
-      .delete()
-      .eq("id", reviewId)
-      .eq("user_id", user.id)
+    // Eliminar fotos del storage si existen
+    if (photoUrls.length > 0) {
+      const { del } = await import("@vercel/blob")
+
+      for (const url of photoUrls) {
+        try {
+          await del(url)
+        } catch (error) {
+          console.error("Error eliminando foto:", error)
+          // Continuar aunque falle la eliminación de una foto
+        }
+      }
+    }
+
+    // Eliminar la reseña de la base de datos
+    const { error: deleteError } = await supabase.from("detailed_reviews").delete().eq("id", reviewId)
 
     if (deleteError) {
-      console.error("Error eliminando reseña:", deleteError)
-      return NextResponse.json({ error: "Error eliminando reseña" }, { status: 500 })
+      throw deleteError
     }
 
     return NextResponse.json({ success: true })
   } catch (error) {
-    console.error("Error en DELETE /api/reviews/delete:", error)
+    console.error("Error eliminando reseña:", error)
     return NextResponse.json({ error: "Error interno del servidor" }, { status: 500 })
   }
 }

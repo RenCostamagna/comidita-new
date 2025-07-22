@@ -84,6 +84,26 @@ export function DetailedReviewForm({
 
   const supabase = createClient()
 
+  // Función para recopilar URLs de fotos desde campos individuales
+  const collectPhotoUrls = (review: any): string[] => {
+    const photoUrls: string[] = []
+
+    // Primero intentar con photo_urls array
+    if (review.photo_urls && Array.isArray(review.photo_urls)) {
+      photoUrls.push(...review.photo_urls.filter((url) => url))
+    }
+
+    // Luego recopilar desde campos individuales photo_1_url, photo_2_url, etc.
+    for (let i = 1; i <= 6; i++) {
+      const photoUrl = review[`photo_${i}_url`]
+      if (photoUrl && typeof photoUrl === "string" && !photoUrls.includes(photoUrl)) {
+        photoUrls.push(photoUrl)
+      }
+    }
+
+    return photoUrls.filter((url) => url && url.trim() !== "")
+  }
+
   // Efecto para cargar datos de la reseña existente en modo edición
   useEffect(() => {
     if (isEditMode && existingReview) {
@@ -125,14 +145,12 @@ export function DetailedReviewForm({
         setSelectedPlace(existingReview.place)
       }
 
-      // CORREGIR: Cargar fotos existentes correctamente
-      console.log("[DEBUG] Photo URLs de la reseña:", existingReview.photo_urls)
-      if (
-        existingReview.photo_urls &&
-        Array.isArray(existingReview.photo_urls) &&
-        existingReview.photo_urls.length > 0
-      ) {
-        const existingPhotos: PhotoData[] = existingReview.photo_urls.map((url: string, index: number) => ({
+      // CORREGIR: Cargar fotos existentes desde campos individuales
+      const photoUrls = collectPhotoUrls(existingReview)
+      console.log("[DEBUG] URLs de fotos recopiladas:", photoUrls)
+
+      if (photoUrls.length > 0) {
+        const existingPhotos: PhotoData[] = photoUrls.map((url: string, index: number) => ({
           file: url,
           isPrimary: index === 0,
           url: url,
@@ -288,26 +306,33 @@ export function DetailedReviewForm({
 
       if (isEditMode && existingReview) {
         // Modo edición: actualizar reseña existente
+        const updateData: any = {
+          dish_name: reviewData.dish_name,
+          food_taste: reviewData.food_taste,
+          presentation: reviewData.presentation,
+          portion_size: reviewData.portion_size,
+          music_acoustics: reviewData.music_acoustics,
+          ambiance: reviewData.ambiance,
+          furniture_comfort: reviewData.furniture_comfort,
+          service: reviewData.service,
+          celiac_friendly: reviewData.celiac_friendly,
+          vegetarian_friendly: reviewData.vegetarian_friendly,
+          price_range: reviewData.price_range,
+          restaurant_category: reviewData.restaurant_category,
+          comment: reviewData.comment,
+          photo_urls: reviewData.photo_urls,
+          primary_photo_url: reviewData.primary_photo_url,
+          updated_at: new Date().toISOString(),
+        }
+
+        // También actualizar campos individuales de fotos para compatibilidad
+        for (let i = 1; i <= 6; i++) {
+          updateData[`photo_${i}_url`] = uploadedPhotoUrls[i - 1] || null
+        }
+
         const { error: updateError } = await supabase
           .from("detailed_reviews")
-          .update({
-            dish_name: reviewData.dish_name,
-            food_taste: reviewData.food_taste,
-            presentation: reviewData.presentation,
-            portion_size: reviewData.portion_size,
-            music_acoustics: reviewData.music_acoustics,
-            ambiance: reviewData.ambiance,
-            furniture_comfort: reviewData.furniture_comfort,
-            service: reviewData.service,
-            celiac_friendly: reviewData.celiac_friendly,
-            vegetarian_friendly: reviewData.vegetarian_friendly,
-            price_range: reviewData.price_range,
-            restaurant_category: reviewData.restaurant_category,
-            comment: reviewData.comment,
-            photo_urls: reviewData.photo_urls,
-            primary_photo_url: reviewData.primary_photo_url,
-            updated_at: new Date().toISOString(),
-          })
+          .update(updateData)
           .eq("id", existingReview.id)
 
         if (updateError) {
@@ -343,7 +368,8 @@ export function DetailedReviewForm({
     category,
     photosCount: photos.length,
     existingReviewCategory: existingReview?.restaurant_category,
-    existingReviewPhotos: existingReview?.photo_urls,
+    categoryInCategories: category in RESTAURANT_CATEGORIES,
+    availableCategories: Object.keys(RESTAURANT_CATEGORIES),
   })
 
   return (
@@ -523,7 +549,11 @@ export function DetailedReviewForm({
               <Label className="text-base font-semibold">Categoría del restaurante *</Label>
               <Select value={category} onValueChange={setCategory}>
                 <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Selecciona una categoría" />
+                  <SelectValue placeholder="Selecciona una categoría">
+                    {category && RESTAURANT_CATEGORIES[category]
+                      ? RESTAURANT_CATEGORIES[category]
+                      : "Selecciona una categoría"}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent className="rounded-[var(--radius-dropdown)]">
                   {Object.entries(RESTAURANT_CATEGORIES).map(([key, label]) => (

@@ -1,5 +1,6 @@
 "use client"
 
+import { useState } from "react"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -10,41 +11,52 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
+import { Button } from "@/components/ui/button"
+import { Loader2 } from "lucide-react"
 
 interface DeleteReviewDialogProps {
-  isOpen: boolean
-  onClose: () => void
-  onConfirm: () => void
-  placeName: string
-  isDeleting: boolean
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  onConfirm: () => Promise<void>
+  reviewTitle?: string
 }
 
-export function DeleteReviewDialog({ isOpen, onClose, onConfirm, placeName, isDeleting }: DeleteReviewDialogProps) {
+export function DeleteReviewDialog({
+  open,
+  onOpenChange,
+  onConfirm,
+  reviewTitle = "esta reseña",
+}: DeleteReviewDialogProps) {
+  const [isDeleting, setIsDeleting] = useState(false)
+
+  const handleConfirm = async () => {
+    setIsDeleting(true)
+    try {
+      await onConfirm()
+      onOpenChange(false)
+    } catch (error) {
+      console.error("Error al eliminar:", error)
+    } finally {
+      setIsDeleting(false)
+    }
+  }
+
   return (
-    <AlertDialog open={isOpen} onOpenChange={onClose}>
+    <AlertDialog open={open} onOpenChange={onOpenChange}>
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>¿Eliminar reseña?</AlertDialogTitle>
+          <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
           <AlertDialogDescription>
-            Estás a punto de eliminar tu reseña de <strong>{placeName}</strong>.
-            <br />
-            <br />
-            Esta acción no se puede deshacer. Se eliminarán:
-            <ul className="list-disc list-inside mt-2 space-y-1">
-              <li>Tu reseña y puntuaciones</li>
-              <li>Fotos subidas</li>
-              <li>Comentarios asociados</li>
-            </ul>
+            Esta acción no se puede deshacer. Se eliminará permanentemente {reviewTitle} y todas las fotos asociadas.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel disabled={isDeleting}>Cancelar</AlertDialogCancel>
-          <AlertDialogAction
-            onClick={onConfirm}
-            disabled={isDeleting}
-            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-          >
-            {isDeleting ? "Eliminando..." : "Eliminar reseña"}
+          <AlertDialogAction asChild>
+            <Button variant="destructive" onClick={handleConfirm} disabled={isDeleting}>
+              {isDeleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {isDeleting ? "Eliminando..." : "Eliminar"}
+            </Button>
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
