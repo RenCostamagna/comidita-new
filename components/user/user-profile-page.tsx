@@ -13,6 +13,8 @@ import { LevelsShowcase } from "@/components/user/levels-showcase"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { AchievementsShowcase } from "@/components/achievements/achievements-showcase"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { deleteMultipleReviewPhotos } from "@/lib/storage"
+import { useToast } from "@/hooks/use-toast"
 
 const handleLogout = async () => {
   const supabase = createClient()
@@ -38,6 +40,7 @@ export function UserProfilePage({ user, onBack, onReviewClick, onEditReview }: U
   const [isLoading, setIsLoading] = useState(true)
 
   const supabase = createClient()
+  const { toast } = useToast()
 
   useEffect(() => {
     fetchUserData()
@@ -127,9 +130,116 @@ export function UserProfilePage({ user, onBack, onReviewClick, onEditReview }: U
     })
   }
 
-  const handleDeleteReview = (reviewId: string) => {
-    // Placeholder function - functionality to be implemented later
-    console.log("Delete review:", reviewId)
+  const handleDeleteReview = async (reviewId: string) => {
+    try {
+      // Mostrar confirmación
+      if (!confirm("¿Estás seguro de que quieres eliminar esta reseña? Esta acción no se puede deshacer.")) {
+        return
+      }
+
+      toast({
+        title: "Eliminando reseña...",
+        description: "Por favor espera mientras eliminamos la reseña y sus fotos.",
+      })
+
+      // Encontrar la reseña a eliminar
+      const reviewToDelete = userReviews.find((r) => r.id === reviewId)
+      if (!reviewToDelete) {
+        throw new Error("Reseña no encontrada")
+      }
+
+      // Obtener todas las URLs de fotos para eliminar
+      const photoUrls: string[] = []
+
+      // Fotos de la nueva estructura
+      if (reviewToDelete.photos && reviewToDelete.photos.length > 0) {
+        reviewToDelete.photos.forEach((photo) => {
+          if (photo.photo_url && photo.photo_url.trim()) {
+            photoUrls.push(photo.photo_url.trim())
+          }
+        })
+      }
+
+      // Fotos de campos legacy
+      const legacyFields = ["photo_1_url", "photo_2_url", "photo_3_url", "photo_4_url", "photo_5_url", "photo_6_url"]
+      legacyFields.forEach((field) => {
+        const photoUrl = reviewToDelete[field as keyof typeof reviewToDelete] as string
+        if (photoUrl && photoUrl.trim() && !photoUrls.includes(photoUrl.trim())) {
+          photoUrls.push(photoUrl.trim())
+        }
+      })
+
+      console.log(`Eliminando reseña ${reviewId} con ${photoUrls.length} fotos`)
+
+      // Eliminar fotos primero
+      if (photoUrls.length > 0) {
+        console.log("Eliminando fotos:", photoUrls)
+        const deleteResults = await deleteMultipleReviewPhotos(photoUrls)
+        const failedDeletes = deleteResults.filter((result) => !result).length
+
+        if (failedDeletes > 0) {
+          console.warn(`${failedDeletes} fotos no pudieron ser eliminadas`)
+        }
+      }
+
+      // Eliminar registros de fotos de la base de datos
+      const { error: photosError } = await supabase.from("review_photos").delete().eq("review_id", reviewId)
+
+      if (photosError) {
+        console.warn("Error eliminando registros de fotos:", photosError)
+      }
+
+      // Eliminar la reseña de la base de datos
+      const { error: reviewError } = await supabase.from("reviews").delete().eq("id", reviewId).eq("user_id", user.id) // Seguridad adicional
+
+      if (reviewError) {
+        throw new Error(`Error eliminando reseña: ${reviewError.message}`)
+      }
+
+      // Actualizar el estado local
+      const updatedReviews = userReviews.filter((r) => r.id !== reviewId)
+      setUserReviews(updatedReviews)
+
+      // Recalcular estadísticas
+      const totalReviews = updatedReviews.length
+      const placesReviewed = new Set(updatedReviews.map((r) => r.place_id)).size
+      const averageRating =
+        updatedReviews.length > 0
+          ? updatedReviews.reduce((sum, review) => {
+              const ratings = [
+                review.food_taste,
+                review.presentation,
+                review.portion_size,
+                review.music_acoustics,
+                review.ambiance,
+                review.furniture_comfort,
+                review.service,
+              ]
+              return sum + ratings.reduce((a, b) => a + b, 0) / ratings.length
+            }, 0) / updatedReviews.length
+          : 0
+
+      setUserStats((prev) => ({
+        ...prev,
+        totalReviews,
+        placesReviewed,
+        averageRating,
+      }))
+
+      toast({
+        title: "Reseña eliminada",
+        description: "La reseña y todas sus fotos han sido eliminadas exitosamente.",
+      })
+
+      console.log(`✅ Reseña ${reviewId} eliminada exitosamente`)
+    } catch (error) {
+      console.error("Error eliminando reseña:", error)
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "No se pudo eliminar la reseña. Inténtalo de nuevo.",
+        variant: "destructive",
+      })
+    }
   }
 
   return (
