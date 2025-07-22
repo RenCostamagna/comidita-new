@@ -310,6 +310,14 @@ export function HomePage({ user: initialUser }: HomePageProps) {
       }
 
       setEditingReview(data)
+
+      // Debug para verificar que la categoría se está pasando
+      console.log("Review data for editing:", {
+        restaurant_category: data.restaurant_category,
+        price_range: data.price_range,
+        dish_name: data.dish_name,
+      })
+
       setIsEditMode(true)
       setShowDetailedReviewForm(true)
       setShowProfile(false)

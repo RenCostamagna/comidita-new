@@ -115,6 +115,12 @@ export function DetailedReviewForm({
       setPriceRange(existingReview.price_range)
       setCategory(existingReview.restaurant_category)
 
+      // Debug para verificar que la categoría se está estableciendo
+      console.log("Setting category from existing review:", {
+        restaurant_category: existingReview.restaurant_category,
+        price_range: existingReview.price_range,
+      })
+
       // Precargar fotos existentes
       if (existingReview.photos && existingReview.photos.length > 0) {
         const existingPhotos = existingReview.photos.map((photo, index) => ({
