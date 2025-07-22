@@ -12,7 +12,6 @@ import { PRICE_RANGES, RESTAURANT_CATEGORIES } from "@/lib/types"
 import { getRatingColor } from "@/lib/rating-labels"
 import type { DetailedReview } from "@/lib/types"
 import { Header } from "@/components/layout/header"
-import { LayoutBase } from "@/components/layout/layout-base"
 import { BottomNavigation } from "@/components/layout/bottom-navigation"
 
 interface SingleReviewPageProps {
@@ -178,11 +177,11 @@ export function SingleReviewPage({
     return (
       <div className="min-h-screen bg-background">
         <Header showBackButton={true} onBack={onBack} user={review?.user} onPlaceSelect={handleHeaderPlaceSelect} />
-        <LayoutBase className="py-8">
+        <main className="container mx-auto px-4 py-8 pt-20">
           <div className="flex items-center justify-center py-12">
             <div className="text-muted-foreground">Cargando reseña...</div>
           </div>
-        </LayoutBase>
+        </main>
       </div>
     )
   }
@@ -191,11 +190,11 @@ export function SingleReviewPage({
     return (
       <div className="min-h-screen bg-background">
         <Header showBackButton={true} onBack={onBack} user={null} onPlaceSelect={handleHeaderPlaceSelect} />
-        <LayoutBase className="py-8">
+        <main className="container mx-auto px-4 py-8 pt-20">
           <div className="flex items-center justify-center py-12">
             <div className="text-muted-foreground">No se pudo cargar la reseña</div>
           </div>
-        </LayoutBase>
+        </main>
       </div>
     )
   }
@@ -216,7 +215,7 @@ export function SingleReviewPage({
         onNotificationClick={onNotificationClick}
       />
 
-      <LayoutBase maxWidth="max-w-2xl" className="py-6">
+      <main className="container mx-auto px-4 py-6 pt-20 max-w-2xl pb-24">
         <Card>
           <CardContent className="p-6 space-y-6">
             {/* Place info with rating */}
@@ -399,7 +398,7 @@ export function SingleReviewPage({
             )}
           </CardContent>
         </Card>
-      </LayoutBase>
+      </main>
 
       {/* Image Modal mejorado */}
       {selectedImage && (

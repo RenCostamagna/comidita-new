@@ -10,7 +10,6 @@ import { Star, SlidersHorizontal, X } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { PlaceCard } from "@/components/places/place-card"
 import { Header } from "@/components/layout/header"
-import { LayoutBase } from "@/components/layout/layout-base"
 import { BottomNavigation } from "@/components/layout/bottom-navigation"
 import { RESTAURANT_CATEGORIES } from "@/lib/types"
 import { RatingSlider } from "@/components/ui/rating-slider"
@@ -167,7 +166,7 @@ export function CategoryPlacesPage({
         onNotificationClick={onNotificationClick} // Pasar la prop
       />
 
-      <LayoutBase maxWidth="max-w-2xl" className="py-6">
+      <main className="container mx-auto px-4 py-6 pt-20 max-w-2xl pb-24">
         {/* Filtros */}
         <Card className="mb-6">
           <CardHeader className="pb-3">
@@ -299,7 +298,7 @@ export function CategoryPlacesPage({
             </CardContent>
           </Card>
         )}
-      </LayoutBase>
+      </main>
 
       {/* Bottom Navigation */}
       <BottomNavigation

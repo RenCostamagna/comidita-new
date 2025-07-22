@@ -577,6 +577,8 @@ export function HomePage({ user: initialUser }: HomePageProps) {
     setSelectedReviewId(null)
     setPreSelectedPlaceForReview(null)
     setNavigationHistory({})
+    // Reset the profile review navigation
+    setSelectedReviewId(null)
   }
 
   const handleReviewSelect = (reviewId: string) => {
@@ -655,6 +657,42 @@ export function HomePage({ user: initialUser }: HomePageProps) {
   }
 
   if (showProfile && currentUser) {
+    // If we have a selected review, show SingleReviewPage
+    if (selectedReviewId) {
+      return (
+        <div className="min-h-screen bg-background">
+          <Header
+            user={currentUser}
+            onViewProfile={goToProfile}
+            onLogoClick={goToHome}
+            onPlaceSelect={handleHeaderPlaceSelect}
+            onNotificationClick={handleNotificationClick}
+          />
+          <main className="container mx-auto px-4 py-8 pt-20 pb-24">
+            <SingleReviewPage
+              reviewId={selectedReviewId}
+              onBack={() => setSelectedReviewId(null)}
+              onViewPlace={handleViewPlaceFromReview}
+              onAddReview={handleAddReview}
+              onGoHome={goToHome}
+              onGoReview={goToReview}
+              onGoProfile={goToProfile}
+              onNotificationClick={handleNotificationClick}
+            />
+          </main>
+          {currentUser && (
+            <BottomNavigation
+              currentPage="profile"
+              onGoHome={resetView}
+              onGoReview={goToReview}
+              onGoProfile={goToProfile}
+            />
+          )}
+        </div>
+      )
+    }
+
+    // Otherwise show UserProfilePage
     return (
       <div className="min-h-screen bg-background">
         <Header
@@ -662,9 +700,14 @@ export function HomePage({ user: initialUser }: HomePageProps) {
           onViewProfile={goToProfile}
           onLogoClick={goToHome}
           onPlaceSelect={handleHeaderPlaceSelect}
+          onNotificationClick={handleNotificationClick}
         />
         <main className="container mx-auto px-4 py-8 pt-20 pb-24">
-          <UserProfilePage user={currentUser} onBack={() => setShowProfile(false)} />
+          <UserProfilePage
+            user={currentUser}
+            onBack={() => setShowProfile(false)}
+            onReviewClick={(reviewId) => setSelectedReviewId(reviewId)}
+          />
         </main>
         {currentUser && (
           <BottomNavigation

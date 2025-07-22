@@ -12,7 +12,6 @@ import { PointsHistory } from "@/components/user/points-history"
 import { LevelsShowcase } from "@/components/user/levels-showcase"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { AchievementsShowcase } from "@/components/achievements/achievements-showcase"
-import { SingleReviewPage } from "@/components/reviews/single-review-page"
 
 const handleLogout = async () => {
   const supabase = createClient()
@@ -23,9 +22,10 @@ const handleLogout = async () => {
 interface UserProfilePageProps {
   user: any
   onBack: () => void
+  onReviewClick: (reviewId: string) => void
 }
 
-export function UserProfilePage({ user, onBack }: UserProfilePageProps) {
+export function UserProfilePage({ user, onBack, onReviewClick }: UserProfilePageProps) {
   const [userReviews, setUserReviews] = useState<DetailedReview[]>([])
   const [userStats, setUserStats] = useState({
     totalReviews: 0,
@@ -34,7 +34,6 @@ export function UserProfilePage({ user, onBack }: UserProfilePageProps) {
     averageRating: 0,
   })
   const [isLoading, setIsLoading] = useState(true)
-  const [selectedReviewId, setSelectedReviewId] = useState<string | null>(null)
 
   const supabase = createClient()
 
@@ -128,14 +127,6 @@ export function UserProfilePage({ user, onBack }: UserProfilePageProps) {
       month: "long",
       day: "numeric",
     })
-  }
-
-  const handleViewReview = (reviewId: string) => {
-    setSelectedReviewId(reviewId)
-  }
-
-  if (selectedReviewId) {
-    return <SingleReviewPage reviewId={selectedReviewId} onBack={() => setSelectedReviewId(null)} />
   }
 
   return (
@@ -298,12 +289,7 @@ export function UserProfilePage({ user, onBack }: UserProfilePageProps) {
                             <span className="text-sm font-medium">{averageRating.toFixed(1)}</span>
                           </div>
                         </div>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleViewReview(review.id)}
-                          className="ml-4"
-                        >
+                        <Button variant="outline" size="sm" onClick={() => onReviewClick(review.id)} className="ml-4">
                           Ver reseña
                         </Button>
                       </div>

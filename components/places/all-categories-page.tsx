@@ -7,7 +7,6 @@ import { Utensils, Coffee, Home, Crown, Beef, Pizza, ChefHat, Truck, Wine, Chevr
 import { createClient } from "@/lib/supabase/client"
 import { RESTAURANT_CATEGORIES } from "@/lib/types"
 import { Header } from "@/components/layout/header"
-import { LayoutBase } from "@/components/layout/layout-base"
 import { BottomNavigation } from "@/components/layout/bottom-navigation"
 
 interface AllCategoriesPageProps {
@@ -130,7 +129,7 @@ export function AllCategoriesPage({
         onNotificationClick={onNotificationClick} // Pasar la prop
       />
 
-      <LayoutBase maxWidth="max-w-4xl" className="py-6">
+      <main className="container mx-auto px-4 py-6 pt-20 max-w-4xl pb-24">
         {/* Grid de categorías */}
         {isLoading ? (
           <div className="flex items-center justify-center py-12">
@@ -196,7 +195,7 @@ export function AllCategoriesPage({
             })}
           </div>
         )}
-      </LayoutBase>
+      </main>
 
       {/* Bottom Navigation */}
       <BottomNavigation
