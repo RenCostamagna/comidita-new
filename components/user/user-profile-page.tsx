@@ -24,9 +24,10 @@ interface UserProfilePageProps {
   user: any
   onBack: () => void
   onReviewClick: (reviewId: string) => void
+  onEditReview: (reviewId: string) => void
 }
 
-export function UserProfilePage({ user, onBack, onReviewClick }: UserProfilePageProps) {
+export function UserProfilePage({ user, onBack, onReviewClick, onEditReview }: UserProfilePageProps) {
   const [userReviews, setUserReviews] = useState<DetailedReview[]>([])
   const [userStats, setUserStats] = useState({
     totalReviews: 0,
@@ -124,11 +125,6 @@ export function UserProfilePage({ user, onBack, onReviewClick }: UserProfilePage
       month: "long",
       day: "numeric",
     })
-  }
-
-  const handleEditReview = (reviewId: string) => {
-    // Placeholder function - functionality to be implemented later
-    console.log("Edit review:", reviewId)
   }
 
   const handleDeleteReview = (reviewId: string) => {
@@ -323,7 +319,7 @@ export function UserProfilePage({ user, onBack, onReviewClick }: UserProfilePage
                                 Ver reseña
                               </DropdownMenuItem>
                               <DropdownMenuItem
-                                onClick={() => handleEditReview(review.id)}
+                                onClick={() => onEditReview(review.id)}
                                 className="flex items-center gap-2 cursor-pointer rounded-[var(--radius-dropdown)]"
                               >
                                 <Edit className="h-4 w-4" />

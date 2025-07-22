@@ -36,6 +36,9 @@ interface DetailedReviewFormProps {
   onCancel: () => void
   isLoading?: boolean
   preSelectedPlace?: any
+  // Nuevas props para modo edición
+  editMode?: boolean
+  existingReview?: any
 }
 
 export function DetailedReviewForm({
@@ -43,6 +46,8 @@ export function DetailedReviewForm({
   onCancel,
   isLoading = false,
   preSelectedPlace,
+  editMode = false,
+  existingReview,
 }: DetailedReviewFormProps) {
   const [selectedPlace, setSelectedPlace] = useState<any>(preSelectedPlace || null)
   const [dishName, setDishName] = useState("")
@@ -81,6 +86,66 @@ export function DetailedReviewForm({
       }
     }
   }, [preSelectedPlace])
+
+  useEffect(() => {
+    if (editMode && existingReview) {
+      // Precargar datos de la reseña existente
+      setSelectedPlace(existingReview.place)
+      setDishName(existingReview.dish_name || "")
+      setComment(existingReview.comment || "")
+      setWantsToRecommendDish(!!existingReview.dish_name)
+
+      // Precargar ratings
+      setRatings({
+        food_taste: existingReview.food_taste,
+        presentation: existingReview.presentation,
+        portion_size: existingReview.portion_size,
+        music_acoustics: existingReview.music_acoustics,
+        ambiance: existingReview.ambiance,
+        furniture_comfort: existingReview.furniture_comfort,
+        service: existingReview.service,
+      })
+
+      // Precargar opciones dietéticas
+      setDietaryOptions({
+        celiac_friendly: existingReview.celiac_friendly || false,
+        vegetarian_friendly: existingReview.vegetarian_friendly || false,
+      })
+
+      setPriceRange(existingReview.price_range)
+      setCategory(existingReview.restaurant_category)
+
+      // Precargar fotos existentes
+      if (existingReview.photos && existingReview.photos.length > 0) {
+        const existingPhotos = existingReview.photos.map((photo, index) => ({
+          file: photo.photo_url,
+          isPrimary: photo.is_primary,
+          id: photo.id,
+          url: photo.photo_url,
+          previewUrl: photo.photo_url,
+        }))
+        setPhotos(existingPhotos)
+      } else {
+        // Fallback a campos legacy
+        const legacyPhotos = []
+        const legacyFields = ["photo_1_url", "photo_2_url", "photo_3_url", "photo_4_url", "photo_5_url", "photo_6_url"]
+
+        legacyFields.forEach((field, index) => {
+          const photoUrl = existingReview[field as keyof typeof existingReview] as string
+          if (photoUrl && photoUrl.trim()) {
+            legacyPhotos.push({
+              file: photoUrl.trim(),
+              isPrimary: index === 0,
+              url: photoUrl.trim(),
+              previewUrl: photoUrl.trim(),
+            })
+          }
+        })
+
+        setPhotos(legacyPhotos)
+      }
+    }
+  }, [editMode, existingReview])
 
   // Labels actualizados sin las opciones dietéticas
   const ratingLabels = {
@@ -232,8 +297,8 @@ export function DetailedReviewForm({
     <div className="w-full max-w-2xl mx-auto space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle>Nueva Reseña</CardTitle>
-          <CardDescription>Comparte tu experiencia completa</CardDescription>
+          <CardTitle>{editMode ? "Editar Reseña" : "Nueva Reseña"}</CardTitle>
+          <CardDescription>{editMode ? "Modifica tu experiencia" : "Comparte tu experiencia completa"}</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-6">
@@ -447,10 +512,14 @@ export function DetailedReviewForm({
               </Button>
               <Button type="submit" disabled={isLoading || isSubmitting || uploadingCount > 0} className="flex-1">
                 {isSubmitting
-                  ? "Enviando..."
+                  ? editMode
+                    ? "Actualizando..."
+                    : "Enviando..."
                   : uploadingCount > 0
                     ? `Subiendo ${uploadingCount} foto(s)...`
-                    : "Enviar reseña"}
+                    : editMode
+                      ? "Actualizar reseña"
+                      : "Enviar reseña"}
               </Button>
             </div>
           </form>

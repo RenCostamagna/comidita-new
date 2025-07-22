@@ -40,6 +40,10 @@ export function HomePage({ user: initialUser }: HomePageProps) {
   const [newAchievements, setNewAchievements] = useState<any[]>([])
   const [showAchievementToast, setShowAchievementToast] = useState(false)
 
+  // Estados para modo edición
+  const [isEditMode, setIsEditMode] = useState(false)
+  const [editingReview, setEditingReview] = useState<any>(null)
+
   const [navigationHistory, setNavigationHistory] = useState<{
     cameFromReview?: string
   }>({})
@@ -127,6 +131,8 @@ export function HomePage({ user: initialUser }: HomePageProps) {
     setShowSingleReview(false)
     setSelectedReviewId(null)
     setNavigationHistory({})
+    setIsEditMode(false)
+    setEditingReview(null)
 
     setShowDetailedReviewForm(true)
   }
@@ -282,6 +288,37 @@ export function HomePage({ user: initialUser }: HomePageProps) {
     goToReview()
   }
 
+  // Nueva función para manejar la edición de reseñas
+  const handleEditReview = async (reviewId: string) => {
+    try {
+      // Buscar la reseña completa con todos los datos
+      const { data, error } = await supabase
+        .from("detailed_reviews")
+        .select(`
+          *,
+          place:places(*),
+          user:users(*),
+          photos:review_photos(*)
+        `)
+        .eq("id", reviewId)
+        .single()
+
+      if (error) {
+        console.error("Error fetching review for edit:", error)
+        alert("Error al cargar la reseña para editar")
+        return
+      }
+
+      setEditingReview(data)
+      setIsEditMode(true)
+      setShowDetailedReviewForm(true)
+      setShowProfile(false)
+    } catch (error) {
+      console.error("Error fetching review for edit:", error)
+      alert("Error al cargar la reseña para editar")
+    }
+  }
+
   const handleSubmitDetailedReview = async (reviewData: any) => {
     if (!currentUser) return
 
@@ -293,6 +330,7 @@ export function HomePage({ user: initialUser }: HomePageProps) {
         photo_urls: reviewData.photo_urls,
         photo_urls_length: reviewData.photo_urls?.length || 0,
         vercel_blob_urls: reviewData.vercel_blob_urls,
+        isEditMode,
       })
 
       // Enhanced validation
@@ -353,23 +391,6 @@ export function HomePage({ user: initialUser }: HomePageProps) {
         }
       }
 
-      // Check for existing review
-      const { data: existingReview, error: reviewCheckError } = await supabase
-        .from("detailed_reviews")
-        .select("id")
-        .eq("user_id", currentUser.id)
-        .eq("place_id", placeId)
-        .single()
-
-      if (reviewCheckError && reviewCheckError.code !== "PGRST116") {
-        console.error("Error checking existing review:", reviewCheckError)
-        throw reviewCheckError
-      }
-
-      if (existingReview) {
-        throw new Error("Ya tienes una reseña para este lugar. Solo puedes tener una reseña por lugar.")
-      }
-
       // Extract and validate photo URLs from the photo_urls array
       const photoUrls = reviewData.photo_urls || []
       console.log("Photo URLs extraídas:", photoUrls)
@@ -416,146 +437,235 @@ export function HomePage({ user: initialUser }: HomePageProps) {
         photo6Url,
       })
 
-      // Calculate points based on photos and other factors
-      const hasPhotos = validPhotoUrls.length > 0
-      const commentLength = reviewData.comment ? reviewData.comment.length : 0
+      if (isEditMode && editingReview) {
+        // Modo edición - actualizar reseña existente
+        const { error: updateError } = await supabase
+          .from("detailed_reviews")
+          .update({
+            dish_name: reviewData.dish_name,
+            food_taste: reviewData.food_taste,
+            presentation: reviewData.presentation,
+            portion_size: reviewData.portion_size,
+            music_acoustics: reviewData.music_acoustics,
+            ambiance: reviewData.ambiance,
+            furniture_comfort: reviewData.furniture_comfort,
+            service: reviewData.service,
+            celiac_friendly: reviewData.celiac_friendly,
+            vegetarian_friendly: reviewData.vegetarian_friendly,
+            price_range: reviewData.price_range,
+            restaurant_category: reviewData.restaurant_category,
+            comment: reviewData.comment,
+            photo_1_url: photo1Url,
+            photo_2_url: photo2Url,
+            photo_3_url: photo3Url,
+            photo_4_url: photo4Url,
+            photo_5_url: photo5Url,
+            photo_6_url: photo6Url,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", editingReview.id)
 
-      const { data: reviewCount } = await supabase
-        .from("detailed_reviews")
-        .select("id", { count: "exact" })
-        .eq("place_id", placeId)
+        if (updateError) {
+          console.error("Error updating review:", updateError)
+          throw new Error(`Error al actualizar la reseña: ${updateError.message}`)
+        }
 
-      const isFirstReview = (reviewCount?.length || 0) === 0
+        // Manejar fotos en la tabla review_photos si existe
+        if (validPhotoUrls.length > 0) {
+          try {
+            // Eliminar fotos existentes
+            const { error: deletePhotosError } = await supabase
+              .from("review_photos")
+              .delete()
+              .eq("review_id", editingReview.id)
 
-      const basePoints = 100
-      const firstReviewBonus = isFirstReview ? 500 : 0
-      const photoBonus = hasPhotos ? Math.min(validPhotoUrls.length * 25, 150) : 0 // 25 points per photo, max 150
-      const extendedReviewBonus = commentLength >= 300 ? 50 : 0
-      const totalPoints = basePoints + firstReviewBonus + photoBonus + extendedReviewBonus
+            if (deletePhotosError) {
+              console.warn("Error deleting existing photos (table may not exist):", deletePhotosError)
+            }
 
-      console.log("Puntos calculados:", {
-        basePoints,
-        firstReviewBonus,
-        photoBonus,
-        extendedReviewBonus,
-        totalPoints,
-        hasPhotos,
-        photoCount: validPhotoUrls.length,
-      })
+            // Insertar nuevas fotos
+            const photoInserts = validPhotoUrls.map((url: string, index: number) => ({
+              review_id: editingReview.id,
+              photo_url: url,
+              is_primary: index === 0,
+              photo_order: index + 1,
+            }))
 
-      // Prepare review data with all photo fields
-      const reviewToInsert = {
-        user_id: currentUser.id,
-        place_id: placeId,
-        dish_name: reviewData.dish_name,
-        food_taste: reviewData.food_taste,
-        presentation: reviewData.presentation,
-        portion_size: reviewData.portion_size,
-        drinks_variety: reviewData.drinks_variety,
-        music_acoustics: reviewData.music_acoustics,
-        ambiance: reviewData.ambiance,
-        furniture_comfort: reviewData.furniture_comfort,
-        cleanliness: reviewData.cleanliness,
-        service: reviewData.service,
-        celiac_friendly: reviewData.celiac_friendly || false,
-        vegetarian_friendly: reviewData.vegetarian_friendly || false,
-        price_range: reviewData.price_range,
-        restaurant_category: reviewData.restaurant_category,
-        comment: reviewData.comment,
-        photo_1_url: photo1Url,
-        photo_2_url: photo2Url,
-        photo_3_url: photo3Url,
-        photo_4_url: photo4Url,
-        photo_5_url: photo5Url,
-        photo_6_url: photo6Url,
-      }
+            const { error: insertPhotosError } = await supabase.from("review_photos").insert(photoInserts)
 
-      console.log("Datos de reseña a insertar:", {
-        ...reviewToInsert,
-        // Solo mostrar las URLs de fotos para debug
-        photos: {
+            if (insertPhotosError) {
+              console.warn("Error inserting new photos (table may not exist):", insertPhotosError)
+            }
+          } catch (photosError) {
+            console.warn("Review_photos table may not exist:", photosError)
+          }
+        }
+
+        console.log("Reseña actualizada exitosamente")
+        alert("Reseña actualizada exitosamente")
+      } else {
+        // Modo creación - crear nueva reseña
+        // Check for existing review
+        const { data: existingReview, error: reviewCheckError } = await supabase
+          .from("detailed_reviews")
+          .select("id")
+          .eq("user_id", currentUser.id)
+          .eq("place_id", placeId)
+          .single()
+
+        if (reviewCheckError && reviewCheckError.code !== "PGRST116") {
+          console.error("Error checking existing review:", reviewCheckError)
+          throw reviewCheckError
+        }
+
+        if (existingReview) {
+          throw new Error("Ya tienes una reseña para este lugar. Solo puedes tener una reseña por lugar.")
+        }
+
+        // Calculate points based on photos and other factors
+        const hasPhotos = validPhotoUrls.length > 0
+        const commentLength = reviewData.comment ? reviewData.comment.length : 0
+
+        const { data: reviewCount } = await supabase
+          .from("detailed_reviews")
+          .select("id", { count: "exact" })
+          .eq("place_id", placeId)
+
+        const isFirstReview = (reviewCount?.length || 0) === 0
+
+        const basePoints = 100
+        const firstReviewBonus = isFirstReview ? 500 : 0
+        const photoBonus = hasPhotos ? Math.min(validPhotoUrls.length * 25, 150) : 0 // 25 points per photo, max 150
+        const extendedReviewBonus = commentLength >= 300 ? 50 : 0
+        const totalPoints = basePoints + firstReviewBonus + photoBonus + extendedReviewBonus
+
+        console.log("Puntos calculados:", {
+          basePoints,
+          firstReviewBonus,
+          photoBonus,
+          extendedReviewBonus,
+          totalPoints,
+          hasPhotos,
+          photoCount: validPhotoUrls.length,
+        })
+
+        // Prepare review data with all photo fields
+        const reviewToInsert = {
+          user_id: currentUser.id,
+          place_id: placeId,
+          dish_name: reviewData.dish_name,
+          food_taste: reviewData.food_taste,
+          presentation: reviewData.presentation,
+          portion_size: reviewData.portion_size,
+          drinks_variety: reviewData.drinks_variety,
+          music_acoustics: reviewData.music_acoustics,
+          ambiance: reviewData.ambiance,
+          furniture_comfort: reviewData.furniture_comfort,
+          cleanliness: reviewData.cleanliness,
+          service: reviewData.service,
+          celiac_friendly: reviewData.celiac_friendly || false,
+          vegetarian_friendly: reviewData.vegetarian_friendly || false,
+          price_range: reviewData.price_range,
+          restaurant_category: reviewData.restaurant_category,
+          comment: reviewData.comment,
           photo_1_url: photo1Url,
           photo_2_url: photo2Url,
           photo_3_url: photo3Url,
           photo_4_url: photo4Url,
           photo_5_url: photo5Url,
           photo_6_url: photo6Url,
-        },
-      })
-
-      // Insert the review
-      const { data: insertedReview, error: insertError } = await supabase
-        .from("detailed_reviews")
-        .insert(reviewToInsert)
-        .select("id")
-        .single()
-
-      if (insertError) {
-        console.error("Error submitting detailed review:", insertError)
-        throw new Error(`Error al guardar la reseña en la base de datos: ${insertError.message}`)
-      }
-
-      console.log("Reseña insertada exitosamente:", insertedReview)
-
-      // If we have photos and the new photos system exists, also insert into review_photos table
-      if (hasPhotos && insertedReview?.id) {
-        try {
-          const photoRecords = validPhotoUrls.map((photoUrl: string, index: number) => ({
-            review_id: insertedReview.id,
-            photo_url: photoUrl,
-            is_primary: index === 0, // First photo is primary
-            photo_order: index + 1,
-          }))
-
-          console.log("Insertando en review_photos:", photoRecords)
-
-          const { error: photosError } = await supabase.from("review_photos").insert(photoRecords)
-
-          if (photosError) {
-            console.warn("Error inserting into review_photos table (may not exist):", photosError)
-            // Don't throw error here as the main review was saved successfully
-          } else {
-            console.log("Fotos insertadas en review_photos exitosamente")
-          }
-        } catch (photosError) {
-          console.warn("Review_photos table may not exist:", photosError)
-          // Continue without throwing error
         }
-      }
 
-      // Check for achievements
-      if (reviewData.restaurant_category) {
-        try {
-          const { data: achievementsData, error: achievementsError } = await supabase.rpc(
-            "check_and_grant_achievements",
-            {
-              user_id_param: currentUser.id,
-              category_param: reviewData.restaurant_category,
-            },
-          )
+        console.log("Datos de reseña a insertar:", {
+          ...reviewToInsert,
+          // Solo mostrar las URLs de fotos para debug
+          photos: {
+            photo_1_url: photo1Url,
+            photo_2_url: photo2Url,
+            photo_3_url: photo3Url,
+            photo_4_url: photo4Url,
+            photo_5_url: photo5Url,
+            photo_6_url: photo6Url,
+          },
+        })
 
-          if (!achievementsError && achievementsData && achievementsData.length > 0) {
-            const newAchievements = achievementsData[0]
-            if (Array.isArray(newAchievements) && newAchievements.length > 0) {
-              setNewAchievements(newAchievements)
-              setShowAchievementToast(true)
+        // Insert the review
+        const { data: insertedReview, error: insertError } = await supabase
+          .from("detailed_reviews")
+          .insert(reviewToInsert)
+          .select("id")
+          .single()
+
+        if (insertError) {
+          console.error("Error submitting detailed review:", insertError)
+          throw new Error(`Error al guardar la reseña en la base de datos: ${insertError.message}`)
+        }
+
+        console.log("Reseña insertada exitosamente:", insertedReview)
+
+        // If we have photos and the new photos system exists, also insert into review_photos table
+        if (hasPhotos && insertedReview?.id) {
+          try {
+            const photoRecords = validPhotoUrls.map((photoUrl: string, index: number) => ({
+              review_id: insertedReview.id,
+              photo_url: photoUrl,
+              is_primary: index === 0, // First photo is primary
+              photo_order: index + 1,
+            }))
+
+            console.log("Insertando en review_photos:", photoRecords)
+
+            const { error: photosError } = await supabase.from("review_photos").insert(photoRecords)
+
+            if (photosError) {
+              console.warn("Error inserting into review_photos table (may not exist):", photosError)
+              // Don't throw error here as the main review was saved successfully
+            } else {
+              console.log("Fotos insertadas en review_photos exitosamente")
             }
+          } catch (photosError) {
+            console.warn("Review_photos table may not exist:", photosError)
+            // Continue without throwing error
           }
-        } catch (error) {
-          console.error("Error checking achievements:", error)
         }
+
+        // Check for achievements
+        if (reviewData.restaurant_category) {
+          try {
+            const { data: achievementsData, error: achievementsError } = await supabase.rpc(
+              "check_and_grant_achievements",
+              {
+                user_id_param: currentUser.id,
+                category_param: reviewData.restaurant_category,
+              },
+            )
+
+            if (!achievementsError && achievementsData && achievementsData.length > 0) {
+              const newAchievements = achievementsData[0]
+              if (Array.isArray(newAchievements) && newAchievements.length > 0) {
+                setNewAchievements(newAchievements)
+                setShowAchievementToast(true)
+              }
+            }
+          } catch (error) {
+            console.error("Error checking achievements:", error)
+          }
+        }
+
+        const photoMessage = hasPhotos
+          ? ` (incluyendo ${validPhotoUrls.length} foto${validPhotoUrls.length > 1 ? "s" : ""})`
+          : ""
+        alert(`¡Reseña enviada exitosamente${photoMessage}! Ganaste ${totalPoints} puntos.`)
+
+        console.log("=== FIN SUBMIT REVIEW EXITOSO ===")
       }
 
+      // Reset states
       setShowDetailedReviewForm(false)
       setPreSelectedPlaceForReview(null)
+      setIsEditMode(false)
+      setEditingReview(null)
       resetView()
-
-      const photoMessage = hasPhotos
-        ? ` (incluyendo ${validPhotoUrls.length} foto${validPhotoUrls.length > 1 ? "s" : ""})`
-        : ""
-      alert(`¡Reseña enviada exitosamente${photoMessage}! Ganaste ${totalPoints} puntos.`)
-
-      console.log("=== FIN SUBMIT REVIEW EXITOSO ===")
     } catch (error) {
       console.error("Error submitting detailed review:", error)
       alert(`Error al enviar la reseña: ${error.message}`)
@@ -577,6 +687,8 @@ export function HomePage({ user: initialUser }: HomePageProps) {
     setSelectedReviewId(null)
     setPreSelectedPlaceForReview(null)
     setNavigationHistory({})
+    setIsEditMode(false)
+    setEditingReview(null)
     // Reset the profile review navigation
     setSelectedReviewId(null)
   }
@@ -668,16 +780,16 @@ export function HomePage({ user: initialUser }: HomePageProps) {
             onPlaceSelect={handleHeaderPlaceSelect}
             onNotificationClick={handleNotificationClick}
           />
-            <SingleReviewPage
-              reviewId={selectedReviewId}
-              onBack={() => setSelectedReviewId(null)}
-              onViewPlace={handleViewPlaceFromReview}
-              onAddReview={handleAddReview}
-              onGoHome={goToHome}
-              onGoReview={goToReview}
-              onGoProfile={goToProfile}
-              onNotificationClick={handleNotificationClick}
-            />
+          <SingleReviewPage
+            reviewId={selectedReviewId}
+            onBack={() => setSelectedReviewId(null)}
+            onViewPlace={handleViewPlaceFromReview}
+            onAddReview={handleAddReview}
+            onGoHome={goToHome}
+            onGoReview={goToReview}
+            onGoProfile={goToProfile}
+            onNotificationClick={handleNotificationClick}
+          />
           {currentUser && (
             <BottomNavigation
               currentPage="profile"
@@ -705,6 +817,7 @@ export function HomePage({ user: initialUser }: HomePageProps) {
             user={currentUser}
             onBack={() => setShowProfile(false)}
             onReviewClick={(reviewId) => setSelectedReviewId(reviewId)}
+            onEditReview={handleEditReview}
           />
         </main>
         {currentUser && (
@@ -868,9 +981,13 @@ export function HomePage({ user: initialUser }: HomePageProps) {
               onCancel={() => {
                 setShowDetailedReviewForm(false)
                 setPreSelectedPlaceForReview(null)
+                setIsEditMode(false)
+                setEditingReview(null)
               }}
               isLoading={isLoading}
               preSelectedPlace={preSelectedPlaceForReview}
+              editMode={isEditMode}
+              existingReview={editingReview}
             />
           </div>
         )}
