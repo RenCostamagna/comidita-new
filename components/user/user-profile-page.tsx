@@ -278,15 +278,18 @@ export function UserProfilePage({ user, onBack, onReviewClick }: UserProfilePage
                   ].reduce((sum, rating) => sum + rating, 0) / 7
 
                 return (
-                    <Card key={review.id} className="hover:shadow-md transition-shadow max-w-md">
-                      <CardContent className="p-3">
-                        <div className="flex flex-col justify-between h-full min-h-[80px]">
-                          {/* Parte superior */}
+                    <Card
+                      key={review.id}
+                      className="hover:shadow-md transition-shadow h-[120px] w-full"
+                    >
+                      <CardContent className="p-3 h-full">
+                        <div className="flex flex-col justify-between h-full">
+                          {/* Parte superior: nombre y puntaje */}
                           <div className="flex justify-between items-start">
                             <div>
                               <h3 className="font-medium text-sm">{review.place?.name}</h3>
                               {review.dish_name && (
-                                <p className="text-xs text-muted-foreground mt-1">
+                                <p className="text-xs text-muted-foreground mt-1 line-clamp-1">
                                   {review.dish_name}
                                 </p>
                               )}
@@ -297,8 +300,8 @@ export function UserProfilePage({ user, onBack, onReviewClick }: UserProfilePage
                             </div>
                           </div>
 
-                          {/* Botón inferior */}
-                          <div className="flex justify-end mt-2">
+                          {/* Parte inferior: botón */}
+                          <div className="flex justify-end">
                             <Button
                               variant="outline"
                               size="sm"
