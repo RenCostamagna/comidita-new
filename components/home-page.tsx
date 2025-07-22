@@ -807,30 +807,25 @@ export function HomePage({ user: initialUser }: HomePageProps) {
       return (
         <div className="min-h-screen bg-background">
           <Header
+            showBackButton={true}
+            onBack={() => setSelectedReviewId(null)}
             user={currentUser}
-            onViewProfile={goToProfile}
-            onLogoClick={goToHome}
             onPlaceSelect={handleHeaderPlaceSelect}
             onNotificationClick={handleNotificationClick}
           />
-          <SingleReviewPage
-            reviewId={selectedReviewId}
-            onBack={() => setSelectedReviewId(null)}
-            onViewPlace={handleViewPlaceFromReview}
-            onAddReview={handleAddReview}
-            onGoHome={goToHome}
+          <main className="pt-20 pb-24">
+            <SingleReviewPage
+              reviewId={selectedReviewId}
+              onViewPlace={handleViewPlaceFromReview}
+              onAddReview={handleAddReview}
+            />
+          </main>
+          <BottomNavigation
+            currentPage="profile"
+            onGoHome={resetView}
             onGoReview={goToReview}
             onGoProfile={goToProfile}
-            onNotificationClick={handleNotificationClick}
           />
-          {currentUser && (
-            <BottomNavigation
-              currentPage="profile"
-              onGoHome={resetView}
-              onGoReview={goToReview}
-              onGoProfile={goToProfile}
-            />
-          )}
         </div>
       )
     }
@@ -1031,22 +1026,21 @@ export function HomePage({ user: initialUser }: HomePageProps) {
               onNotificationClick={handleNotificationClick}
             />
 
-              <div className="w-full max-w-2xl mx-auto space-y-6 px-4">
-                <DetailedReviewForm
-                  onSubmit={handleSubmitDetailedReview}
-                  onCancel={() => {
-                    setShowDetailedReviewForm(false)
-                    setPreSelectedPlaceForReview(null)
-                    setIsEditMode(false)
-                    setEditingReview(null)
-                  }}
-                  isLoading={isLoading}
-                  preSelectedPlace={preSelectedPlaceForReview}
-                  editMode={isEditMode}
-                  existingReview={editingReview}
-                />
-              </div>
-
+            <div className="w-full max-w-2xl mx-auto space-y-6 px-4">
+              <DetailedReviewForm
+                onSubmit={handleSubmitDetailedReview}
+                onCancel={() => {
+                  setShowDetailedReviewForm(false)
+                  setPreSelectedPlaceForReview(null)
+                  setIsEditMode(false)
+                  setEditingReview(null)
+                }}
+                isLoading={isLoading}
+                preSelectedPlace={preSelectedPlaceForReview}
+                editMode={isEditMode}
+                existingReview={editingReview}
+              />
+            </div>
 
             <BottomNavigation
               currentPage="review"
