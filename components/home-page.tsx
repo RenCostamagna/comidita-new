@@ -1014,13 +1014,30 @@ export function HomePage({ user: initialUser }: HomePageProps) {
         {showDetailedReviewForm && (
           <div className="min-h-screen bg-background">
             <Header
-              showBackButton={true}
-              onBack={() => {
-                setShowDetailedReviewForm(false)
-                setPreSelectedPlaceForReview(null)
-                setIsEditMode(false)
-                setEditingReview(null)
-              }}
+              showBackButton={isEditMode}
+              onBack={
+                isEditMode
+                  ? () => {
+                      // Si estamos editando, volver al perfil
+                      setShowDetailedReviewForm(false)
+                      setPreSelectedPlaceForReview(null)
+                      setIsEditMode(false)
+                      setEditingReview(null)
+                      setShowProfile(true)
+                    }
+                  : undefined
+              }
+              onLogoClick={
+                !isEditMode
+                  ? () => {
+                      // Si es una reseña nueva, volver al inicio
+                      setShowDetailedReviewForm(false)
+                      setPreSelectedPlaceForReview(null)
+                      setIsEditMode(false)
+                      setEditingReview(null)
+                    }
+                  : undefined
+              }
               user={currentUser}
               onPlaceSelect={handleHeaderPlaceSelect}
               onNotificationClick={handleNotificationClick}
@@ -1030,10 +1047,20 @@ export function HomePage({ user: initialUser }: HomePageProps) {
               <DetailedReviewForm
                 onSubmit={handleSubmitDetailedReview}
                 onCancel={() => {
-                  setShowDetailedReviewForm(false)
-                  setPreSelectedPlaceForReview(null)
-                  setIsEditMode(false)
-                  setEditingReview(null)
+                  if (isEditMode) {
+                    // Si estamos editando, volver al perfil
+                    setShowDetailedReviewForm(false)
+                    setPreSelectedPlaceForReview(null)
+                    setIsEditMode(false)
+                    setEditingReview(null)
+                    setShowProfile(true)
+                  } else {
+                    // Si es una reseña nueva, volver al inicio
+                    setShowDetailedReviewForm(false)
+                    setPreSelectedPlaceForReview(null)
+                    setIsEditMode(false)
+                    setEditingReview(null)
+                  }
                 }}
                 isLoading={isLoading}
                 preSelectedPlace={preSelectedPlaceForReview}
