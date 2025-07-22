@@ -113,7 +113,11 @@ export function DetailedReviewForm({
       })
 
       setPriceRange(existingReview.price_range)
-      setCategory(existingReview.restaurant_category)
+
+      // Usar setTimeout para asegurar que el Select se actualice correctamente
+      setTimeout(() => {
+        setCategory(existingReview.restaurant_category)
+      }, 0)
 
       // Debug para verificar que la categoría se está estableciendo
       console.log("Setting category from existing review:", {
