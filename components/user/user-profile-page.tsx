@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, Suspense, lazy } from "react"
+import { useState, useEffect } from "react"
 import { Calendar, Star, LogOut, MoreVertical, Eye, Edit, Trash2 } from "lucide-react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -8,24 +8,13 @@ import { UserLevelBadge } from "@/components/user/user-level-badge"
 import { createClient } from "@/lib/supabase/client"
 import type { DetailedReview } from "@/lib/types"
 import { Button } from "@/components/ui/button"
+import { PointsHistory } from "@/components/user/points-history"
+import { LevelsShowcase } from "@/components/user/levels-showcase"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { AchievementsShowcase } from "@/components/achievements/achievements-showcase"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { deleteMultipleReviewPhotos } from "@/lib/storage"
 import { useToast } from "@/hooks/use-toast"
-import { Skeleton } from "@/components/ui/skeleton"
-
-// Lazy load de componentes pesados
-const PointsHistory = lazy(() =>
-  import("@/components/user/points-history").then((module) => ({ default: module.PointsHistory })),
-)
-const LevelsShowcase = lazy(() =>
-  import("@/components/user/levels-showcase").then((module) => ({ default: module.LevelsShowcase })),
-)
-const AchievementsShowcase = lazy(() =>
-  import("@/components/achievements/achievements-showcase").then((module) => ({
-    default: module.AchievementsShowcase,
-  })),
-)
 
 const handleLogout = async () => {
   const supabase = createClient()
@@ -40,31 +29,6 @@ interface UserProfilePageProps {
   onEditReview: (reviewId: string) => void
 }
 
-// Componente de skeleton para las pestañas
-const TabSkeleton = () => (
-  <div className="space-y-4">
-    <Card>
-      <CardHeader>
-        <Skeleton className="h-6 w-32" />
-      </CardHeader>
-      <CardContent className="space-y-3">
-        <Skeleton className="h-4 w-full" />
-        <Skeleton className="h-4 w-3/4" />
-        <Skeleton className="h-4 w-1/2" />
-      </CardContent>
-    </Card>
-    <Card>
-      <CardContent className="p-6">
-        <div className="space-y-3">
-          <Skeleton className="h-4 w-full" />
-          <Skeleton className="h-4 w-5/6" />
-          <Skeleton className="h-4 w-2/3" />
-        </div>
-      </CardContent>
-    </Card>
-  </div>
-)
-
 export function UserProfilePage({ user, onBack, onReviewClick, onEditReview }: UserProfilePageProps) {
   const [userReviews, setUserReviews] = useState<DetailedReview[]>([])
   const [userStats, setUserStats] = useState({
@@ -74,8 +38,6 @@ export function UserProfilePage({ user, onBack, onReviewClick, onEditReview }: U
     averageRating: 0,
   })
   const [isLoading, setIsLoading] = useState(true)
-  const [activeTab, setActiveTab] = useState("activity")
-  const [loadedTabs, setLoadedTabs] = useState<Set<string>>(new Set(["activity"]))
 
   const supabase = createClient()
   const { toast } = useToast()
@@ -83,14 +45,6 @@ export function UserProfilePage({ user, onBack, onReviewClick, onEditReview }: U
   useEffect(() => {
     fetchUserData()
   }, [user.id])
-
-  // Precargar datos cuando se cambia de pestaña
-  const handleTabChange = (value: string) => {
-    setActiveTab(value)
-    if (!loadedTabs.has(value)) {
-      setLoadedTabs((prev) => new Set([...prev, value]))
-    }
-  }
 
   const fetchUserData = async () => {
     try {
@@ -337,198 +291,147 @@ export function UserProfilePage({ user, onBack, onReviewClick, onEditReview }: U
         </CardHeader>
       </Card>
 
-      {/* Tabs con transiciones suaves */}
-      <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
+      {/* Tabs para organizar el contenido */}
+      <Tabs defaultValue="activity" className="w-full">
         <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="activity" className="transition-all duration-200">
-            Actividad
-          </TabsTrigger>
-          <TabsTrigger value="achievements" className="transition-all duration-200">
-            Logros
-          </TabsTrigger>
-          <TabsTrigger value="levels" className="transition-all duration-200">
-            Niveles
-          </TabsTrigger>
-          <TabsTrigger value="reviews" className="transition-all duration-200">
-            Reseñas
-          </TabsTrigger>
+          <TabsTrigger value="activity">Actividad</TabsTrigger>
+          <TabsTrigger value="achievements">Logros</TabsTrigger>
+          <TabsTrigger value="levels">Niveles</TabsTrigger>
+          <TabsTrigger value="reviews">Reseñas</TabsTrigger>
         </TabsList>
 
-        <div className="mt-6">
-          <TabsContent value="activity" className="space-y-6 animate-in fade-in-0 slide-in-from-bottom-2 duration-300">
-            {loadedTabs.has("activity") ? (
-              <>
-                {/* Historial de puntos con Suspense */}
-                <Suspense fallback={<TabSkeleton />}>
-                  <PointsHistory userId={user.id} />
-                </Suspense>
+        <TabsContent value="activity" className="space-y-6">
+          {/* Historial de puntos */}
+          <PointsHistory userId={user.id} />
 
-                {/* Información adicional */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <Calendar className="h-5 w-5" />
-                      Información
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-2">
-                    <div className="flex items-center gap-2 text-sm">
-                      <Calendar className="h-4 w-4 text-muted-foreground" />
-                      <span>Miembro desde {formatDate(user.created_at || new Date().toISOString())}</span>
-                    </div>
-                    {userStats.totalReviews > 0 && (
-                      <div className="flex items-center gap-2 text-sm">
-                        <Star className="h-4 w-4 text-muted-foreground" />
-                        <span>Última reseña: {formatDate(userReviews[0]?.created_at)}</span>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              </>
-            ) : (
-              <TabSkeleton />
-            )}
-          </TabsContent>
+          {/* Información adicional */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Calendar className="h-5 w-5" />
+                Información
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              <div className="flex items-center gap-2 text-sm">
+                <Calendar className="h-4 w-4 text-muted-foreground" />
+                <span>Miembro desde {formatDate(user.created_at || new Date().toISOString())}</span>
+              </div>
+              {userStats.totalReviews > 0 && (
+                <div className="flex items-center gap-2 text-sm">
+                  <Star className="h-4 w-4 text-muted-foreground" />
+                  <span>Última reseña: {formatDate(userReviews[0]?.created_at)}</span>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
 
-          <TabsContent value="achievements" className="animate-in fade-in-0 slide-in-from-bottom-2 duration-300">
-            {loadedTabs.has("achievements") ? (
-              <Suspense fallback={<TabSkeleton />}>
-                <AchievementsShowcase userId={user.id} />
-              </Suspense>
-            ) : (
-              <TabSkeleton />
-            )}
-          </TabsContent>
+        <TabsContent value="achievements">
+          <AchievementsShowcase userId={user.id} />
+        </TabsContent>
 
-          <TabsContent value="levels" className="animate-in fade-in-0 slide-in-from-bottom-2 duration-300">
-            {loadedTabs.has("levels") ? (
-              <Suspense fallback={<TabSkeleton />}>
-                <LevelsShowcase currentUserPoints={userStats.totalPoints} showStatistics={true} />
-              </Suspense>
-            ) : (
-              <TabSkeleton />
-            )}
-          </TabsContent>
+        <TabsContent value="levels">
+          <LevelsShowcase currentUserPoints={userStats.totalPoints} showStatistics={true} />
+        </TabsContent>
 
-          <TabsContent value="reviews" className="space-y-6 animate-in fade-in-0 slide-in-from-bottom-2 duration-300">
-            {/* Header de reseñas */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Mis Reseñas ({userStats.totalReviews})</CardTitle>
-              </CardHeader>
-            </Card>
+        <TabsContent value="reviews" className="space-y-6">
+          {/* Header de reseñas */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Mis Reseñas ({userStats.totalReviews})</CardTitle>
+            </CardHeader>
+          </Card>
 
-            {/* Lista de reseñas simplificada */}
-            {isLoading ? (
-              <div className="space-y-3">
-                {[...Array(3)].map((_, i) => (
-                  <Card key={i} className="h-[120px]">
+          {/* Lista de reseñas simplificada */}
+          {isLoading ? (
+            <div className="text-center py-8">
+              <div className="text-muted-foreground">Cargando reseñas...</div>
+            </div>
+          ) : userReviews.length > 0 ? (
+            <div className="space-y-3">
+              {userReviews.map((review) => {
+                const averageRating =
+                  [
+                    review.food_taste,
+                    review.presentation,
+                    review.portion_size,
+                    review.music_acoustics,
+                    review.ambiance,
+                    review.furniture_comfort,
+                    review.service,
+                  ].reduce((sum, rating) => sum + rating, 0) / 7
+
+                return (
+                  <Card key={review.id} className="hover:shadow-md transition-shadow h-[120px] w-full">
                     <CardContent className="p-3 h-full">
                       <div className="flex flex-col justify-between h-full">
+                        {/* Parte superior: nombre y puntaje */}
                         <div className="flex justify-between items-start">
-                          <div className="space-y-2">
-                            <Skeleton className="h-4 w-32" />
-                            <Skeleton className="h-3 w-24" />
+                          <div>
+                            <h3 className="font-medium text-sm">{review.place?.name}</h3>
+                            {review.dish_name && (
+                              <p className="text-xs text-muted-foreground mt-1 line-clamp-1">{review.dish_name}</p>
+                            )}
                           </div>
-                          <Skeleton className="h-4 w-12" />
+                          <div className="flex items-center gap-1">
+                            <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
+                            <span className="text-sm font-medium">{averageRating.toFixed(1)}</span>
+                          </div>
                         </div>
+
+                        {/* Parte inferior: dropdown de acciones */}
                         <div className="flex justify-end">
-                          <Skeleton className="h-8 w-8" />
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="text-xs px-2 py-1 bg-transparent h-8 w-8 p-0"
+                              >
+                                <MoreVertical className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-40 rounded-[var(--radius-dropdown)]">
+                              <DropdownMenuItem
+                                onClick={() => onReviewClick(review.id)}
+                                className="flex items-center gap-2 cursor-pointer rounded-[var(--radius-dropdown)]"
+                              >
+                                <Eye className="h-4 w-4" />
+                                Ver reseña
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={() => onEditReview(review.id)}
+                                className="flex items-center gap-2 cursor-pointer rounded-[var(--radius-dropdown)]"
+                              >
+                                <Edit className="h-4 w-4" />
+                                Modificar
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={() => handleDeleteReview(review.id)}
+                                className="flex items-center gap-2 cursor-pointer text-red-600 focus:text-red-600 rounded-[var(--radius-dropdown)]"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                                Eliminar
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         </div>
                       </div>
                     </CardContent>
                   </Card>
-                ))}
-              </div>
-            ) : userReviews.length > 0 ? (
-              <div className="space-y-3">
-                {userReviews.map((review, index) => {
-                  const averageRating =
-                    [
-                      review.food_taste,
-                      review.presentation,
-                      review.portion_size,
-                      review.music_acoustics,
-                      review.ambiance,
-                      review.furniture_comfort,
-                      review.service,
-                    ].reduce((sum, rating) => sum + rating, 0) / 7
-
-                  return (
-                    <Card
-                      key={review.id}
-                      className="hover:shadow-md transition-all duration-200 h-[120px] w-full animate-in fade-in-0 slide-in-from-left-2"
-                      style={{ animationDelay: `${index * 50}ms` }}
-                    >
-                      <CardContent className="p-3 h-full">
-                        <div className="flex flex-col justify-between h-full">
-                          {/* Parte superior: nombre y puntaje */}
-                          <div className="flex justify-between items-start">
-                            <div>
-                              <h3 className="font-medium text-sm">{review.place?.name}</h3>
-                              {review.dish_name && (
-                                <p className="text-xs text-muted-foreground mt-1 line-clamp-1">{review.dish_name}</p>
-                              )}
-                            </div>
-                            <div className="flex items-center gap-1">
-                              <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
-                              <span className="text-sm font-medium">{averageRating.toFixed(1)}</span>
-                            </div>
-                          </div>
-
-                          {/* Parte inferior: dropdown de acciones */}
-                          <div className="flex justify-end">
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  className="text-xs px-2 py-1 bg-transparent h-8 w-8 p-0 hover:bg-accent transition-colors duration-200"
-                                >
-                                  <MoreVertical className="h-4 w-4" />
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end" className="w-40 rounded-[var(--radius-dropdown)]">
-                                <DropdownMenuItem
-                                  onClick={() => onReviewClick(review.id)}
-                                  className="flex items-center gap-2 cursor-pointer rounded-[var(--radius-dropdown)] transition-colors duration-150"
-                                >
-                                  <Eye className="h-4 w-4" />
-                                  Ver reseña
-                                </DropdownMenuItem>
-                                <DropdownMenuItem
-                                  onClick={() => onEditReview(review.id)}
-                                  className="flex items-center gap-2 cursor-pointer rounded-[var(--radius-dropdown)] transition-colors duration-150"
-                                >
-                                  <Edit className="h-4 w-4" />
-                                  Modificar
-                                </DropdownMenuItem>
-                                <DropdownMenuItem
-                                  onClick={() => handleDeleteReview(review.id)}
-                                  className="flex items-center gap-2 cursor-pointer text-red-600 focus:text-red-600 rounded-[var(--radius-dropdown)] transition-colors duration-150"
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                  Eliminar
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  )
-                })}
-              </div>
-            ) : (
-              <Card>
-                <CardContent className="text-center py-8">
-                  <p className="text-muted-foreground">Aún no has hecho ninguna reseña.</p>
-                  <p className="text-sm text-muted-foreground mt-2">¡Comparte tu primera experiencia gastronómica!</p>
-                </CardContent>
-              </Card>
-            )}
-          </TabsContent>
-        </div>
+                )
+              })}
+            </div>
+          ) : (
+            <Card>
+              <CardContent className="text-center py-8">
+                <p className="text-muted-foreground">Aún no has hecho ninguna reseña.</p>
+                <p className="text-sm text-muted-foreground mt-2">¡Comparte tu primera experiencia gastronómica!</p>
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
       </Tabs>
     </div>
   )
