@@ -18,7 +18,7 @@ import { PhotoUpload } from "@/components/photos/photo-upload"
 import { getRatingColor } from "@/lib/rating-labels"
 import { createClient } from "@/lib/supabase/client"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { AlertCircle, Sparkles, Loader2 } from "lucide-react"
+import { AlertCircle } from "lucide-react"
 import { cleanAddress, formatPlaceForStorage } from "@/lib/address-utils"
 
 interface PhotoData {
@@ -52,14 +52,10 @@ export function DetailedReviewForm({
   const [selectedPlace, setSelectedPlace] = useState<any>(preSelectedPlace || null)
   const [dishName, setDishName] = useState("")
   const [comment, setComment] = useState("")
-  const [originalComment, setOriginalComment] = useState("") // Para guardar el comentario original
   const [photos, setPhotos] = useState<PhotoData[]>([])
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [wantsToRecommendDish, setWantsToRecommendDish] = useState(false)
-  const [isEnhancing, setIsEnhancing] = useState(false)
-  const [enhanceError, setEnhanceError] = useState<string | null>(null)
-  const [hasBeenEnhanced, setHasBeenEnhanced] = useState(false)
 
   // Puntuaciones (1-10) - valores iniciales en 5
   const [ratings, setRatings] = useState({
@@ -97,7 +93,6 @@ export function DetailedReviewForm({
       setSelectedPlace(existingReview.place)
       setDishName(existingReview.dish_name || "")
       setComment(existingReview.comment || "")
-      setOriginalComment(existingReview.comment || "")
       setWantsToRecommendDish(!!existingReview.dish_name)
 
       // Precargar ratings
@@ -185,62 +180,6 @@ export function DetailedReviewForm({
 
   const handleDietaryOptionChange = (option: string, checked: boolean) => {
     setDietaryOptions((prev) => ({ ...prev, [option]: checked }))
-  }
-
-  // Función para mejorar el comentario con IA
-  const handleEnhanceComment = async () => {
-    if (!comment.trim()) {
-      setEnhanceError("Escribe un comentario primero para poder mejorarlo")
-      return
-    }
-
-    if (comment.trim().length < 10) {
-      setEnhanceError("El comentario debe tener al menos 10 caracteres para poder mejorarlo")
-      return
-    }
-
-    setIsEnhancing(true)
-    setEnhanceError(null)
-
-    try {
-      const response = await fetch("/api/enhance-review", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          comment: comment.trim(),
-          dishName: dishName.trim() || null,
-          placeName: selectedPlace?.name || null,
-          category: category || null,
-        }),
-      })
-
-      const data = await response.json()
-
-      if (!response.ok) {
-        throw new Error(data.error || "Error al mejorar la reseña")
-      }
-
-      // Guardar el comentario original si es la primera vez que se mejora
-      if (!hasBeenEnhanced) {
-        setOriginalComment(comment)
-      }
-
-      setComment(data.enhancedComment)
-      setHasBeenEnhanced(true)
-    } catch (error) {
-      console.error("Error enhancing comment:", error)
-      setEnhanceError(error instanceof Error ? error.message : "Error al mejorar la reseña")
-    } finally {
-      setIsEnhancing(false)
-    }
-  }
-
-  // Función para restaurar el comentario original
-  const handleRestoreOriginal = () => {
-    setComment(originalComment)
-    setHasBeenEnhanced(false)
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -557,74 +496,17 @@ export function DetailedReviewForm({
           {/* Fotos - Componente mejorado */}
           <PhotoUpload photos={photos} onPhotosChange={setPhotos} maxPhotos={6} userId="temp-user" />
 
-          {/* Comentario con embellecedor */}
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <Label htmlFor="comment">Comentario adicional (opcional)</Label>
-              {hasBeenEnhanced && (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={handleRestoreOriginal}
-                  className="text-xs text-muted-foreground hover:text-foreground"
-                >
-                  Restaurar original
-                </Button>
-              )}
-            </div>
-
-            <div className="relative">
-              <Textarea
-                className="py-3 pr-12"
-                id="comment"
-                placeholder="Cuéntanos más detalles sobre tu experiencia..."
-                value={comment}
-                onChange={(e) => {
-                  setComment(e.target.value)
-                  setEnhanceError(null)
-                  // Si el usuario modifica el comentario mejorado, resetear el estado
-                  if (hasBeenEnhanced && e.target.value !== comment) {
-                    setHasBeenEnhanced(false)
-                  }
-                }}
-                rows={4}
-              />
-
-              {/* Botón embellecedor */}
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={handleEnhanceComment}
-                disabled={isEnhancing || !comment.trim() || comment.trim().length < 10}
-                className="absolute top-2 right-2 h-8 w-8 p-0 hover:bg-purple-100 hover:text-purple-700"
-                title="Mejorar comentario con IA"
-              >
-                {isEnhancing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-              </Button>
-            </div>
-
-            {/* Indicador de comentario mejorado */}
-            {hasBeenEnhanced && (
-              <div className="flex items-center gap-2 text-xs text-purple-600 bg-purple-50 p-2 rounded-md">
-                <Sparkles className="h-3 w-3" />
-                <span>Comentario mejorado con IA</span>
-              </div>
-            )}
-
-            {/* Error del embellecedor */}
-            {enhanceError && (
-              <Alert variant="destructive">
-                <AlertCircle className="h-4 w-4" />
-                <AlertDescription className="text-sm">{enhanceError}</AlertDescription>
-              </Alert>
-            )}
-
-            <p className="text-xs text-muted-foreground">
-              💡 Tip: Escribe tu experiencia y usa el botón <Sparkles className="h-3 w-3 inline" /> para mejorarla con
-              IA
-            </p>
+          {/* Comentario */}
+          <div className="space-y-2">
+            <Label htmlFor="comment">Comentario adicional (opcional)</Label>
+            <Textarea
+              className="py-3"
+              id="comment"
+              placeholder="Cuéntanos más detalles..."
+              value={comment}
+              onChange={(e) => setComment(e.target.value)}
+              rows={4}
+            />
           </div>
 
           <div className="flex gap-2">
