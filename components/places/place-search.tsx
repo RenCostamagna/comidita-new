@@ -132,7 +132,15 @@ export function PlaceSearch({
         // For header search, prioritize local places
         const localResults = await searchLocalPlaces(searchQuery)
         setLocalPlaces(localResults)
-        setPlaces([])
+
+        // If no local results, search Google Maps
+        if (localResults.length === 0) {
+          const googleResults = await searchPlaces(searchQuery)
+          const resultsWithLocalData = await fetchLocalRatingsForGooglePlaces(googleResults)
+          setPlaces(resultsWithLocalData)
+        } else {
+          setPlaces([])
+        }
       } else if (searchMode === "api") {
         const results = await searchPlaces(searchQuery)
         const resultsWithLocalData = await fetchLocalRatingsForGooglePlaces(results)
@@ -202,6 +210,16 @@ export function PlaceSearch({
   }
 
   const renderGooglePlaceRating = (place: any) => {
+    // Si es modo header y no tiene reseñas locales, mostrar mensaje especial
+    if (searchMode === "header" && place.localTotalReviews === 0) {
+      return (
+        <div className="flex items-center gap-1 mt-1">
+          <Star className="h-3 w-3 text-muted-foreground" />
+          <span className="text-xs text-blue-600 font-medium">¡Sé el primero en reseñarlo!</span>
+        </div>
+      )
+    }
+
     if (place.localTotalReviews > 0) {
       return (
         <div className="flex items-center gap-1 mt-1">
@@ -265,6 +283,17 @@ export function PlaceSearch({
               </div>
             </Button>
           ))}
+
+          {/* Separator when we have both local and Google results */}
+          {localPlaces.length > 0 && places.length > 0 && searchMode === "header" && (
+            <div className="px-4 py-2">
+              <div className="flex items-center gap-2">
+                <div className="flex-1 border-t"></div>
+                <span className="text-xs text-muted-foreground">Otros lugares</span>
+                <div className="flex-1 border-t"></div>
+              </div>
+            </div>
+          )}
 
           {/* Render Google places */}
           {places.map((place) => (

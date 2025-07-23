@@ -194,9 +194,33 @@ export function HomePage({ user: initialUser }: HomePageProps) {
         console.error("Error processing header place selection:", error)
       }
     } else {
-      // Es un lugar de Google Maps, usar el flujo normal
+      // Es un lugar de Google Maps
       await handlePlaceSelect(place)
-      setShowReviews(true)
+
+      // Si el lugar no tiene reseñas locales (localTotalReviews === 0), ir directamente a crear reseña
+      if (place.localTotalReviews === 0) {
+        // Normalizar el lugar para el formulario de reseñas
+        const normalizedPlace = {
+          id: place.id || `temp-${Date.now()}`,
+          google_place_id: place.place_id,
+          place_id: place.place_id,
+          name: place.name,
+          address: place.formatted_address,
+          formatted_address: place.formatted_address,
+          latitude: place.geometry?.location?.lat || -32.9442426,
+          longitude: place.geometry?.location?.lng || -60.6505388,
+          phone: place.formatted_phone_number,
+          website: place.website,
+          rating: 0,
+          total_reviews: 0,
+          geometry: place.geometry,
+        }
+
+        setPreSelectedPlaceForReview(normalizedPlace)
+        goToReview()
+      } else {
+        setShowReviews(true)
+      }
     }
   }
 
