@@ -1,11 +1,12 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { ChevronRight } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { RESTAURANT_CATEGORIES } from "@/lib/types"
+import { AchievementsSkeleton } from "./achievements-skeleton"
 
 interface Achievement {
   achievement_id: string
@@ -68,15 +69,47 @@ export function AchievementsProgress({
   onAchievementSelect,
 }: AchievementsProgressProps) {
   const [incompleteAchievements, setIncompleteAchievements] = useState<Achievement[]>([])
-  const [isLoading, setIsLoading] = useState(true)
+  const [isLoading, setIsLoading] = useState(false)
+  const [isVisible, setIsVisible] = useState(false)
+  const [hasLoaded, setHasLoaded] = useState(false)
+  const containerRef = useRef<HTMLDivElement>(null)
 
   const supabase = createClient()
 
+  // Intersection Observer for lazy loading
   useEffect(() => {
-    fetchIncompleteAchievements()
-  }, [userId])
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting && !hasLoaded) {
+          setIsVisible(true)
+        }
+      },
+      {
+        rootMargin: "100px", // Start loading 100px before the component is visible
+        threshold: 0.1,
+      },
+    )
+
+    if (containerRef.current) {
+      observer.observe(containerRef.current)
+    }
+
+    return () => {
+      if (containerRef.current) {
+        observer.unobserve(containerRef.current)
+      }
+    }
+  }, [hasLoaded])
+
+  // Load achievements when component becomes visible
+  useEffect(() => {
+    if (isVisible && !hasLoaded) {
+      fetchIncompleteAchievements()
+    }
+  }, [isVisible, hasLoaded])
 
   const fetchIncompleteAchievements = async () => {
+    setIsLoading(true)
     try {
       const categories = Object.keys(RESTAURANT_CATEGORIES)
       const allAchievements: Achievement[] = []
@@ -187,9 +220,11 @@ export function AchievementsProgress({
         .slice(0, 6) // Maximum 6 achievements
 
       setIncompleteAchievements(uniqueAchievements)
+      setHasLoaded(true)
     } catch (error) {
       console.error("Error fetching incomplete achievements:", error)
       setIncompleteAchievements([])
+      setHasLoaded(true)
     } finally {
       setIsLoading(false)
     }
@@ -215,13 +250,11 @@ export function AchievementsProgress({
     return RESTAURANT_CATEGORIES[category as keyof typeof RESTAURANT_CATEGORIES] || category
   }
 
-  if (isLoading) {
+  // Show skeleton while loading or not visible
+  if (!isVisible || isLoading) {
     return (
-      <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <h2 className="text-xl font-semibold">Logros</h2>
-        </div>
-        <div className="text-center py-8 text-muted-foreground">Cargando logros...</div>
+      <div ref={containerRef}>
+        <AchievementsSkeleton />
       </div>
     )
   }

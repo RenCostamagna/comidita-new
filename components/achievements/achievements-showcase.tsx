@@ -109,7 +109,6 @@ export function AchievementsShowcase({ userId }: AchievementsShowcaseProps) {
             <Trophy className="h-5 w-5" />
             Resumen de Logros
           </CardTitle>
-          
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -194,7 +193,7 @@ export function AchievementsShowcase({ userId }: AchievementsShowcaseProps) {
           <div className="space-y-6">
             {/* Dropdown selector */}
             <div className="w-full">
-              <Select defaultValue="PARRILLAS" onValueChange={setSelectedCategory} >
+              <Select defaultValue="PARRILLAS" onValueChange={setSelectedCategory}>
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Selecciona una categoría" className="rounded-[var(--radius-dropdown)]" />
                 </SelectTrigger>
