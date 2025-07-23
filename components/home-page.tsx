@@ -16,7 +16,7 @@ import { Header } from "@/components/layout/header"
 import { BottomNavigation } from "@/components/layout/bottom-navigation"
 import { CategoriesSection } from "@/components/places/categories-section"
 import { AchievementToast } from "@/components/achievements/achievement-toast"
-import { AchievementsProgress } from "@/components/achievements/achievements-progress"
+import { LazyAchievementsProgress } from "@/components/achievements/lazy-achievements-progress"
 
 import type { Notification } from "@/lib/notifications"
 
@@ -1024,9 +1024,9 @@ export function HomePage({ user: initialUser }: HomePageProps) {
             {/* Categorías - MOVED TO SECOND POSITION */}
             <CategoriesSection onCategorySelect={handleCategorySelect} onViewAllCategories={handleViewAllCategories} />
 
-            {/* Logros - MOVED TO THIRD POSITION */}
-            <AchievementsProgress
-              userId={currentUser?.id} // Pass undefined if no user, component will handle it
+            {/* Logros con Lazy Loading - MOVED TO THIRD POSITION */}
+            <LazyAchievementsProgress
+              userId={currentUser?.id}
               onViewAllAchievements={() => setShowProfile(true)}
               onAchievementSelect={(achievement) => {
                 console.log("Selected achievement:", achievement)

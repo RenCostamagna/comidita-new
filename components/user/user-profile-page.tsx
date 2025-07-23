@@ -363,7 +363,7 @@ export function UserProfilePage({ user, onBack, onReviewClick, onEditReview }: U
                   ].reduce((sum, rating) => sum + rating, 0) / 7
 
                 return (
-                  <Card key={review.id} className="hover:shadow-md transition-shadow h-[120px] w-full">
+                  <Card key={review.id} className="hover:shadow-md transition-shadow h-[90px] w-full">
                     <CardContent className="p-3 h-full">
                       <div className="flex flex-col justify-between h-full">
                         {/* Parte superior: nombre y puntaje */}
