@@ -72,11 +72,11 @@ export function AchievementsProgress({
   const [isLoading, setIsLoading] = useState(false)
   const [isVisible, setIsVisible] = useState(false)
   const [hasLoaded, setHasLoaded] = useState(false)
-  const containerRef = useRef<HTMLDivElement>(null)
+  const cardsRef = useRef<HTMLDivElement>(null)
 
   const supabase = createClient()
 
-  // Intersection Observer for lazy loading
+  // Intersection Observer for lazy loading - only for the cards section
   useEffect(() => {
     const observer = new IntersectionObserver(
       ([entry]) => {
@@ -90,13 +90,13 @@ export function AchievementsProgress({
       },
     )
 
-    if (containerRef.current) {
-      observer.observe(containerRef.current)
+    if (cardsRef.current) {
+      observer.observe(cardsRef.current)
     }
 
     return () => {
-      if (containerRef.current) {
-        observer.unobserve(containerRef.current)
+      if (cardsRef.current) {
+        observer.unobserve(cardsRef.current)
       }
     }
   }, [hasLoaded])
@@ -250,41 +250,9 @@ export function AchievementsProgress({
     return RESTAURANT_CATEGORIES[category as keyof typeof RESTAURANT_CATEGORIES] || category
   }
 
-  // Show skeleton while loading or not visible
-  if (!isVisible || isLoading) {
-    return (
-      <div ref={containerRef}>
-        <AchievementsSkeleton />
-      </div>
-    )
-  }
-
-  // Always show achievements, even if empty (though this shouldn't happen now)
-  if (incompleteAchievements.length === 0) {
-    return (
-      <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <h2 className="text-xl font-semibold">Logros</h2>
-          {userId && (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="text-primary hover:text-primary/80"
-              onClick={handleViewAllClick}
-            >
-              Ver todos
-              <ChevronRight className="ml-1 h-4 w-4" />
-            </Button>
-          )}
-        </div>
-        <div className="text-center py-8 text-muted-foreground">No hay logros disponibles</div>
-      </div>
-    )
-  }
-
   return (
     <div className="space-y-4">
-      {/* Header */}
+      {/* Header - Always visible */}
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-xl font-semibold">Logros</h2>
@@ -300,89 +268,102 @@ export function AchievementsProgress({
         )}
       </div>
 
-      {/* Horizontal scrollable cards */}
-      <div className="relative">
-        <div className="overflow-x-auto pb-4 scrollbar-hide">
-          <div className="flex gap-3 w-max pl-0 pr-16">
-            {incompleteAchievements.map((achievement) => {
-              const config = getCategoryConfig(achievement.category)
-              const categoryName = getCategoryName(achievement.category)
+      {/* Cards section - Lazy loaded */}
+      <div ref={cardsRef}>
+        {!isVisible || isLoading ? (
+          // Show skeleton while loading or not visible
+          <AchievementsSkeleton />
+        ) : incompleteAchievements.length === 0 ? (
+          // Show empty state
+          <div className="text-center py-8 text-muted-foreground">No hay logros disponibles</div>
+        ) : (
+          // Show actual achievements cards
+          <div className="relative">
+            <div className="overflow-x-auto pb-4 scrollbar-hide">
+              <div className="flex gap-3 w-max pl-0 pr-16">
+                {incompleteAchievements.map((achievement) => {
+                  const config = getCategoryConfig(achievement.category)
+                  const categoryName = getCategoryName(achievement.category)
 
-              return (
-                <Card
-                  key={achievement.achievement_id}
-                  className={`relative overflow-hidden cursor-pointer hover:shadow-lg transition-all duration-300 w-48 h-48 border-0 flex-shrink-0 ${config.color}`}
-                  onClick={() => handleAchievementClick(achievement)}
-                >
-                  <CardContent className="p-4 h-full flex flex-col justify-between text-white relative">
-                    {/* Background pattern/texture */}
-                    <div className="absolute inset-0 bg-black/10"></div>
+                  return (
+                    <Card
+                      key={achievement.achievement_id}
+                      className={`relative overflow-hidden cursor-pointer hover:shadow-lg transition-all duration-300 w-48 h-48 border-0 flex-shrink-0 ${config.color}`}
+                      onClick={() => handleAchievementClick(achievement)}
+                    >
+                      <CardContent className="p-4 h-full flex flex-col justify-between text-white relative">
+                        {/* Background pattern/texture */}
+                        <div className="absolute inset-0 bg-black/10"></div>
 
-                    {/* Decorative elements */}
-                    <div className="absolute top-0 right-0 w-16 h-16 bg-white/5 rounded-full -translate-y-8 translate-x-8"></div>
-                    <div className="absolute bottom-0 left-0 w-12 h-12 bg-white/5 rounded-full translate-y-6 -translate-x-6"></div>
+                        {/* Decorative elements */}
+                        <div className="absolute top-0 right-0 w-16 h-16 bg-white/5 rounded-full -translate-y-8 translate-x-8"></div>
+                        <div className="absolute bottom-0 left-0 w-12 h-12 bg-white/5 rounded-full translate-y-6 -translate-x-6"></div>
 
-                    {/* Content */}
-                    <div className="relative z-10 h-full flex flex-col">
-                      {/* Top row with icon and level */}
-                      <div className="flex items-start justify-between mb-3">
-                        <div className="p-2 bg-white/20 backdrop-blur-sm rounded-lg">
-                          <span className="text-lg">{achievement.icon}</span>
-                        </div>
-                        <div className="bg-white/20 backdrop-blur-sm text-white border-white/30 text-xs px-2 py-1 rounded-full font-medium">
-                          Nivel {achievement.level}
-                        </div>
-                      </div>
-
-                      {/* Achievement info */}
-                      <div className="flex-1 flex flex-col justify-between">
-                        <div className="mb-4">
-                          <h3 className="font-semibold text-sm text-white leading-tight mb-1">{achievement.name}</h3>
-                          <p className="text-xs text-white/80 leading-tight">{categoryName}</p>
-                        </div>
-
-                        {/* Progress section */}
-                        <div className="space-y-1">
-                          <div className="flex justify-between items-center text-xs">
-                            <span className="text-white/90">
-                              {achievement.current_progress}/{achievement.required_reviews} reseñas
-                            </span>
-                            <span className="font-semibold text-white">+{achievement.points_reward} pts</span>
+                        {/* Content */}
+                        <div className="relative z-10 h-full flex flex-col">
+                          {/* Top row with icon and level */}
+                          <div className="flex items-start justify-between mb-3">
+                            <div className="p-2 bg-white/20 backdrop-blur-sm rounded-lg">
+                              <span className="text-lg">{achievement.icon}</span>
+                            </div>
+                            <div className="bg-white/20 backdrop-blur-sm text-white border-white/30 text-xs px-2 py-1 rounded-full font-medium">
+                              Nivel {achievement.level}
+                            </div>
                           </div>
 
-                          {/* Progress bar */}
-                          <div className="w-full bg-white/20 rounded-full h-2 backdrop-blur-sm">
-                            <div
-                              className="bg-white h-2 rounded-full transition-all duration-500 ease-out shadow-sm"
-                              style={{ width: `${achievement.progress_percentage}%` }}
-                            />
-                          </div>
+                          {/* Achievement info */}
+                          <div className="flex-1 flex flex-col justify-between">
+                            <div className="mb-4">
+                              <h3 className="font-semibold text-sm text-white leading-tight mb-1">
+                                {achievement.name}
+                              </h3>
+                              <p className="text-xs text-white/80 leading-tight">{categoryName}</p>
+                            </div>
 
-                          {/* Progress percentage - with less bottom spacing */}
-                          <div className="text-center pt-0.5">
-                            <span className="text-xs font-medium text-white">
-                              {userId && achievement.current_progress > 0
-                                ? `${Math.round(achievement.progress_percentage)}% completado`
-                                : userId
-                                  ? "Sin progreso aún"
-                                  : "Inicia sesión para comenzar"}
-                            </span>
+                            {/* Progress section */}
+                            <div className="space-y-1">
+                              <div className="flex justify-between items-center text-xs">
+                                <span className="text-white/90">
+                                  {achievement.current_progress}/{achievement.required_reviews} reseñas
+                                </span>
+                                <span className="font-semibold text-white">+{achievement.points_reward} pts</span>
+                              </div>
+
+                              {/* Progress bar */}
+                              <div className="w-full bg-white/20 rounded-full h-2 backdrop-blur-sm">
+                                <div
+                                  className="bg-white h-2 rounded-full transition-all duration-500 ease-out shadow-sm"
+                                  style={{ width: `${achievement.progress_percentage}%` }}
+                                />
+                              </div>
+
+                              {/* Progress percentage - with less bottom spacing */}
+                              <div className="text-center pt-0.5">
+                                <span className="text-xs font-medium text-white">
+                                  {userId && achievement.current_progress > 0
+                                    ? `${Math.round(achievement.progress_percentage)}% completado`
+                                    : userId
+                                      ? "Sin progreso aún"
+                                      : "Inicia sesión para comenzar"}
+                                </span>
+                              </div>
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    </div>
 
-                    {/* Hover effect indicator */}
-                    <div className="absolute inset-0 bg-white/0 hover:bg-white/10 transition-all duration-300 rounded-lg"></div>
-                  </CardContent>
-                </Card>
-              )
-            })}
+                        {/* Hover effect indicator */}
+                        <div className="absolute inset-0 bg-white/0 hover:bg-white/10 transition-all duration-300 rounded-lg"></div>
+                      </CardContent>
+                    </Card>
+                  )
+                })}
+              </div>
+            </div>
+
+            {/* Gradient overlay to indicate more content */}
+            <div className="absolute top-0 right-0 bottom-0 w-4 bg-gradient-to-l from-background/60 via-background/40 to-transparent pointer-events-none"></div>
           </div>
-        </div>
-
-        {/* Gradient overlay to indicate more content */}
-        <div className="absolute top-0 right-0 bottom-0 w-4 bg-gradient-to-l from-background/60 via-background/40 to-transparent pointer-events-none"></div>
+        )}
       </div>
     </div>
   )
