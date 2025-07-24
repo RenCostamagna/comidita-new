@@ -101,7 +101,7 @@ export function PhotoModal({ photos, isOpen, initialIndex, onClose }: PhotoModal
   const currentPhoto = photos[currentIndex]
 
   return (
-    <div className="fixed inset-0 bg-black/95 z-50 flex items-center justify-center" onClick={onClose}>
+    <div className="fixed inset-0 bg-black/95 z-[100] flex items-center justify-center" onClick={onClose}>
       {/* Header con botón de cerrar */}
       <div className="absolute top-0 left-0 right-0 z-10 flex justify-between items-center p-4 bg-gradient-to-b from-black/50 to-transparent">
         <div className="flex items-center gap-2 text-white text-sm">
