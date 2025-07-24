@@ -109,8 +109,8 @@ export function PhotoModal({ photos, isOpen, initialIndex, onClose }: PhotoModal
             {currentIndex + 1} / {photos.length}
           </span>
         </div>
-        <Button variant="ghost" size="icon" className="text-white hover:bg-white/20 h-10 w-10" onClick={onClose}>
-          <X className="h-5 w-5" />
+        <Button variant="ghost" size="icon" className="text-white hover:bg-white/20 h-12 w-12" onClick={onClose}>
+          <X className="h-6 w-6" />
         </Button>
       </div>
 
