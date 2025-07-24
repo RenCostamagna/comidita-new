@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { ReviewCard } from "@/components/reviews/review-card"
 import { DetailedReviewCard } from "@/components/reviews/detailed-review-card"
+import { PhotoModal } from "@/components/photos/photo-modal"
 import { createClient } from "@/lib/supabase/client"
 import type { Place, Review, DetailedReview } from "@/lib/types"
 
@@ -18,6 +19,11 @@ export function PlaceReviewsPage({ place, onAddReview, currentUser }: PlaceRevie
   const [reviews, setReviews] = useState<Review[]>([])
   const [detailedReviews, setDetailedReviews] = useState<DetailedReview[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [isPhotoModalOpen, setIsPhotoModalOpen] = useState(false)
+  const [selectedPhotos, setSelectedPhotos] = useState<
+    Array<{ photo_url: string; is_primary?: boolean; photo_order?: number }>
+  >([])
+  const [selectedImageIndex, setSelectedImageIndex] = useState(0)
 
   const supabase = createClient()
 
@@ -101,7 +107,8 @@ export function PlaceReviewsPage({ place, onAddReview, currentUser }: PlaceRevie
         .from("detailed_reviews")
         .select(`
           *,
-          user:users(*)
+          user:users(*),
+          photos:review_photos(*)
         `)
         .eq("place_id", internalPlaceId)
         .order("created_at", { ascending: false })
@@ -120,6 +127,48 @@ export function PlaceReviewsPage({ place, onAddReview, currentUser }: PlaceRevie
     } finally {
       setIsLoading(false)
     }
+  }
+
+  const handlePhotoClick = (review: DetailedReview, photoIndex: number) => {
+    // Obtener fotos de la reseña
+    const photos = getReviewPhotos(review)
+    setSelectedPhotos(photos)
+    setSelectedImageIndex(photoIndex)
+    setIsPhotoModalOpen(true)
+  }
+
+  const getReviewPhotos = (review: DetailedReview) => {
+    if (review?.photos && review.photos.length > 0) {
+      return review.photos
+        .filter((photo) => photo.photo_url)
+        .sort((a, b) => {
+          if (a.is_primary && !b.is_primary) return -1
+          if (!a.is_primary && b.is_primary) return 1
+          return a.photo_order - b.photo_order
+        })
+    }
+
+    // Fallback a campos legacy
+    const legacyPhotos = []
+    const legacyFields = ["photo_1_url", "photo_2_url", "photo_3_url", "photo_4_url", "photo_5_url", "photo_6_url"]
+
+    legacyFields.forEach((field, index) => {
+      const photoUrl = review[field as keyof typeof review] as string
+      if (photoUrl && photoUrl.trim() && !legacyPhotos.some((p) => p.photo_url === photoUrl.trim())) {
+        legacyPhotos.push({
+          photo_url: photoUrl.trim(),
+          is_primary: index === 0,
+          photo_order: index + 1,
+        })
+      }
+    })
+
+    return legacyPhotos
+  }
+
+  const closePhotoModal = () => {
+    setIsPhotoModalOpen(false)
+    setSelectedPhotos([])
   }
 
   if (isLoading) {
@@ -147,7 +196,11 @@ export function PlaceReviewsPage({ place, onAddReview, currentUser }: PlaceRevie
         {detailedReviews.length > 0 || reviews.length > 0 ? (
           <>
             {detailedReviews.map((review) => (
-              <DetailedReviewCard key={review.id} review={review} />
+              <DetailedReviewCard
+                key={review.id}
+                review={review}
+                onPhotoClick={(photoIndex) => handlePhotoClick(review, photoIndex)}
+              />
             ))}
             {reviews.map((review) => (
               <ReviewCard key={review.id} review={review} />
@@ -166,6 +219,14 @@ export function PlaceReviewsPage({ place, onAddReview, currentUser }: PlaceRevie
           </Card>
         )}
       </div>
+
+      {/* Photo Modal */}
+      <PhotoModal
+        photos={selectedPhotos}
+        isOpen={isPhotoModalOpen}
+        initialIndex={selectedImageIndex}
+        onClose={closePhotoModal}
+      />
     </div>
   )
 }

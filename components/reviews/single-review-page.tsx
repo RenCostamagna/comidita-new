@@ -1,12 +1,13 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Calendar, Star, DollarSign, Utensils, MapPin, X, ChevronLeft, ChevronRight } from "lucide-react"
+import { Calendar, Star, DollarSign, Utensils, MapPin } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
+import { PhotoModal } from "@/components/photos/photo-modal"
 import { createClient } from "@/lib/supabase/client"
 import { PRICE_RANGES, RESTAURANT_CATEGORIES } from "@/lib/types"
 import { getRatingColor } from "@/lib/rating-labels"
@@ -21,8 +22,8 @@ interface SingleReviewPageProps {
 export function SingleReviewPage({ reviewId, onViewPlace, onAddReview }: SingleReviewPageProps) {
   const [review, setReview] = useState<DetailedReview | null>(null)
   const [isLoading, setIsLoading] = useState(true)
-  const [selectedImage, setSelectedImage] = useState<string | null>(null)
-  const [currentImageIndex, setCurrentImageIndex] = useState(0)
+  const [isPhotoModalOpen, setIsPhotoModalOpen] = useState(false)
+  const [selectedImageIndex, setSelectedImageIndex] = useState(0)
 
   const supabase = createClient()
 
@@ -91,13 +92,13 @@ export function SingleReviewPage({ reviewId, onViewPlace, onAddReview }: SingleR
     }
   }
 
-  const handleImageClick = (imageUrl: string, index: number) => {
-    setSelectedImage(imageUrl)
-    setCurrentImageIndex(index)
+  const handleImageClick = (index: number) => {
+    setSelectedImageIndex(index)
+    setIsPhotoModalOpen(true)
   }
 
-  const closeImageModal = () => {
-    setSelectedImage(null)
+  const closePhotoModal = () => {
+    setIsPhotoModalOpen(false)
   }
 
   // Obtener fotos - priorizar nueva estructura, fallback a campos legacy
@@ -128,16 +129,6 @@ export function SingleReviewPage({ reviewId, onViewPlace, onAddReview }: SingleR
     })
 
     return legacyPhotos
-  }
-
-  const navigateImage = (direction: "prev" | "next") => {
-    const photos = getReviewPhotos()
-    if (direction === "prev") {
-      setCurrentImageIndex((prev) => (prev > 0 ? prev - 1 : photos.length - 1))
-    } else {
-      setCurrentImageIndex((prev) => (prev < photos.length - 1 ? prev + 1 : 0))
-    }
-    setSelectedImage(photos[currentImageIndex].photo_url)
   }
 
   // Categorías de rating actualizadas - SOLO 7 CAMPOS ACTIVOS
@@ -280,7 +271,7 @@ export function SingleReviewPage({ reviewId, onViewPlace, onAddReview }: SingleR
                       alt="Foto principal de la reseña"
                       className="w-full h-full object-cover rounded-lg cursor-pointer hover:opacity-90 transition-opacity"
                       crossOrigin="anonymous"
-                      onClick={() => handleImageClick(primaryPhoto.photo_url, 0)}
+                      onClick={() => handleImageClick(0)}
                       onError={(e) => {
                         console.error("Error cargando foto principal:", primaryPhoto.photo_url)
                         const target = e.target as HTMLImageElement
@@ -304,7 +295,7 @@ export function SingleReviewPage({ reviewId, onViewPlace, onAddReview }: SingleR
                         alt={`Foto adicional ${index + 1}`}
                         className="w-full h-full object-cover rounded-md cursor-pointer hover:opacity-90 transition-opacity"
                         crossOrigin="anonymous"
-                        onClick={() => handleImageClick(photo.photo_url, index + 1)}
+                        onClick={() => handleImageClick(index + 1)}
                         onError={(e) => {
                           console.error(`Error cargando foto ${index + 1}:`, photo.photo_url)
                           const target = e.target as HTMLImageElement
@@ -359,70 +350,13 @@ export function SingleReviewPage({ reviewId, onViewPlace, onAddReview }: SingleR
         </CardContent>
       </Card>
 
-      {/* Image Modal mejorado */}
-      {selectedImage && (
-        <div className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-4" onClick={closeImageModal}>
-          <div className="relative max-w-4xl max-h-full">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="absolute top-2 right-2 z-10 bg-black/50 hover:bg-black/70 text-white"
-              onClick={closeImageModal}
-            >
-              <X className="h-4 w-4" />
-            </Button>
-
-            {/* Navegación de imágenes */}
-            {photos.length > 1 && (
-              <>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="absolute left-2 top-1/2 -translate-y-1/2 z-10 bg-black/50 hover:bg-black/70 text-white"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    navigateImage("prev")
-                  }}
-                >
-                  <ChevronLeft className="h-4 w-4" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="absolute right-2 top-1/2 -translate-y-1/2 z-10 bg-black/50 hover:bg-black/70 text-white"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    navigateImage("next")
-                  }}
-                >
-                  <ChevronRight className="h-4 w-4" />
-                </Button>
-
-                {/* Contador de fotos */}
-                <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-10 bg-black/50 text-white px-3 py-1 rounded-full text-sm">
-                  {currentImageIndex + 1} / {photos.length}
-                </div>
-              </>
-            )}
-
-            <img
-              src={selectedImage || "/placeholder.svg"}
-              alt="Imagen ampliada"
-              className="max-w-full max-h-full object-contain rounded-lg"
-              crossOrigin="anonymous"
-              onClick={(e) => e.stopPropagation()}
-              onError={(e) => {
-                console.error("Error cargando imagen en modal:", selectedImage)
-                const target = e.target as HTMLImageElement
-                target.src = "/placeholder.svg?height=600&width=600&text=Error+cargando+imagen"
-              }}
-              onLoad={() => {
-                console.log("✅ Imagen cargada en modal:", selectedImage)
-              }}
-            />
-          </div>
-        </div>
-      )}
+      {/* Photo Modal */}
+      <PhotoModal
+        photos={photos}
+        isOpen={isPhotoModalOpen}
+        initialIndex={selectedImageIndex}
+        onClose={closePhotoModal}
+      />
     </div>
   )
 }

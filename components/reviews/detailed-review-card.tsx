@@ -1,5 +1,7 @@
-import { Star, Calendar, Utensils, DollarSign, ImageIcon } from "lucide-react"
-import { Card, CardContent, CardHeader } from "@/components/ui/card"
+"use client"
+
+import { Calendar, Star, DollarSign, Utensils } from "lucide-react"
+import { Card, CardContent } from "@/components/ui/card"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
@@ -9,38 +11,35 @@ import type { DetailedReview } from "@/lib/types"
 
 interface DetailedReviewCardProps {
   review: DetailedReview
+  onPhotoClick?: (photoIndex: number) => void
 }
 
-export function DetailedReviewCard({ review }: DetailedReviewCardProps) {
+export function DetailedReviewCard({ review, onPhotoClick }: DetailedReviewCardProps) {
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString("es-AR", {
-      year: "numeric",
-      month: "long",
       day: "numeric",
+      month: "long",
+      year: "numeric",
     })
   }
 
-  // Labels actualizados - SOLO 7 CAMPOS ACTIVOS
-  const ratingLabels = {
-    food_taste: "Sabor",
-    presentation: "Presentación",
-    portion_size: "Porción",
-    music_acoustics: "Música",
-    ambiance: "Ambiente",
-    furniture_comfort: "Confort",
-    service: "Servicio",
+  const calculateAverageRating = (review: DetailedReview) => {
+    // Calcular promedio con los 7 campos actualizados
+    const ratings = [
+      review.food_taste,
+      review.presentation,
+      review.portion_size,
+      review.music_acoustics,
+      review.ambiance,
+      review.furniture_comfort,
+      review.service,
+    ]
+    return ratings.reduce((sum, rating) => sum + rating, 0) / ratings.length
   }
-
-  // Calcular promedio con los 7 campos actualizados
-  const averageRating =
-    Object.values(ratingLabels).reduce((sum, _, index) => {
-      const key = Object.keys(ratingLabels)[index] as keyof typeof ratingLabels
-      return sum + review[key]
-    }, 0) / Object.keys(ratingLabels).length
 
   // Obtener fotos - priorizar nueva estructura, fallback a campos legacy
   const getReviewPhotos = () => {
-    if (review.photos && review.photos.length > 0) {
+    if (review?.photos && review.photos.length > 0) {
       return review.photos
         .filter((photo) => photo.photo_url) // Filtrar fotos sin URL
         .sort((a, b) => {
@@ -68,59 +67,66 @@ export function DetailedReviewCard({ review }: DetailedReviewCardProps) {
     return legacyPhotos
   }
 
+  // Categorías de rating actualizadas - SOLO 7 CAMPOS ACTIVOS
+  const ratingCategories = [
+    { key: "food_taste", label: "Sabor" },
+    { key: "presentation", label: "Presentación" },
+    { key: "portion_size", label: "Porción" },
+    { key: "music_acoustics", label: "Música" },
+    { key: "ambiance", label: "Ambiente" },
+    { key: "furniture_comfort", label: "Confort" },
+    { key: "service", label: "Servicio" },
+  ]
+
+  const averageRating = calculateAverageRating(review)
   const photos = getReviewPhotos()
   const primaryPhoto = photos.find((p) => p.is_primary) || photos[0]
   const otherPhotos = photos.filter((p) => !p.is_primary)
 
   return (
-    <Card className="w-full">
-      <CardHeader className="pb-3">
-        <div className="flex items-start gap-3">
-          <Avatar className="h-10 w-10">
-            <AvatarImage src={review.user?.avatar_url || "/placeholder.svg"} />
-            <AvatarFallback>{review.user?.full_name?.charAt(0) || review.user?.email?.charAt(0) || "U"}</AvatarFallback>
-          </Avatar>
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center justify-between">
-              <h4 className="font-medium truncate">{review.user?.full_name || "Usuario anónimo"}</h4>
-              <div className="flex items-center gap-2">
-                <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
-                <span className="text-sm font-medium">{averageRating.toFixed(1)}</span>
+    <Card>
+      <CardContent className="p-6 space-y-4">
+        {/* User info and rating */}
+        <div className="flex items-start justify-between">
+          <div className="flex items-center gap-3">
+            <Avatar className="h-8 w-8">
+              <AvatarImage src={review.user?.avatar_url || "/placeholder.svg"} alt={review.user?.full_name} />
+              <AvatarFallback className="text-xs">
+                {review.user?.full_name?.charAt(0) || review.user?.email?.charAt(0) || "U"}
+              </AvatarFallback>
+            </Avatar>
+            <div>
+              <p className="font-medium text-sm">{review.user?.full_name || "Usuario anónimo"}</p>
+              <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                <Calendar className="h-3 w-3" />
+                {formatDate(review.created_at)}
               </div>
             </div>
-            <div className="flex items-center gap-1 text-xs text-muted-foreground mt-1">
-              <Calendar className="h-3 w-3" />
-              {formatDate(review.created_at)}
-            </div>
+          </div>
+          <div className="flex items-center gap-1">
+            <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
+            <span className="font-semibold">{averageRating.toFixed(1)}</span>
           </div>
         </div>
-      </CardHeader>
 
-      <CardContent className="space-y-4">
-        {/* Dish name with prominence */}
-        {review.dish_name && (
-          <div className="space-y-2">
-            <div className="flex items-center gap-2">
-              <Utensils className="h-4 w-4 text-foreground" />
-              <span className="font-medium text-foreground">
-                {review.dish_name.charAt(0).toUpperCase() + review.dish_name.slice(1).toLowerCase()}
-              </span>
+        {/* Dish info */}
+        <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
+          {review.dish_name && (
+            <div className="flex items-center gap-1">
+              <Utensils className="h-4 w-4" />
+              <span>{review.dish_name}</span>
             </div>
+          )}
+          <div className="flex items-center gap-1">
+            <DollarSign className="h-4 w-4" />
+            <span>{PRICE_RANGES[review.price_range as keyof typeof PRICE_RANGES]}</span>
           </div>
-        )}
-
-        {/* Other details */}
-        <div className="flex flex-wrap gap-2">
-          <Badge variant="outline" className="flex items-center gap-1">
-            <DollarSign className="h-3 w-3" />
-            {PRICE_RANGES[review.price_range as keyof typeof PRICE_RANGES]}
-          </Badge>
-          <Badge variant="outline">
+          <span className="text-xs">
             {RESTAURANT_CATEGORIES[review.restaurant_category as keyof typeof RESTAURANT_CATEGORIES]}
-          </Badge>
+          </span>
         </div>
 
-        {/* Opciones dietéticas - NUEVOS BADGES INFORMATIVOS */}
+        {/* Opciones dietéticas */}
         {(review.celiac_friendly || review.vegetarian_friendly) && (
           <div className="flex flex-wrap gap-2">
             {review.celiac_friendly && (
@@ -139,25 +145,23 @@ export function DetailedReviewCard({ review }: DetailedReviewCardProps) {
           </div>
         )}
 
-        {/* Fotos mejoradas */}
+        {/* Photos */}
         {photos.length > 0 && (
           <div className="space-y-3">
             {/* Foto principal */}
             {primaryPhoto && (
               <div className="relative">
-                <div className="aspect-video max-w-sm mx-auto">
+                <div className="aspect-video max-w-md mx-auto">
                   <img
                     src={primaryPhoto.photo_url || "/placeholder.svg"}
                     alt="Foto principal de la reseña"
-                    className="w-full h-full object-cover rounded-lg"
+                    className="w-full h-full object-cover rounded-lg cursor-pointer hover:opacity-90 transition-opacity"
                     crossOrigin="anonymous"
+                    onClick={() => onPhotoClick?.(0)}
                     onError={(e) => {
                       console.error("Error cargando foto principal:", primaryPhoto.photo_url)
                       const target = e.target as HTMLImageElement
-                      target.src = "/placeholder.svg?height=300&width=300&text=Error+cargando+imagen"
-                    }}
-                    onLoad={() => {
-                      console.log("✅ Foto principal cargada:", primaryPhoto.photo_url)
+                      target.src = "/placeholder.svg?height=300&width=400&text=Error+cargando+imagen"
                     }}
                   />
                 </div>
@@ -167,63 +171,55 @@ export function DetailedReviewCard({ review }: DetailedReviewCardProps) {
             {/* Otras fotos en grid */}
             {otherPhotos.length > 0 && (
               <div className="grid grid-cols-3 gap-2">
-                {otherPhotos.slice(0, 5).map((photo, index) => (
+                {otherPhotos.map((photo, index) => (
                   <div key={index} className="aspect-square">
                     <img
                       src={photo.photo_url || "/placeholder.svg"}
                       alt={`Foto adicional ${index + 1}`}
-                      className="w-full h-full object-cover rounded-md"
+                      className="w-full h-full object-cover rounded-md cursor-pointer hover:opacity-90 transition-opacity"
                       crossOrigin="anonymous"
+                      onClick={() => onPhotoClick?.(index + 1)}
                       onError={(e) => {
                         console.error(`Error cargando foto ${index + 1}:`, photo.photo_url)
                         const target = e.target as HTMLImageElement
-                        target.src = "/placeholder.svg?height=150&width=150&text=Error"
-                      }}
-                      onLoad={() => {
-                        console.log(`✅ Foto ${index + 1} cargada:`, photo.photo_url)
+                        target.src = "/placeholder.svg?height=100&width=100&text=Error"
                       }}
                     />
                   </div>
                 ))}
+              </div>
+            )}
 
-                {/* Indicador de más fotos */}
-                {otherPhotos.length > 5 && (
-                  <div className="aspect-square bg-muted/50 rounded-md flex items-center justify-center">
-                    <div className="text-center">
-                      <ImageIcon className="h-6 w-6 mx-auto text-muted-foreground mb-1" />
-                      <span className="text-xs text-muted-foreground">+{otherPhotos.length - 5}</span>
-                    </div>
-                  </div>
-                )}
+            {photos.length > 1 && (
+              <div className="text-center text-xs text-muted-foreground">
+                {photos.length} foto{photos.length > 1 ? "s" : ""} • Toca para ampliar
               </div>
             )}
           </div>
         )}
 
-        {/* Puntuaciones detalladas - CAMPOS ACTUALIZADOS */}
-        <div className="grid grid-cols-2 gap-3 text-sm">
-          {Object.entries(ratingLabels).map(([key, label]) => {
-            const rating = review[key as keyof typeof review] as number
+        {/* Rating categories - CAMPOS ACTUALIZADOS */}
+        <div className="grid grid-cols-2 gap-3">
+          {ratingCategories.map((category) => {
+            const rating = review[category.key as keyof DetailedReview] as number
             const ratingColor = getRatingColor(rating)
 
             return (
-              <div key={key} className="space-y-1">
+              <div key={category.key} className="space-y-1">
                 <div className="flex justify-between items-center">
-                  <span className="text-muted-foreground">{label}</span>
-                  <div className="flex items-center gap-1">
-                    <span className="font-medium">{rating}/10</span>
-                  </div>
+                  <span className="text-xs text-muted-foreground">{category.label}</span>
+                  <span className="text-xs font-medium">{rating}/10</span>
                 </div>
-                <Progress value={rating * 10} className="h-2" />
+                <Progress value={rating * 10} className="h-1.5" />
               </div>
             )
           })}
         </div>
 
-        {/* Comentario */}
+        {/* Comment */}
         {review.comment && (
           <div className="pt-2 border-t">
-            <p className="text-sm leading-relaxed">{review.comment}</p>
+            <p className="text-sm leading-relaxed text-muted-foreground">{review.comment}</p>
           </div>
         )}
       </CardContent>
