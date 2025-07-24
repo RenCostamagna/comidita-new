@@ -148,6 +148,32 @@ export function UserProfilePage({ user, onBack, onReviewClick, onEditReview }: U
         throw new Error("Reseña no encontrada")
       }
 
+      const placeId = reviewToDelete.place_id
+
+      // Verificar si esta es la única reseña del lugar
+      const { data: placeReviewsCount, error: countError } = await supabase
+        .from("reviews")
+        .select("id", { count: "exact" })
+        .eq("place_id", placeId)
+
+      if (countError) {
+        console.error("Error contando reseñas del lugar:", countError)
+      }
+
+      const { data: detailedReviewsCount, error: detailedCountError } = await supabase
+        .from("detailed_reviews")
+        .select("id", { count: "exact" })
+        .eq("place_id", placeId)
+
+      if (detailedCountError) {
+        console.error("Error contando reseñas detalladas del lugar:", detailedCountError)
+      }
+
+      const totalReviewsForPlace = (placeReviewsCount?.length || 0) + (detailedReviewsCount?.length || 0)
+      const isLastReview = totalReviewsForPlace <= 1
+
+      console.log(`Eliminando reseña ${reviewId}. Es la última reseña del lugar: ${isLastReview}`)
+
       // Obtener todas las URLs de fotos para eliminar
       const photoUrls: string[] = []
 
@@ -189,11 +215,31 @@ export function UserProfilePage({ user, onBack, onReviewClick, onEditReview }: U
         console.warn("Error eliminando registros de fotos:", photosError)
       }
 
-      // Eliminar la reseña de la base de datos
-      const { error: reviewError } = await supabase.from("reviews").delete().eq("id", reviewId).eq("user_id", user.id) // Seguridad adicional
+      // Determinar si es una reseña detallada o simple
+      const isDetailedReview = reviewToDelete.food_taste !== undefined
+
+      // Eliminar la reseña de la tabla correspondiente
+      const tableName = isDetailedReview ? "detailed_reviews" : "reviews"
+      const { error: reviewError } = await supabase.from(tableName).delete().eq("id", reviewId).eq("user_id", user.id) // Seguridad adicional
 
       if (reviewError) {
         throw new Error(`Error eliminando reseña: ${reviewError.message}`)
+      }
+
+      console.log(`✅ Reseña eliminada de tabla ${tableName}`)
+
+      // Si es la última reseña del lugar, eliminar también el lugar
+      if (isLastReview && placeId) {
+        console.log(`Eliminando lugar ${placeId} porque era la única reseña`)
+
+        const { error: placeError } = await supabase.from("places").delete().eq("id", placeId)
+
+        if (placeError) {
+          console.warn("Error eliminando lugar:", placeError)
+          // No lanzar error aquí, la reseña ya fue eliminada exitosamente
+        } else {
+          console.log(`✅ Lugar ${placeId} eliminado exitosamente`)
+        }
       }
 
       // Actualizar el estado local
@@ -228,7 +274,9 @@ export function UserProfilePage({ user, onBack, onReviewClick, onEditReview }: U
 
       toast({
         title: "Reseña eliminada",
-        description: "La reseña y todas sus fotos han sido eliminadas exitosamente.",
+        description: isLastReview
+          ? "La reseña y el lugar han sido eliminados exitosamente. Ahora se puede reseñar por primera vez de nuevo."
+          : "La reseña y todas sus fotos han sido eliminadas exitosamente.",
       })
 
       console.log(`✅ Reseña ${reviewId} eliminada exitosamente`)
