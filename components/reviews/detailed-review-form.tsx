@@ -18,8 +18,9 @@ import { PhotoUpload } from "@/components/photos/photo-upload"
 import { getRatingColor } from "@/lib/rating-labels"
 import { createClient } from "@/lib/supabase/client"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { AlertCircle } from "lucide-react"
+import { AlertCircle } from 'lucide-react'
 import { cleanAddress, formatPlaceForStorage } from "@/lib/address-utils"
+import { TextEnhancer } from "@/components/reviews/text-enhancer"
 
 interface PhotoData {
   file: File | string
@@ -496,17 +497,26 @@ export function DetailedReviewForm({
           {/* Fotos - Componente mejorado */}
           <PhotoUpload photos={photos} onPhotosChange={setPhotos} maxPhotos={6} userId="temp-user" />
 
-          {/* Comentario */}
+          {/* Comentario con embellecedor */}
           <div className="space-y-2">
             <Label htmlFor="comment">Comentario adicional (opcional)</Label>
-            <Textarea
-              className="py-3"
-              id="comment"
-              placeholder="Cuéntanos más detalles..."
+            <TextEnhancer
               value={comment}
-              onChange={(e) => setComment(e.target.value)}
+              onChange={setComment}
+              placeholder="Cuéntanos más detalles sobre tu experiencia..."
               rows={4}
+              context={{
+                placeName: selectedPlace?.name,
+                dishName: dishName.trim() || undefined,
+                ratings,
+                priceRange,
+                category,
+                dietaryOptions,
+              }}
             />
+            <p className="text-xs text-muted-foreground">
+              💡 Tip: Usa el botón ✨ para que la IA te ayude a mejorar tu comentario
+            </p>
           </div>
 
           <div className="flex gap-2">
