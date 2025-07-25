@@ -728,6 +728,7 @@ export function HomePage({ user: initialUser }: HomePageProps) {
   const handleReviewSelect = (reviewId: string) => {
     setSelectedReviewId(reviewId)
     setShowSingleReview(true)
+    setShowReviews(false) // Resetear showReviews para que se muestre SingleReviewPage
   }
 
   const handleViewPlaceFromReview = (place: Place) => {
@@ -790,7 +791,12 @@ export function HomePage({ user: initialUser }: HomePageProps) {
         />
 
         <main className="pt-20 pb-24">
-          <PlaceReviewsPage place={selectedPlace} onAddReview={handleAddReview} currentUser={currentUser} />
+          <PlaceReviewsPage
+            place={selectedPlace}
+            onAddReview={handleAddReview}
+            currentUser={currentUser}
+            onViewReview={handleReviewSelect}
+          />
         </main>
 
         <BottomNavigation currentPage="home" onGoHome={goToHome} onGoReview={goToReview} onGoProfile={goToProfile} />
@@ -806,6 +812,7 @@ export function HomePage({ user: initialUser }: HomePageProps) {
           onBack={() => {
             setShowSingleReview(false)
             setSelectedReviewId(null)
+            setShowReviews(true) // Regresar a la página de reseñas del lugar
           }}
           user={currentUser}
           onPlaceSelect={handleHeaderPlaceSelect}

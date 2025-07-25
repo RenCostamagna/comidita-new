@@ -5,6 +5,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
+import { Button } from "@/components/ui/button"
 import { PRICE_RANGES, RESTAURANT_CATEGORIES } from "@/lib/types"
 import { getRatingColor } from "@/lib/rating-labels"
 import type { DetailedReview } from "@/lib/types"
@@ -12,9 +13,10 @@ import type { DetailedReview } from "@/lib/types"
 interface DetailedReviewCardProps {
   review: DetailedReview
   onPhotoClick?: (photoIndex: number) => void
+  onViewReview?: (reviewId: string) => void
 }
 
-export function DetailedReviewCard({ review, onPhotoClick }: DetailedReviewCardProps) {
+export function DetailedReviewCard({ review, onPhotoClick, onViewReview }: DetailedReviewCardProps) {
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString("es-AR", {
       day: "numeric",
@@ -145,6 +147,13 @@ export function DetailedReviewCard({ review, onPhotoClick }: DetailedReviewCardP
           </div>
         )}
 
+        {/* Comment */}
+        {review.comment && (
+          <div className="pt-2">
+            <p className="text-sm leading-relaxed text-muted-foreground">{review.comment}</p>
+          </div>
+        )}
+
         {/* Photos - Carrusel horizontal */}
         {photos.length > 0 && (
           <div className="space-y-3">
@@ -196,29 +205,37 @@ export function DetailedReviewCard({ review, onPhotoClick }: DetailedReviewCardP
         )}
 
         {/* Rating categories - CAMPOS ACTUALIZADOS */}
-        <div className="grid grid-cols-2 gap-3">
-          {ratingCategories.map((category) => {
-            const rating = review[category.key as keyof DetailedReview] as number
-            const ratingColor = getRatingColor(rating)
+        <div className="relative">
+          <div className="grid grid-cols-2 gap-3">
+            {ratingCategories.map((category) => {
+              const rating = review[category.key as keyof DetailedReview] as number
+              const ratingColor = getRatingColor(rating)
 
-            return (
-              <div key={category.key} className="space-y-1">
-                <div className="flex justify-between items-center">
-                  <span className="text-xs text-muted-foreground">{category.label}</span>
-                  <span className="text-xs font-medium">{rating}/10</span>
+              return (
+                <div key={category.key} className="space-y-1">
+                  <div className="flex justify-between items-center">
+                    <span className="text-xs text-muted-foreground">{category.label}</span>
+                    <span className="text-xs font-medium">{rating}/10</span>
+                  </div>
+                  <Progress value={rating * 10} className="h-1.5" />
                 </div>
-                <Progress value={rating * 10} className="h-1.5" />
-              </div>
-            )
-          })}
-        </div>
-
-        {/* Comment */}
-        {review.comment && (
-          <div className="pt-2 border-t">
-            <p className="text-sm leading-relaxed text-muted-foreground">{review.comment}</p>
+              )
+            })}
           </div>
-        )}
+
+          {/* Botón Ver reseña - Posicionado en la esquina inferior derecha */}
+          {onViewReview && (
+            <div className="absolute -bottom-2 right-0">
+              <Button
+                size="sm"
+                onClick={() => onViewReview(review.id)}
+                className="text-xs h-7 px-3 bg-red-500 hover:bg-red-600 text-white border-0 shadow-sm"
+              >
+                Ver reseña
+              </Button>
+            </div>
+          )}
+        </div>
       </CardContent>
     </Card>
   )

@@ -13,9 +13,10 @@ interface PlaceReviewsPageProps {
   place: Place
   onAddReview: (place: Place) => void
   currentUser: any
+  onViewReview?: (reviewId: string) => void
 }
 
-export function PlaceReviewsPage({ place, onAddReview, currentUser }: PlaceReviewsPageProps) {
+export function PlaceReviewsPage({ place, onAddReview, currentUser, onViewReview }: PlaceReviewsPageProps) {
   const [reviews, setReviews] = useState<Review[]>([])
   const [detailedReviews, setDetailedReviews] = useState<DetailedReview[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -200,6 +201,7 @@ export function PlaceReviewsPage({ place, onAddReview, currentUser }: PlaceRevie
                 key={review.id}
                 review={review}
                 onPhotoClick={(photoIndex) => handlePhotoClick(review, photoIndex)}
+                onViewReview={onViewReview}
               />
             ))}
             {reviews.map((review) => (
