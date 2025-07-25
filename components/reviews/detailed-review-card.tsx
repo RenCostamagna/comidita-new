@@ -145,56 +145,53 @@ export function DetailedReviewCard({ review, onPhotoClick }: DetailedReviewCardP
           </div>
         )}
 
-        {/* Photos */}
+        {/* Photos - Carrusel horizontal */}
         {photos.length > 0 && (
           <div className="space-y-3">
-            {/* Foto principal */}
-            {primaryPhoto && (
-              <div className="relative">
-                <div className="aspect-video max-w-md mx-auto">
-                  <img
-                    src={primaryPhoto.photo_url || "/placeholder.svg"}
-                    alt="Foto principal de la reseña"
-                    className="w-full h-full object-cover rounded-lg cursor-pointer hover:opacity-90 transition-opacity"
-                    crossOrigin="anonymous"
-                    onClick={() => onPhotoClick?.(0)}
-                    onError={(e) => {
-                      console.error("Error cargando foto principal:", primaryPhoto.photo_url)
-                      const target = e.target as HTMLImageElement
-                      target.src = "/placeholder.svg?height=300&width=400&text=Error+cargando+imagen"
-                    }}
-                  />
+            <div className="relative">
+              {/* Contenedor del carrusel */}
+              <div className="overflow-x-auto scrollbar-hide">
+                <div className="flex gap-3 pb-2" style={{ width: "max-content" }}>
+                  {photos.map((photo, index) => (
+                    <div
+                      key={index}
+                      className="flex-shrink-0 w-48 aspect-video cursor-pointer hover:opacity-90 transition-opacity"
+                      onClick={() => onPhotoClick?.(index)}
+                    >
+                      <img
+                        src={photo.photo_url || "/placeholder.svg"}
+                        alt={`Foto ${index + 1} de la reseña`}
+                        className="w-full h-full object-cover rounded-lg"
+                        crossOrigin="anonymous"
+                        onError={(e) => {
+                          console.error(`Error cargando foto ${index + 1}:`, photo.photo_url)
+                          const target = e.target as HTMLImageElement
+                          target.src = "/placeholder.svg?height=108&width=192&text=Error+cargando+imagen"
+                        }}
+                      />
+                      {/* Indicador de foto principal */}
+                      {photo.is_primary && (
+                        <div className="absolute top-2 left-2 bg-black/70 text-white text-xs px-2 py-1 rounded">
+                          Principal
+                        </div>
+                      )}
+                    </div>
+                  ))}
                 </div>
               </div>
-            )}
 
-            {/* Otras fotos en grid */}
-            {otherPhotos.length > 0 && (
-              <div className="grid grid-cols-3 gap-2">
-                {otherPhotos.map((photo, index) => (
-                  <div key={index} className="aspect-square">
-                    <img
-                      src={photo.photo_url || "/placeholder.svg"}
-                      alt={`Foto adicional ${index + 1}`}
-                      className="w-full h-full object-cover rounded-md cursor-pointer hover:opacity-90 transition-opacity"
-                      crossOrigin="anonymous"
-                      onClick={() => onPhotoClick?.(index + 1)}
-                      onError={(e) => {
-                        console.error(`Error cargando foto ${index + 1}:`, photo.photo_url)
-                        const target = e.target as HTMLImageElement
-                        target.src = "/placeholder.svg?height=100&width=100&text=Error"
-                      }}
-                    />
-                  </div>
-                ))}
-              </div>
-            )}
+              {/* Indicador de scroll si hay muchas fotos */}
+              {photos.length > 2 && (
+                <div className="absolute right-0 top-1/2 -translate-y-1/2 bg-gradient-to-l from-white via-white to-transparent dark:from-gray-950 dark:via-gray-950 w-8 h-full pointer-events-none flex items-center justify-end pr-1">
+                  <div className="w-1 h-8 bg-gradient-to-b from-transparent via-gray-300 to-transparent dark:via-gray-600 rounded-full opacity-60"></div>
+                </div>
+              )}
+            </div>
 
-            {photos.length > 1 && (
-              <div className="text-center text-xs text-muted-foreground">
-                {photos.length} foto{photos.length > 1 ? "s" : ""} • Toca para ampliar
-              </div>
-            )}
+            {/* Contador de fotos */}
+            <div className="text-center text-xs text-muted-foreground">
+              {photos.length} foto{photos.length > 1 ? "s" : ""} • Toca para ampliar
+            </div>
           </div>
         )}
 
@@ -225,4 +222,23 @@ export function DetailedReviewCard({ review, onPhotoClick }: DetailedReviewCardP
       </CardContent>
     </Card>
   )
+}
+
+// Agregar estilos para ocultar scrollbar
+const styles = `
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+`
+
+// Inyectar estilos si no existen
+if (typeof document !== "undefined" && !document.getElementById("scrollbar-hide-styles")) {
+  const styleSheet = document.createElement("style")
+  styleSheet.id = "scrollbar-hide-styles"
+  styleSheet.textContent = styles
+  document.head.appendChild(styleSheet)
 }

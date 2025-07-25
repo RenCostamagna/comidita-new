@@ -259,62 +259,61 @@ export function SingleReviewPage({ reviewId, onViewPlace, onAddReview }: SingleR
             </div>
           )}
 
-          {/* Photos mejoradas */}
-          {photos.length > 0 && (
-            <div className="space-y-4">
-              {/* Foto principal */}
-              {primaryPhoto && (
-                <div className="relative">
-                  <div className="aspect-video max-w-lg mx-auto">
-                    <img
-                      src={primaryPhoto.photo_url || "/placeholder.svg"}
-                      alt="Foto principal de la reseña"
-                      className="w-full h-full object-cover rounded-lg cursor-pointer hover:opacity-90 transition-opacity"
-                      crossOrigin="anonymous"
-                      onClick={() => handleImageClick(0)}
-                      onError={(e) => {
-                        console.error("Error cargando foto principal:", primaryPhoto.photo_url)
-                        const target = e.target as HTMLImageElement
-                        target.src = "/placeholder.svg?height=400&width=600&text=Error+cargando+imagen"
-                      }}
-                      onLoad={() => {
-                        console.log("✅ Foto principal cargada:", primaryPhoto.photo_url)
-                      }}
-                    />
-                  </div>
-                </div>
-              )}
+          {/* Comment */}
+          {review.comment && (
+            <div>
+              <h3 className="font-medium mb-2">Comentario</h3>
+              <p className="text-sm leading-relaxed text-muted-foreground">{review.comment}</p>
+            </div>
+          )}
 
-              {/* Otras fotos en grid */}
-              {otherPhotos.length > 0 && (
-                <div className="grid grid-cols-3 gap-2">
-                  {otherPhotos.map((photo, index) => (
-                    <div key={index} className="aspect-square">
-                      <img
-                        src={photo.photo_url || "/placeholder.svg"}
-                        alt={`Foto adicional ${index + 1}`}
-                        className="w-full h-full object-cover rounded-md cursor-pointer hover:opacity-90 transition-opacity"
-                        crossOrigin="anonymous"
-                        onClick={() => handleImageClick(index + 1)}
-                        onError={(e) => {
-                          console.error(`Error cargando foto ${index + 1}:`, photo.photo_url)
-                          const target = e.target as HTMLImageElement
-                          target.src = "/placeholder.svg?height=150&width=150&text=Error"
-                        }}
-                        onLoad={() => {
-                          console.log(`✅ Foto ${index + 1} cargada:`, photo.photo_url)
-                        }}
-                      />
+          {/* Photos en carrusel horizontal */}
+          {photos.length > 0 && (
+            <div className="space-y-3">
+              <div className="relative">
+                <div className="flex gap-3 overflow-x-auto scrollbar-hide pb-2">
+                  {photos.map((photo, index) => (
+                    <div key={index} className="flex-shrink-0 relative">
+                      <div className="w-64 aspect-video">
+                        <img
+                          src={photo.photo_url || "/placeholder.svg"}
+                          alt={`Foto ${index + 1} de la reseña`}
+                          className="w-full h-full object-cover rounded-lg cursor-pointer hover:opacity-90 transition-opacity shadow-sm"
+                          crossOrigin="anonymous"
+                          onClick={() => handleImageClick(index)}
+                          onError={(e) => {
+                            console.error(`Error cargando foto ${index + 1}:`, photo.photo_url)
+                            const target = e.target as HTMLImageElement
+                            target.src = "/placeholder.svg?height=180&width=256&text=Error+cargando+imagen"
+                          }}
+                          onLoad={() => {
+                            console.log(`✅ Foto ${index + 1} cargada:`, photo.photo_url)
+                          }}
+                        />
+                      </div>
+                      {photo.is_primary && (
+                        <div className="absolute top-2 left-2">
+                          <Badge
+                            variant="secondary"
+                            className="text-white text-xs px-2 py-1 opacity-100 bg-transparent"
+                          >
+                            Plato
+                          </Badge>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
-              )}
 
-              {photos.length > 1 && (
-                <div className="text-center text-xs text-muted-foreground">
-                  {photos.length} foto{photos.length > 1 ? "s" : ""} • Toca para ampliar
-                </div>
-              )}
+                {/* Gradiente indicador de scroll */}
+                {photos.length > 2 && (
+                  <div className="absolute top-0 right-0 w-8 h-full bg-gradient-to-l from-background to-transparent pointer-events-none rounded-r-lg" />
+                )}
+              </div>
+
+              <div className="text-center text-xs text-muted-foreground">
+                {photos.length} foto{photos.length > 1 ? "s" : ""} • Desliza para ver más • Toca para ampliar
+              </div>
             </div>
           )}
 
@@ -339,14 +338,6 @@ export function SingleReviewPage({ reviewId, onViewPlace, onAddReview }: SingleR
               })}
             </div>
           </div>
-
-          {/* Comment */}
-          {review.comment && (
-            <div className="pt-4 border-t">
-              <h3 className="font-medium mb-2">Comentario</h3>
-              <p className="text-sm leading-relaxed text-muted-foreground">{review.comment}</p>
-            </div>
-          )}
         </CardContent>
       </Card>
 
