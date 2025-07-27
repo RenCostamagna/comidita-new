@@ -1019,23 +1019,24 @@ export function HomePage({ user: initialUser }: HomePageProps) {
                   </Button>
                 </div>
 
-                {/* Divider */}
-                <div className="flex items-center gap-4">
-                  <div className="flex-1 border-t"></div>
-                  <span className="text-sm text-muted-foreground">o</span>
-                  <div className="flex-1 border-t"></div>
-                </div>
-
-                {/* Usuario de prueba - Solo en preview/desarrollo */}
+                {/* Divider y Usuario de prueba - Solo en preview/desarrollo */}
                 {shouldShowTestUser() && (
-                  <div className="space-y-3">
-                    <Button onClick={handleTestLogin} variant="secondary" className="w-full">
-                      🧪 Entrar como Usuario de Prueba
-                    </Button>
-                    <p className="text-xs text-muted-foreground text-center">
-                      Para probar la aplicación sin configurar autenticación
-                    </p>
-                  </div>
+                  <>
+                    <div className="flex items-center gap-4">
+                      <div className="flex-1 border-t"></div>
+                      <span className="text-sm text-muted-foreground">o</span>
+                      <div className="flex-1 border-t"></div>
+                    </div>
+
+                    <div className="space-y-3">
+                      <Button onClick={handleTestLogin} variant="secondary" className="w-full">
+                        🧪 Entrar como Usuario de Prueba
+                      </Button>
+                      <p className="text-xs text-muted-foreground text-center">
+                        Para probar la aplicación sin configurar autenticación
+                      </p>
+                    </div>
+                  </>
                 )}
               </CardContent>
             </Card>
