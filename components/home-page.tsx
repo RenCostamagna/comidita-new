@@ -56,6 +56,23 @@ export function HomePage({ user: initialUser }: HomePageProps) {
 
   const [showNotificationHandler, setShowNotificationHandler] = useState(false)
 
+  // Función para determinar si mostrar el usuario de prueba
+  const shouldShowTestUser = () => {
+    if (typeof window === "undefined") return false
+
+    const hostname = window.location.hostname
+    const isProduction =
+      hostname.includes("vercel.app") ||
+      hostname.includes("netlify.app") ||
+      (!hostname.includes("localhost") &&
+        !hostname.includes("v0.dev") &&
+        !hostname.includes("127.0.0.1") &&
+        process.env.NODE_ENV === "production")
+
+    // Mostrar en desarrollo/preview, ocultar en producción
+    return !isProduction
+  }
+
   const handleNotificationClick = (notification: Notification) => {
     switch (notification.type) {
       case "review_published":
@@ -1009,15 +1026,17 @@ export function HomePage({ user: initialUser }: HomePageProps) {
                   <div className="flex-1 border-t"></div>
                 </div>
 
-                {/* Usuario de prueba */}
-                <div className="space-y-3">
-                  <Button onClick={handleTestLogin} variant="secondary" className="w-full">
-                    🧪 Entrar como Usuario de Prueba
-                  </Button>
-                  <p className="text-xs text-muted-foreground text-center">
-                    Para probar la aplicación sin configurar autenticación
-                  </p>
-                </div>
+                {/* Usuario de prueba - Solo en preview/desarrollo */}
+                {shouldShowTestUser() && (
+                  <div className="space-y-3">
+                    <Button onClick={handleTestLogin} variant="secondary" className="w-full">
+                      🧪 Entrar como Usuario de Prueba
+                    </Button>
+                    <p className="text-xs text-muted-foreground text-center">
+                      Para probar la aplicación sin configurar autenticación
+                    </p>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </div>
