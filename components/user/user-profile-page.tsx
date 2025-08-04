@@ -188,6 +188,46 @@ export function UserProfilePage({ user, onBack, onReviewClick, onEditReview }: U
 
       console.log(`Eliminando reseña ${reviewId} con ${photoUrls.length} fotos`)
 
+      // Calcular los puntos a restar
+      let pointsToSubtract = 100 // Puntos base por reseña
+
+      // Puntos por fotos
+      if (photoUrls.length > 0) {
+        pointsToSubtract += 50
+      }
+
+      // Puntos por reseña extensa (50 puntos si el comentario tiene más de 300 caracteres)
+      if (reviewToDelete.comment && reviewToDelete.comment.length > 300) {
+        pointsToSubtract += 50
+      }
+
+      // Si es la última reseña del lugar, significa que fue la primera reseña
+      // Por lo tanto, también hay que restar los 500 puntos del bonus
+      if (isLastReview) {
+        pointsToSubtract += 500
+        console.log(`Esta era la primera reseña del lugar. Restando 500 puntos adicionales del bonus.`)
+      }
+
+      console.log(`Restando ${pointsToSubtract} puntos del usuario`)
+
+      // Restar los puntos del usuario
+      const { error: pointsError } = await supabase
+        .from("users")
+        .update({
+          points: Math.max(0, userStats.totalPoints - pointsToSubtract), // Asegurar que no sea negativo
+        })
+        .eq("id", user.id)
+
+      if (pointsError) {
+        console.warn("Error actualizando puntos del usuario:", pointsError)
+      }
+
+      // Actualizar el estado local de puntos
+      setUserStats((prev) => ({
+        ...prev,
+        totalPoints: Math.max(0, prev.totalPoints - pointsToSubtract),
+      }))
+
       // Eliminar fotos primero
       if (photoUrls.length > 0) {
         console.log("Eliminando fotos:", photoUrls)

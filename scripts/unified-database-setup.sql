@@ -418,7 +418,7 @@ INSERT INTO category_achievements (category, level, name, description, required_
 ('BARES', 1, 'Primer After', 'Iniciando en la vida nocturna', 2, 150, '🍺', '#F59E0B'),
 ('BARES', 2, 'Fan de las IPAs', 'Conocedor de cervezas artesanales', 4, 300, '🍻', '#D97706'),
 ('BARES', 3, 'Crítico de Cervezas', 'Tu paladar distingue cada estilo', 6, 600, '🎯', '#B45309'),
-('BARES', 4, 'Maestro del After Office', 'Leyenda de los after office', 10, 1000, '🏆', '#92400E');
+('BARES', 4, 'Maestro del After Office', 'Leyenda de los after office', 10, 1000, '���', '#92400E');
 
 -- HELADERÍAS (nueva categoría)
 INSERT INTO category_achievements (category, level, name, description, required_reviews, points_reward, icon, color) VALUES
